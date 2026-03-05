@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -9,21 +10,25 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/joshuasantos/liham/internal/preview"
 	"github.com/joshuasantos/liham/internal/source"
+	"github.com/joshuasantos/liham/internal/watcher"
 )
 
 var statusStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("240"))
 
 type Model struct {
-	config     Config
-	source     source.Model
-	preview    preview.Model
-	focus      FocusTarget
-	syncScroll bool
-	keys       keyMap
-	width      int
-	height     int
-	ready      bool
+	config        Config
+	source        source.Model
+	preview       preview.Model
+	focus         FocusTarget
+	syncScroll    bool
+	keys          keyMap
+	width         int
+	height        int
+	ready         bool
+	program       *tea.Program
+	watcherCancel context.CancelFunc
+	fileDeleted   bool
 }
 
 func New(cfg Config) Model {
@@ -54,6 +59,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, m.keys.Quit):
+			m.stopWatcher()
 			return m, tea.Quit
 
 		case key.Matches(msg, m.keys.Tab):
@@ -72,6 +78,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd := m.routeScroll(msg)
 			return m, cmd
 		}
+
+	case programMsg:
+		m.program = msg.p
+		// if we're already ready (got WindowSizeMsg first), start watcher now
+		if m.ready {
+			m.startWatcher()
+		}
+		return m, nil
+
+	case watcher.FileChangedMsg:
+		m.fileDeleted = false
+		content := string(msg.Content)
+		m.source.SetContent(content)
+		// render in background
+		return m, func() tea.Msg {
+			return RenderCompleteMsg{Output: content}
+		}
+
+	case RenderCompleteMsg:
+		m.preview.SetContent(msg.Output)
+		return m, nil
+
+	case watcher.FileDeletedMsg:
+		m.fileDeleted = true
+		m.stopWatcher()
+		return m, nil
 	}
 
 	// forward to both panes
@@ -118,20 +150,19 @@ func (m *Model) resize() {
 		m.height,
 	)
 
-	// preserve scroll positions
 	sourcePct := m.source.ScrollPercent()
 	previewPct := m.preview.ScrollPercent()
 
 	m.source.SetSize(paneW, paneH)
 	m.preview.SetSize(paneW, paneH)
 
-	// load file content on first ready
 	if !m.ready {
 		m.ready = true
 		m.source.SetFocused(m.focus == FocusSource)
 		m.preview.SetFocused(m.focus == FocusPreview)
 		if m.config.FilePath != "" {
 			m.loadFile(m.config.FilePath)
+			m.startWatcher()
 		}
 	} else {
 		m.source.SetScrollPercent(sourcePct)
@@ -148,6 +179,22 @@ func (m *Model) loadFile(path string) {
 	content := string(data)
 	m.source.SetContent(content)
 	m.preview.SetContent(content)
+}
+
+func (m *Model) startWatcher() {
+	if m.config.NoWatch || m.config.FilePath == "" || m.program == nil {
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	m.watcherCancel = cancel
+	_ = watcher.Watch(ctx, m.config.FilePath, m.program)
+}
+
+func (m *Model) stopWatcher() {
+	if m.watcherCancel != nil {
+		m.watcherCancel()
+		m.watcherCancel = nil
+	}
 }
 
 func (m *Model) toggleFocus() {
@@ -177,6 +224,12 @@ func (m *Model) routeScroll(msg tea.Msg) tea.Cmd {
 }
 
 func (m Model) statusBar() string {
+	if m.fileDeleted {
+		return statusStyle.Width(m.width).
+			Foreground(lipgloss.Color("196")).
+			Render("⚠ file deleted — source shows last known content")
+	}
+
 	sync := "off"
 	if m.syncScroll {
 		sync = "on"
@@ -196,10 +249,17 @@ func (m Model) statusBar() string {
 	return statusStyle.Width(m.width).Render(hints)
 }
 
+// programMsg is sent internally to give the model access to the program for p.Send()
+type programMsg struct{ p *tea.Program }
+
 // Run starts the TUI program
 func Run(cfg Config) error {
 	m := New(cfg)
 	p := tea.NewProgram(m)
+	// send program reference so the model can use p.Send() for the watcher
+	go func() {
+		p.Send(programMsg{p: p})
+	}()
 	_, err := p.Run()
 	return err
 }

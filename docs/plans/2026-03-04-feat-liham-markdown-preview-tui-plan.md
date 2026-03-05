@@ -271,14 +271,14 @@ func (m Model) View() tea.View {
 **Goal:** Navigate within and between panes.
 
 Tasks:
-- [ ] Focus state tracking (left/right) with visual border highlight on focused pane — `internal/app/focus.go`
-- [ ] `tab` to toggle focus — `internal/app/keys.go`
-- [ ] `j`/`k`/arrows route to focused pane's viewport — `internal/app/model.go`
-- [ ] Mouse scroll enabled by default (Bubbletea v2 `tea.MouseWheelMsg`) — `internal/app/model.go`
-- [ ] Percentage-based scroll sync: when enabled, scrolling one pane sets the other to the same % — `internal/app/model.go`
+- [x] Focus state tracking (left/right) with visual border highlight on focused pane — `internal/app/focus.go`
+- [x] `tab` to toggle focus — `internal/app/keys.go`
+- [x] `j`/`k`/arrows route to focused pane's viewport — `internal/app/model.go`
+- [x] Mouse scroll enabled by default (Bubbletea v2 `tea.MouseWheelMsg`) — `internal/app/model.go`
+- [x] Percentage-based scroll sync: when enabled, scrolling one pane sets the other to the same % — `internal/app/model.go`
   - **BLOCKER GUARD:** protect against division-by-zero when `TotalLines <= ViewportHeight`
-- [ ] `s` to toggle scroll sync on/off — `internal/app/keys.go`
-- [ ] `--sync-scroll` flag to start with sync enabled — `cmd/root.go`
+- [x] `s` to toggle scroll sync on/off — `internal/app/keys.go`
+- [x] `--sync-scroll` flag to start with sync enabled — `cmd/root.go`
 
 **Success criteria:** Tab between panes, scroll independently or in sync. Mouse wheel works. No panic on short files.
 
@@ -328,18 +328,18 @@ var (
 **Goal:** Preview auto-updates when the file is saved externally.
 
 Tasks:
-- [ ] fsnotify wrapper that watches the **parent directory** (not the file itself) — `internal/watcher/watcher.go`
+- [x] fsnotify wrapper that watches the **parent directory** (not the file itself) — `internal/watcher/watcher.go`
   - watches parent dir and filters events matching target filename
   - handles atomic saves (Neovim/Vim write temp file then rename over original — fsnotify loses inode watch on rename, so watching parent dir catches the CREATE event for the new file)
-  - **BLOCKER:** debounce timer (50-100ms) — a single Neovim save fires CREATE+WRITE+CHMOD (2-4 events). Use `time.AfterFunc` to collapse into one re-read
+  - **BLOCKER:** debounce timer (80ms) with `time.AfterFunc` to collapse event bursts
   - skip vim temp files: ignore filenames matching `4913`, `*~`, `.swp`, `.swx`
-- [ ] `FileChangedMsg` custom message type — `internal/app/messages.go`
-- [ ] Use `p.Send()` pattern: watcher goroutine sends messages into the `tea.Program` event loop — `internal/watcher/watcher.go`
-- [ ] Watcher accepts `context.Context` for clean cancellation — `internal/watcher/watcher.go`
-- [ ] On `FileChangedMsg`: re-read file, update source pane content, re-render preview as async `tea.Cmd` — `internal/app/model.go`
-- [ ] `--no-watch` flag to disable — `cmd/root.go`
-- [ ] Handle file deletion: show "file deleted" message in preview pane, keep source at last-known content, stop watcher — `internal/app/model.go`
-- [ ] Stop watcher cleanly when returning to browser mode (cancel context, prevent goroutine leak) — `internal/app/model.go`
+- [x] `FileChangedMsg` custom message type — `internal/watcher/watcher.go`
+- [x] Use `p.Send()` pattern: watcher goroutine sends messages into the `tea.Program` event loop — `internal/watcher/watcher.go`
+- [x] Watcher accepts `context.Context` for clean cancellation — `internal/watcher/watcher.go`
+- [x] On `FileChangedMsg`: re-read file, update source pane content, re-render preview as async `tea.Cmd` — `internal/app/model.go`
+- [x] `--no-watch` flag to disable — `cmd/root.go`
+- [x] Handle file deletion: show "file deleted" message in status bar, keep source at last-known content, stop watcher — `internal/app/model.go`
+- [x] Stop watcher cleanly when returning to browser mode (cancel context, prevent goroutine leak) — `internal/app/model.go`
 
 **Success criteria:** Edit file in separate terminal, save, preview updates within ~200ms. No duplicate renders on single save.
 
