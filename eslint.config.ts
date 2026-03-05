@@ -41,6 +41,11 @@ export default tseslint.config(
 				{ prefer: 'type-imports', fixStyle: 'inline-type-imports' },
 			],
 			'@typescript-eslint/no-explicit-any': 'error',
+			// TODO: enable once there's code to validate against
+			// '@typescript-eslint/strict-boolean-expressions': [
+			// 	'error',
+			// 	{ allowString: false, allowNumber: false, allowNullableObject: true },
+			// ],
 
 			// --- type-aware ---
 			'@typescript-eslint/no-floating-promises': 'error',
@@ -53,6 +58,10 @@ export default tseslint.config(
 			'no-empty': ['error', { allowEmptyCatch: false }],
 		},
 	},
+	// TODO: add eslint-plugin-boundaries once modules have content
+	// enforce: cli -> app -> pipeline/components/browser/source/preview/watcher/theme
+	//          pipeline -> components (not reverse)
+	//          components -> theme
 	{
 		ignores: ['dist/', 'node_modules/', '**/*.js', '**/*.mjs'],
 	},
