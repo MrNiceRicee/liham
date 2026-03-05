@@ -30,7 +30,7 @@ export default tseslint.config(
 			'sonarjs/no-nested-assignment': 'warn',
 			'sonarjs/no-nested-functions': 'warn',
 			'sonarjs/no-hardcoded-ip': 'warn',
-			'sonarjs/todo-tag': 'off',
+			'sonarjs/todo-tag': 'warn',
 			'sonarjs/prefer-read-only-props': 'warn',
 			'sonarjs/deprecation': 'error',
 
