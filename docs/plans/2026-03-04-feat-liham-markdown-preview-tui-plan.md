@@ -180,35 +180,35 @@ liham/
 **Goal:** `liham README.md` opens and displays a static split-pane view.
 
 Tasks:
-- [ ] `go mod init github.com/joshuasantos/liham` — `main.go`
-- [ ] `go get` all dependencies — `go.mod`:
+- [x] `go mod init github.com/joshuasantos/liham` — `main.go`
+- [x] `go get` all dependencies — `go.mod`:
   - `charm.land/bubbletea/v2`
   - `charm.land/lipgloss/v2`
   - `charm.land/bubbles/v2`
   - `github.com/charmbracelet/glamour`
   - `github.com/fsnotify/fsnotify`
   - `github.com/spf13/cobra`
-- [ ] `git init` + initial commit
-- [ ] Cobra root command with positional arg for file path — `cmd/root.go`
+- [x] `git init` + initial commit
+- [x] Cobra root command with positional arg for file path — `cmd/root.go`
   - Use `RunE` (not `Run`) for error returns
   - Construct `Config` struct, pass to `app.New(cfg)`
   - Validate file path with `filepath.Abs()` + `filepath.EvalSymlinks()`
-- [ ] Config struct for Cobra→Bubbletea handoff — `internal/app/config.go`
-- [ ] Custom message types — `internal/app/messages.go`
-- [ ] Root app model with basic window size handling — `internal/app/model.go`
+- [x] Config struct for Cobra→Bubbletea handoff — `internal/app/config.go`
+- [x] Custom message types — `internal/app/messages.go`
+- [x] Root app model with basic window size handling — `internal/app/model.go`
   - Lazy viewport init: don't set dimensions until first `tea.WindowSizeMsg`
-  - Root `View()` returns `tea.View` with `AltScreen = true`, `MouseMode = tea.MouseModeNormal`
-- [ ] Source pane model: load file content into viewport — `internal/source/model.go`
+  - Root `View()` returns `tea.View` with `AltScreen = true`, `MouseMode = tea.MouseModeCellMotion`
+- [x] Source pane model: load file content into viewport — `internal/source/model.go`
   - Use `viewport.New(viewport.WithWidth(w), viewport.WithHeight(h))`
   - Child `View()` returns `string`
-- [ ] Preview pane model: render markdown with Glamour, display in viewport — `internal/preview/model.go`
+- [x] Preview pane model: render markdown with Glamour, display in viewport — `internal/preview/model.go`
   - Create Glamour renderer once, cache rendered output
   - `glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(width))`
   - Rebuild renderer only on width change
-- [ ] Theme config struct with `glamour.WithAutoStyle()` — `internal/app/theme.go`
-- [ ] Layout types and split logic — `internal/app/layout.go`
+- [x] Theme config struct with `glamour.WithAutoStyle()` — `internal/app/theme.go`
+- [x] Layout types and split logic — `internal/app/layout.go`
   - `lipgloss.JoinHorizontal()` for side-by-side, 50/50 split
-- [ ] `q` / `ctrl+c` to quit — `internal/app/keys.go`
+- [x] `q` / `ctrl+c` to quit — `internal/app/keys.go`
 
 **Success criteria:** Run `liham README.md`, see raw source on left, rendered preview on right. Quit with `q`.
 
