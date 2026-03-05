@@ -80,6 +80,30 @@ func init() {
 	rootCmd.Flags().BoolVar(&sourceOnly, "source-only", false, "show only raw source")
 	rootCmd.Flags().BoolVar(&noWatch, "no-watch", false, "disable file watching")
 	rootCmd.Flags().BoolVar(&syncScroll, "sync-scroll", false, "start with scroll sync enabled")
+
+	rootCmd.CompletionOptions.HiddenDefaultCmd = true
+	rootCmd.AddCommand(completionCmd)
+}
+
+var completionCmd = &cobra.Command{
+	Use:   "completion [bash|zsh|fish|powershell]",
+	Short: "generate shell completion script",
+	Args:  cobra.ExactArgs(1),
+	ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		switch args[0] {
+		case "bash":
+			return rootCmd.GenBashCompletion(os.Stdout)
+		case "zsh":
+			return rootCmd.GenZshCompletion(os.Stdout)
+		case "fish":
+			return rootCmd.GenFishCompletion(os.Stdout, true)
+		case "powershell":
+			return rootCmd.GenPowerShellCompletionWithDesc(os.Stdout)
+		default:
+			return fmt.Errorf("unsupported shell: %s", args[0])
+		}
+	},
 }
 
 func Execute() error {
