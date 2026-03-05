@@ -58,6 +58,13 @@ export default tseslint.config(
 			'no-empty': ['error', { allowEmptyCatch: false }],
 		},
 	},
+	{
+		// react components naturally return different JSX element shapes
+		files: ['**/*.tsx'],
+		rules: {
+			'sonarjs/function-return-type': 'off',
+		},
+	},
 	// TODO: add eslint-plugin-boundaries once modules have content
 	// enforce: cli -> app -> pipeline/components/browser/source/preview/watcher/theme
 	//          pipeline -> components (not reverse)

@@ -5,7 +5,7 @@
 		"module": "Preserve",
 		"moduleDetection": "force",
 		"jsx": "react-jsx",
-		// TODO: set jsxImportSource per OpenTUI requirements once installed
+		"jsxImportSource": "@opentui/react",
 
 		"moduleResolution": "bundler",
 		"allowImportingTsExtensions": true,

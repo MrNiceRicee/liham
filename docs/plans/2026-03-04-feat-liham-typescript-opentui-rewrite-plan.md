@@ -364,13 +364,13 @@ Build the pipeline AND a minimal OpenTUI app in a single phase. This validates t
 
 ##### Phase 2a: Pipeline Core + 4 Components
 
-- [ ] Install unified.js ecosystem: `unified`, `remark-parse`, `remark-gfm`, `remark-rehype`, `rehype-highlight`
-- [ ] Install OpenTUI: `@opentui/core`, `@opentui/react`
-- [ ] Create `sanitizeForTerminal()` in `src/pipeline/sanitize.ts`:
-  - [ ] Strip bytes `0x00-0x1f` (except `\n`, `\t`) and `0x7f`
-  - [ ] Strip ESC byte (`0x1b`) to prevent terminal escape injection
-  - [ ] This is the SOLE path for all text output to terminal
-- [ ] Create pipeline module (`src/pipeline/processor.ts`):
+- [x] Install unified.js ecosystem: `unified`, `remark-parse`, `remark-gfm`, `remark-rehype`, `rehype-highlight`
+- [x] Install OpenTUI: `@opentui/core`, `@opentui/react`
+- [x] Create `sanitizeForTerminal()` in `src/pipeline/sanitize.ts`:
+  - [x] Strip bytes `0x00-0x1f` (except `\n`, `\t`) and `0x7f`
+  - [x] Strip ESC byte (`0x1b`) to prevent terminal escape injection
+  - [x] This is the SOLE path for all text output to terminal
+- [x] Create pipeline module (`src/pipeline/processor.ts`):
   ```typescript
   const processor = unified()
     .use(remarkParse)
@@ -379,28 +379,28 @@ Build the pipeline AND a minimal OpenTUI app in a single phase. This validates t
     .use(rehypeHighlight)
     .use(rehypeTerminal, { components: componentMap, theme })
   ```
-  - [ ] Add `CompileResultMap` type augmentation for `ReactNode`
-  - [ ] Pipeline returns `Result<ReactNode, PipelineError>` (discriminated union, no throws across boundary)
-  - [ ] Add 5-second execution timeout to mitigate ReDoS from rehype-highlight
-- [ ] Create rehype-terminal plugin (`src/pipeline/rehype-terminal.ts`):
-  - [ ] Assign `this.compiler` (lowercase c -- modern unified API)
-  - [ ] Recursive dispatch pattern (model after `hast-util-to-jsx-runtime`)
-  - [ ] Thread `state.ancestors` for parent context (code inside pre vs inline)
-  - [ ] `state.components` for tag-to-component mapping (extensible)
-  - [ ] All text nodes pass through `sanitizeForTerminal()` before output
-  - [ ] Unknown nodes: `file.message()` warning + render children as plain text
-  - [ ] Output goes to `file.result` (not `file.value`)
-- [ ] Implement 4 core components:
-  - [ ] `Heading.tsx` -- h1-h6 with level-based styling
-  - [ ] `Paragraph.tsx` -- wraps inline children
-  - [ ] `CodeBlock.tsx` -- syntax-highlighted, bordered
-  - [ ] `Fallback.tsx` -- unknown node handler
-- [ ] Create theme types (`src/theme/types.ts`) + basic dark theme
-- [ ] Create minimal OpenTUI app that renders pipeline output in a `<scrollbox>`:
-  - [ ] Parse a markdown file, run pipeline, render in scrollable viewport
-  - [ ] Keyboard navigation: j/k, arrows for scroll
-  - [ ] **Measure: pipeline time for 500-line file, scroll frame rate with 200+ components**
-- [ ] Write tests: markdown string in -> verify component tree structure out
+  - [x] Add `CompileResultMap` type augmentation for `ReactNode`
+  - [x] Pipeline returns `Result<ReactNode, PipelineError>` (discriminated union, no throws across boundary)
+  - [x] Add 5-second execution timeout to mitigate ReDoS from rehype-highlight
+- [x] Create rehype-terminal plugin (`src/pipeline/rehype-terminal.ts`):
+  - [x] Assign `this.compiler` (lowercase c -- modern unified API)
+  - [x] Recursive dispatch pattern (model after `hast-util-to-jsx-runtime`)
+  - [x] Thread `state.ancestors` for parent context (code inside pre vs inline)
+  - [x] `state.components` for tag-to-component mapping (extensible)
+  - [x] All text nodes pass through `sanitizeForTerminal()` before output
+  - [x] Unknown nodes: `file.message()` warning + render children as plain text
+  - [x] Output goes to `file.result` (not `file.value`)
+- [x] Implement 4 core components:
+  - [x] `Heading.tsx` -- h1-h6 with level-based styling
+  - [x] `Paragraph.tsx` -- wraps inline children
+  - [x] `CodeBlock.tsx` -- syntax-highlighted, bordered
+  - [x] `Fallback.tsx` -- unknown node handler
+- [x] Create theme types (`src/theme/types.ts`) + basic dark theme
+- [x] Create minimal OpenTUI app that renders pipeline output in a `<scrollbox>`:
+  - [x] Parse a markdown file, run pipeline, render in scrollable viewport
+  - [x] Keyboard navigation: j/k, arrows for scroll
+  - [x] **Measure: pipeline time for 500-line file, scroll frame rate with 200+ components**
+- [x] Write tests: markdown string in -> verify component tree structure out
 
 **Performance gate:** If pipeline > 200ms for 500 lines or scroll < 30fps, STOP and investigate before proceeding. Options: component tree virtualization, worker thread, or reconsider OpenTUI.
 
