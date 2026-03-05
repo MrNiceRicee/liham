@@ -1,0 +1,33 @@
+{
+	"name": "liham",
+	"version": "2.0.0-alpha.0",
+	"description": "Terminal markdown previewer TUI",
+	"module": "src/index.ts",
+	"type": "module",
+	"private": true,
+	"bin": {
+		"liham": "src/cli/index.ts"
+	},
+	"scripts": {
+		"dev": "bun run src/index.ts",
+		"lint": "eslint src/",
+		"format": "biome format --write",
+		"format:check": "biome format",
+		"typecheck": "tsc --noEmit",
+		"check": "bun run typecheck && bun run lint && bun run format:check",
+		"test": "bun test"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.5",
+		"@eslint/js": "^10.0.1",
+		"@types/bun": "latest",
+		"eslint": "^10.0.2",
+		"eslint-plugin-perfectionist": "^5.6.0",
+		"eslint-plugin-sonarjs": "^4.0.0",
+		"jiti": "^2.6.1",
+		"typescript-eslint": "^8.56.1"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	}
+}
