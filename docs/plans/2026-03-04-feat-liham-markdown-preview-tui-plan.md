@@ -420,14 +420,14 @@ case RenderCompleteMsg:
 **Goal:** Support `--preview-only`, `--source-only`, `--layout top`.
 
 Tasks:
-- [ ] Layout enum: `side` (default), `top` — `internal/app/layout.go`
-- [ ] `--layout` flag with validation (reject invalid values at Cobra level) — `cmd/root.go`
-- [ ] `lipgloss.JoinVertical()` for top/bottom layout — `internal/app/layout.go`
-- [ ] `--preview-only` flag: single pane, full-width rendered preview — `cmd/root.go`, `internal/app/model.go`
-- [ ] `--source-only` flag: single pane, full-width raw source — `cmd/root.go`, `internal/app/model.go`
-- [ ] Flag conflict handling: `--preview-only` / `--source-only` override `--layout` — `cmd/root.go`
-- [ ] `--preview-only` + `--source-only` together → exit with error: "flags are mutually exclusive" — `cmd/root.go`
-- [ ] Keybindings adapt: no `tab` in single-pane modes, no scroll sync — `internal/app/keys.go`
+- [x] Layout enum: `side` (default), `top` — `internal/app/config.go`
+- [x] `--layout` flag with validation (reject invalid values at Cobra level) — `cmd/root.go`
+- [x] `lipgloss.JoinVertical()` for top/bottom layout — `internal/app/layout.go`
+- [x] `--preview-only` flag: single pane, full-width rendered preview — `cmd/root.go`, `internal/app/model.go`
+- [x] `--source-only` flag: single pane, full-width raw source — `cmd/root.go`, `internal/app/model.go`
+- [x] Flag conflict handling: `--preview-only` / `--source-only` override `--layout` — `cmd/root.go`
+- [x] `--preview-only` + `--source-only` together → exit with error: "flags are mutually exclusive" — `cmd/root.go`
+- [x] Keybindings adapt: no `tab` in single-pane modes, no scroll sync — `internal/app/model.go`
 
 **Success criteria:** All three layout modes render correctly. Flags compose without errors.
 
@@ -487,20 +487,19 @@ PreRunE: func(cmd *cobra.Command, args []string) error {
 **Goal:** `liham` with no args opens a fuzzy file picker.
 
 Tasks:
-- [ ] Browser model: Bubbles `list` with built-in filtering enabled — `internal/browser/model.go`
-  - `list.New()` + `SetFilteringEnabled(true)` for built-in substring matching
+- [x] Browser model: Bubbles `list` with built-in filtering enabled — `internal/browser/model.go`
+  - `list.New()` with filtering enabled by default in bubbles v2
   - No separate `textinput` needed — list v2 has filtering built in
-- [ ] Walk directory tree up to 3 levels deep, collect `.md` files — `internal/browser/model.go`
-  - Use `filepath.WalkDir` (not `filepath.Walk`) — does not follow symlinks by default
-  - Cap file count at 1000 to prevent UI stall on huge repos
-  - Run directory scan as async `tea.Cmd` → send `DirScanCompleteMsg`
-- [ ] `enter` to select file → send `FileSelectedMsg` → transition to preview mode — `internal/app/model.go`
-- [ ] `esc` / `b` from preview mode → return to browser, restore filter/scroll state — `internal/app/model.go`
+- [x] Walk directory tree up to 3 levels deep, collect `.md` files — `internal/browser/model.go`
+  - Uses `filepath.WalkDir` — does not follow symlinks by default
+  - Cap file count at 1000, async scan as `tea.Cmd`
+- [x] `enter` to select file → send `FileSelectedMsg` → transition to preview mode — `internal/app/model.go`
+- [x] `esc` / `b` from preview mode → return to browser, restore filter/scroll state — `internal/app/model.go`
   - browser model is retained in parent model while preview is active (not recreated)
-  - `esc` in browser mode (no prior file view) → clears search filter (does not quit)
-- [ ] Cobra: detect no-arg invocation → start in browser mode — `cmd/root.go`
-- [ ] Cobra: detect directory arg (`liham ./docs`) → browser scoped to that directory — `cmd/root.go`
-- [ ] Start file watcher when opening a file from browser — `internal/app/model.go`
+  - `esc` in browser mode → handled by list's built-in filter (clears filter, does not quit)
+- [x] Cobra: detect no-arg invocation → start in browser mode — `cmd/root.go`
+- [x] Cobra: detect directory arg (`liham ./docs`) → browser scoped to that directory — `cmd/root.go`
+- [x] Start file watcher when opening a file from browser — `internal/app/model.go`
 
 **Success criteria:** `liham` shows .md files, type to filter, enter to open, esc to go back. State preserved on return.
 

@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
+	"github.com/joshuasantos/liham/internal/browser"
 	"github.com/joshuasantos/liham/internal/preview"
 	"github.com/joshuasantos/liham/internal/source"
 	"github.com/joshuasantos/liham/internal/watcher"
@@ -18,8 +19,10 @@ var statusStyle = lipgloss.NewStyle().
 
 type Model struct {
 	config        Config
+	mode          Mode
 	source        source.Model
 	preview       preview.Model
+	browser       browser.Model
 	focus         FocusTarget
 	syncScroll    bool
 	keys          keyMap
@@ -29,10 +32,11 @@ type Model struct {
 	program       *tea.Program
 	watcherCancel context.CancelFunc
 	fileDeleted   bool
+	currentFile   string
 }
 
 func New(cfg Config) Model {
-	return Model{
+	m := Model{
 		config:     cfg,
 		source:     source.New(),
 		preview:    preview.New(),
@@ -40,9 +44,26 @@ func New(cfg Config) Model {
 		syncScroll: cfg.SyncScroll,
 		keys:       defaultKeyMap(),
 	}
+
+	// determine initial mode
+	if cfg.FilePath != "" {
+		m.mode = ModePreview
+	} else {
+		m.mode = ModeBrowser
+		dir := cfg.DirPath
+		if dir == "" {
+			dir, _ = os.Getwd()
+		}
+		m.browser = browser.New(dir)
+	}
+
+	return m
 }
 
 func (m Model) Init() tea.Cmd {
+	if m.mode == ModeBrowser {
+		return m.browser.ScanDir()
+	}
 	return nil
 }
 
@@ -56,42 +77,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resize()
 		return m, nil
 
-	case tea.KeyPressMsg:
-		switch {
-		case key.Matches(msg, m.keys.Quit):
-			m.stopWatcher()
-			return m, tea.Quit
-
-		case key.Matches(msg, m.keys.Tab):
-			if !m.config.PreviewOnly && !m.config.SourceOnly {
-				m.toggleFocus()
-			}
-			return m, nil
-
-		case key.Matches(msg, m.keys.SyncScroll):
-			if !m.config.PreviewOnly && !m.config.SourceOnly {
-				m.syncScroll = !m.syncScroll
-			}
-			return m, nil
-
-		case key.Matches(msg, m.keys.Up, m.keys.Down, m.keys.PageUp, m.keys.PageDown, m.keys.HalfUp, m.keys.HalfDown):
-			cmd := m.routeScroll(msg)
-			return m, cmd
-		}
-
 	case programMsg:
 		m.program = msg.p
-		// if we're already ready (got WindowSizeMsg first), start watcher now
-		if m.ready {
+		if m.ready && m.mode == ModePreview {
 			m.startWatcher()
 		}
 		return m, nil
+
+	case tea.KeyPressMsg:
+		return m.handleKey(msg)
 
 	case watcher.FileChangedMsg:
 		m.fileDeleted = false
 		content := string(msg.Content)
 		m.source.SetContent(content)
-		// render in background
 		return m, func() tea.Msg {
 			return RenderCompleteMsg{Output: content}
 		}
@@ -104,20 +103,72 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.fileDeleted = true
 		m.stopWatcher()
 		return m, nil
+
+	case browser.FileSelectedMsg:
+		return m.openFile(msg.Path)
 	}
 
-	// forward to both panes
-	var cmd tea.Cmd
-	m.source, cmd = m.source.Update(msg)
-	if cmd != nil {
-		cmds = append(cmds, cmd)
-	}
-	m.preview, cmd = m.preview.Update(msg)
-	if cmd != nil {
-		cmds = append(cmds, cmd)
+	// forward to active components
+	if m.mode == ModeBrowser {
+		var cmd tea.Cmd
+		m.browser, cmd = m.browser.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	} else {
+		var cmd tea.Cmd
+		m.source, cmd = m.source.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		m.preview, cmd = m.preview.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Quit):
+		// in browser mode, q quits. in preview mode from browser, q also quits.
+		m.stopWatcher()
+		return m, tea.Quit
+
+	case m.mode == ModePreview && (msg.String() == "esc" || msg.String() == "b"):
+		// only return to browser if we came from browser (DirPath set or no FilePath)
+		if m.config.FilePath == "" {
+			return m.returnToBrowser()
+		}
+		return m, nil
+
+	case m.mode == ModePreview && key.Matches(msg, m.keys.Tab):
+		if !m.config.PreviewOnly && !m.config.SourceOnly {
+			m.toggleFocus()
+		}
+		return m, nil
+
+	case m.mode == ModePreview && key.Matches(msg, m.keys.SyncScroll):
+		if !m.config.PreviewOnly && !m.config.SourceOnly {
+			m.syncScroll = !m.syncScroll
+		}
+		return m, nil
+
+	case m.mode == ModePreview && key.Matches(msg, m.keys.Up, m.keys.Down, m.keys.PageUp, m.keys.PageDown, m.keys.HalfUp, m.keys.HalfDown):
+		cmd := m.routeScroll(msg)
+		return m, cmd
+	}
+
+	// in browser mode, forward keys to browser (except q which was caught above)
+	if m.mode == ModeBrowser {
+		var cmd tea.Cmd
+		m.browser, cmd = m.browser.Update(msg)
+		return m, cmd
+	}
+
+	return m, nil
 }
 
 func (m Model) View() tea.View {
@@ -127,6 +178,11 @@ func (m Model) View() tea.View {
 
 	if !m.ready {
 		v.Content = "loading..."
+		return v
+	}
+
+	if m.mode == ModeBrowser {
+		v.Content = m.browser.View()
 		return v
 	}
 
@@ -142,6 +198,14 @@ func (m Model) View() tea.View {
 }
 
 func (m *Model) resize() {
+	if m.mode == ModeBrowser {
+		m.browser.SetSize(m.width, m.height)
+		if !m.ready {
+			m.ready = true
+		}
+		return
+	}
+
 	paneW, paneH := paneDimensions(
 		m.config.Layout,
 		m.config.PreviewOnly,
@@ -170,6 +234,50 @@ func (m *Model) resize() {
 	}
 }
 
+func (m *Model) openFile(path string) (tea.Model, tea.Cmd) {
+	m.mode = ModePreview
+	m.currentFile = path
+	m.fileDeleted = false
+
+	// size panes if we have dimensions
+	if m.width > 0 {
+		paneW, paneH := paneDimensions(
+			m.config.Layout,
+			m.config.PreviewOnly,
+			m.config.SourceOnly,
+			m.width,
+			m.height,
+		)
+		m.source.SetSize(paneW, paneH)
+		m.preview.SetSize(paneW, paneH)
+	}
+
+	m.source.SetFocused(m.focus == FocusSource)
+	m.preview.SetFocused(m.focus == FocusPreview)
+	m.loadFile(path)
+
+	// start watching the opened file
+	m.config.FilePath = ""
+	m.currentFile = path
+	m.startWatcherForFile(path)
+
+	return m, nil
+}
+
+func (m *Model) returnToBrowser() (tea.Model, tea.Cmd) {
+	m.stopWatcher()
+	m.mode = ModeBrowser
+	m.currentFile = ""
+	m.fileDeleted = false
+
+	// resize browser to current dimensions
+	if m.width > 0 {
+		m.browser.SetSize(m.width, m.height)
+	}
+
+	return m, nil
+}
+
 func (m *Model) loadFile(path string) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -185,9 +293,20 @@ func (m *Model) startWatcher() {
 	if m.config.NoWatch || m.config.FilePath == "" || m.program == nil {
 		return
 	}
+	m.stopWatcher()
 	ctx, cancel := context.WithCancel(context.Background())
 	m.watcherCancel = cancel
 	_ = watcher.Watch(ctx, m.config.FilePath, m.program)
+}
+
+func (m *Model) startWatcherForFile(path string) {
+	if m.config.NoWatch || m.program == nil {
+		return
+	}
+	m.stopWatcher()
+	ctx, cancel := context.WithCancel(context.Background())
+	m.watcherCancel = cancel
+	_ = watcher.Watch(ctx, path, m.program)
 }
 
 func (m *Model) stopWatcher() {
@@ -243,7 +362,11 @@ func (m Model) statusBar() string {
 		if m.focus == FocusPreview {
 			focus = "preview"
 		}
-		hints = fmt.Sprintf("tab: focus [%s] • s: sync [%s] • j/k: scroll • q: quit", focus, sync)
+		returnHint := ""
+		if m.currentFile != "" && m.config.FilePath == "" {
+			returnHint = "esc: back • "
+		}
+		hints = fmt.Sprintf("%stab: focus [%s] • s: sync [%s] • j/k: scroll • q: quit", returnHint, focus, sync)
 	}
 
 	return statusStyle.Width(m.width).Render(hints)
@@ -256,7 +379,6 @@ type programMsg struct{ p *tea.Program }
 func Run(cfg Config) error {
 	m := New(cfg)
 	p := tea.NewProgram(m)
-	// send program reference so the model can use p.Send() for the watcher
 	go func() {
 		p.Send(programMsg{p: p})
 	}()
