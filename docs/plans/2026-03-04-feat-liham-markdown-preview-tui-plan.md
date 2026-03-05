@@ -579,20 +579,20 @@ case tea.KeyPressMsg:
 **Goal:** Handle real-world usage gracefully.
 
 Tasks:
-- [ ] Invalid file path → exit with clear error message — `cmd/root.go`
+- [x] Invalid file path → exit with clear error message — `cmd/root.go`
   - Canonicalize with `filepath.Abs()` then `filepath.EvalSymlinks()`
-- [ ] Non-markdown file → open anyway, best-effort render — `internal/app/model.go`
-- [ ] Empty file → show empty panes, watcher still active — `internal/app/model.go`
-- [ ] Very large file (>1MB) → warn in status bar, debounce Glamour re-renders to prevent UI freeze — `internal/app/model.go`
-- [ ] Terminal resize → `tea.WindowSizeMsg` reflows all panes, preserves scroll percentage — `internal/app/model.go`
+- [x] Non-markdown file → open anyway, best-effort render — `internal/app/model.go`
+- [x] Empty file → show empty panes, watcher still active — `internal/app/model.go`
+- [x] Very large file (>1MB) → warn in status bar, debounce Glamour re-renders to prevent UI freeze — `internal/app/model.go`
+- [x] Terminal resize → `tea.WindowSizeMsg` reflows all panes, preserves scroll percentage — `internal/app/model.go`
   - Debounce resize handler (rapid resize events during drag)
-- [ ] Status bar at bottom: thin fixed-height row showing context-appropriate keybindings per mode — `internal/app/model.go`
-- [ ] Split ratio: 50/50 for both `side` and `top` layouts (configurable split is V2) — `internal/app/layout.go`
-- [ ] Mouse scroll on unfocused pane with sync enabled → scrolls both panes (follows cursor pane) — `internal/app/model.go`
-- [ ] Disambiguate file vs directory arg: check `os.Stat()`, handle symlinks — `cmd/root.go`
-- [ ] File browser: empty directory (no .md files found) → show message — `internal/browser/model.go`
-- [ ] File browser: permission errors on directory walk → skip and continue — `internal/browser/model.go`
-- [ ] Sanitize filenames for display (prevent terminal escape sequence injection) — `internal/browser/model.go`
+- [x] Status bar at bottom: thin fixed-height row showing context-appropriate keybindings per mode — `internal/app/model.go`
+- [x] Split ratio: 50/50 for both `side` and `top` layouts (configurable split is V2) — `internal/app/layout.go`
+- [x] Mouse scroll on unfocused pane with sync enabled → scrolls both panes (follows cursor pane) — `internal/app/model.go`
+- [x] Disambiguate file vs directory arg: check `os.Stat()`, handle symlinks — `cmd/root.go`
+- [x] File browser: empty directory (no .md files found) → show message — `internal/browser/model.go`
+- [x] File browser: permission errors on directory walk → skip and continue — `internal/browser/model.go`
+- [x] Sanitize filenames for display (prevent terminal escape sequence injection) — `internal/browser/model.go`
 
 **Success criteria:** No panics or weird rendering on edge cases. Resize is smooth.
 
@@ -647,26 +647,26 @@ case tea.WindowSizeMsg:
 
 ### Functional Requirements
 
-- [ ] `liham README.md` opens split-pane view (source left, preview right)
-- [ ] File watcher auto-updates preview on external save
-- [ ] `tab` toggles focus, `s` toggles scroll sync, `j`/`k`/arrows scroll
-- [ ] `esc`/`b` returns to file browser from preview mode
-- [ ] `liham` (no args) opens fuzzy file picker for .md files
-- [ ] `liham ./docs` scopes browser to that directory
-- [ ] `--preview-only`, `--source-only`, `--layout top|side` all work correctly
-- [ ] `--no-watch` disables file watcher
-- [ ] `--sync-scroll` starts with scroll sync enabled
-- [ ] Mouse scroll works by default
-- [ ] Glamour auto-detects dark/light terminal background
-- [ ] `q` / `ctrl+c` quits cleanly
+- [x] `liham README.md` opens split-pane view (source left, preview right)
+- [x] File watcher auto-updates preview on external save
+- [x] `tab` toggles focus, `s` toggles scroll sync, `j`/`k`/arrows scroll
+- [x] `esc`/`b` returns to file browser from preview mode
+- [x] `liham` (no args) opens fuzzy file picker for .md files
+- [x] `liham ./docs` scopes browser to that directory
+- [x] `--preview-only`, `--source-only`, `--layout top|side` all work correctly
+- [x] `--no-watch` disables file watcher
+- [x] `--sync-scroll` starts with scroll sync enabled
+- [x] Mouse scroll works by default
+- [x] Glamour auto-detects dark/light terminal background
+- [x] `q` / `ctrl+c` quits cleanly
 
 ### Non-Functional Requirements
 
-- [ ] Single static Go binary, no runtime dependencies
-- [ ] Preview update latency < 200ms after file save
-- [ ] No duplicate re-renders on single atomic save (debounce)
-- [ ] Smooth terminal resize handling
-- [ ] No panics on edge cases (empty file, deleted file, non-markdown, permission errors, short files with scroll sync)
+- [x] Single static Go binary, no runtime dependencies
+- [x] Preview update latency < 200ms after file save
+- [x] No duplicate re-renders on single atomic save (debounce)
+- [x] Smooth terminal resize handling
+- [x] No panics on edge cases (empty file, deleted file, non-markdown, permission errors, short files with scroll sync)
 
 ## Dependencies & Prerequisites
 

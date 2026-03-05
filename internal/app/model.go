@@ -32,6 +32,7 @@ type Model struct {
 	program       *tea.Program
 	watcherCancel context.CancelFunc
 	fileDeleted   bool
+	largeFile     bool
 	currentFile   string
 }
 
@@ -86,6 +87,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+
+	case tea.MouseWheelMsg:
+		if m.mode == ModePreview && m.syncScroll {
+			// scroll the focused pane and sync the other
+			cmd := m.routeScroll(msg)
+			return m, cmd
+		}
+		// without sync, let both panes handle mouse independently (fall through)
 
 	case watcher.FileChangedMsg:
 		m.fileDeleted = false
@@ -284,6 +293,7 @@ func (m *Model) loadFile(path string) {
 		m.source.SetContent(fmt.Sprintf("error reading file: %v", err))
 		return
 	}
+	m.largeFile = len(data) > 1024*1024 // >1MB
 	content := string(data)
 	m.source.SetContent(content)
 	m.preview.SetContent(content)
@@ -355,18 +365,20 @@ func (m Model) statusBar() string {
 	}
 
 	var hints string
+	if m.largeFile {
+		hints = "⚠ large file • "
+	}
 	if m.config.PreviewOnly || m.config.SourceOnly {
-		hints = fmt.Sprintf("scroll: j/k • sync: %s • q: quit", sync)
+		hints += fmt.Sprintf("scroll: j/k • sync: %s • q: quit", sync)
 	} else {
 		focus := "source"
 		if m.focus == FocusPreview {
 			focus = "preview"
 		}
-		returnHint := ""
 		if m.currentFile != "" && m.config.FilePath == "" {
-			returnHint = "esc: back • "
+			hints += "esc: back • "
 		}
-		hints = fmt.Sprintf("%stab: focus [%s] • s: sync [%s] • j/k: scroll • q: quit", returnHint, focus, sync)
+		hints += fmt.Sprintf("tab: focus [%s] • s: sync [%s] • j/k: scroll • q: quit", focus, sync)
 	}
 
 	return statusStyle.Width(m.width).Render(hints)
