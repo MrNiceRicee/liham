@@ -31,9 +31,10 @@ type Model struct {
 	ready         bool
 	program       *tea.Program
 	watcherCancel context.CancelFunc
-	fileDeleted   bool
-	largeFile     bool
-	currentFile   string
+	fileDeleted    bool
+	largeFile      bool
+	currentFile    string
+	pendingContent string
 }
 
 func New(cfg Config) Model {
@@ -49,6 +50,8 @@ func New(cfg Config) Model {
 	// determine initial mode
 	if cfg.FilePath != "" {
 		m.mode = ModePreview
+		// pre-load file content so it's ready on first render
+		m.preloadFile(cfg.FilePath)
 	} else {
 		m.mode = ModeBrowser
 		dir := cfg.DirPath
@@ -59,6 +62,15 @@ func New(cfg Config) Model {
 	}
 
 	return m
+}
+
+func (m *Model) preloadFile(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	m.largeFile = len(data) > 1024*1024
+	m.pendingContent = string(data)
 }
 
 func (m Model) Init() tea.Cmd {
@@ -76,7 +88,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.resize()
-		return m, nil
+		return m, func() tea.Msg { return repaintMsg{} }
 
 	case programMsg:
 		m.program = msg.p
@@ -181,28 +193,24 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() tea.View {
-	v := tea.NewView("")
-	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
-
-	if !m.ready {
-		v.Content = "loading..."
-		return v
-	}
+	var content string
 
 	if m.mode == ModeBrowser {
-		v.Content = m.browser.View()
-		return v
+		content = m.browser.View()
+	} else if m.ready {
+		panes := joinPanes(
+			m.config.Layout,
+			m.config.PreviewOnly,
+			m.config.SourceOnly,
+			m.source.View(),
+			m.preview.View(),
+		)
+		content = panes + "\n" + m.statusBar()
 	}
 
-	panes := joinPanes(
-		m.config.Layout,
-		m.config.PreviewOnly,
-		m.config.SourceOnly,
-		m.source.View(),
-		m.preview.View(),
-	)
-	v.Content = panes + "\n" + m.statusBar()
+	v := tea.NewView(content)
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
@@ -233,7 +241,12 @@ func (m *Model) resize() {
 		m.ready = true
 		m.source.SetFocused(m.focus == FocusSource)
 		m.preview.SetFocused(m.focus == FocusPreview)
-		if m.config.FilePath != "" {
+		if m.pendingContent != "" {
+			m.source.SetContent(m.pendingContent)
+			m.preview.SetContent(m.pendingContent)
+			m.pendingContent = ""
+			m.startWatcher()
+		} else if m.config.FilePath != "" {
 			m.loadFile(m.config.FilePath)
 			m.startWatcher()
 		}
@@ -383,6 +396,9 @@ func (m Model) statusBar() string {
 
 	return statusStyle.Width(m.width).Render(hints)
 }
+
+// repaintMsg forces a re-render cycle
+type repaintMsg struct{}
 
 // programMsg is sent internally to give the model access to the program for p.Send()
 type programMsg struct{ p *tea.Program }

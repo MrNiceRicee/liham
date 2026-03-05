@@ -57,6 +57,10 @@ func (m *Model) SetSize(w, h int) {
 		m.viewport.SoftWrap = true
 		m.ready = true
 		m.ensureRenderer(innerW)
+		// render any content that was set before the viewport was created
+		if m.raw != "" {
+			m.render()
+		}
 	} else {
 		m.viewport.SetWidth(innerW)
 		m.viewport.SetHeight(innerH)
@@ -137,6 +141,5 @@ func (m Model) View() string {
 	}
 	return style.
 		Width(m.width - 2).
-		Height(m.height - 2).
 		Render(m.viewport.View())
 }
