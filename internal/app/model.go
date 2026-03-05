@@ -41,7 +41,7 @@ func New(cfg Config) Model {
 	m := Model{
 		config:     cfg,
 		source:     source.New(),
-		preview:    preview.New(),
+		preview:    preview.New(cfg.GlamourStyle),
 		focus:      FocusSource,
 		syncScroll: cfg.SyncScroll,
 		keys:       defaultKeyMap(),
@@ -405,6 +405,14 @@ type programMsg struct{ p *tea.Program }
 
 // Run starts the TUI program
 func Run(cfg Config) error {
+	// detect terminal background while still in normal mode —
+	// must happen before tea.NewProgram enters alt screen
+	if lipgloss.HasDarkBackground(os.Stdin, os.Stderr) {
+		cfg.GlamourStyle = "dark"
+	} else {
+		cfg.GlamourStyle = "light"
+	}
+
 	m := New(cfg)
 	p := tea.NewProgram(m)
 	go func() {

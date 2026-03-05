@@ -29,10 +29,14 @@ type Model struct {
 	rendererWidth int
 	ready         bool
 	focused       bool
+	style         string
 }
 
-func New() Model {
-	return Model{}
+func New(style string) Model {
+	if style == "" {
+		style = "dark"
+	}
+	return Model{style: style}
 }
 
 func (m *Model) SetSize(w, h int) {
@@ -73,7 +77,7 @@ func (m *Model) SetSize(w, h int) {
 
 func (m *Model) ensureRenderer(width int) {
 	m.renderer, _ = glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
+		glamour.WithStandardStyle(m.style),
 		glamour.WithWordWrap(width),
 	)
 	m.rendererWidth = width

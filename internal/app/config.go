@@ -17,11 +17,12 @@ const (
 )
 
 type Config struct {
-	FilePath    string
-	DirPath     string
-	Layout      Layout
-	PreviewOnly bool
-	SourceOnly  bool
-	NoWatch     bool
-	SyncScroll  bool
+	FilePath     string
+	DirPath      string
+	Layout       Layout
+	PreviewOnly  bool
+	SourceOnly   bool
+	NoWatch      bool
+	SyncScroll   bool
+	GlamourStyle string
 }
