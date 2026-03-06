@@ -52,13 +52,58 @@ function measureColumnWidths(node: TableNode): number[] {
 	return colWidths
 }
 
+function measureHeaderWidths(node: TableNode): number[] {
+	for (const row of node.children) {
+		if (row.type !== 'tableRow' || !row.isHeader) continue
+		return row.children
+			.filter((c) => c.type === 'tableCell')
+			.map((cell) => (cell.type === 'tableCell' ? measureIRText(cell.children) : 0))
+	}
+	return []
+}
+
+// distributes available terminal width across columns when table overflows.
+// proportional to content width, with header width as minimum per column.
+function distributeColumnWidths(
+	contentWidths: number[],
+	headerWidths: number[],
+	terminalWidth: number,
+): number[] {
+	const numCols = contentWidths.length
+	const overhead = numCols + 1 + numCols * 2 + 2 // borders + cell padding + scrollbox padding
+	const available = terminalWidth - overhead
+	const totalContent = contentWidths.reduce((sum, w) => sum + w, 0)
+
+	// fits? use content-fitted
+	if (totalContent <= available) return contentWidths
+
+	// minimum = header width per column (at least 1 char)
+	const minWidths = contentWidths.map((_, i) => Math.max(headerWidths[i] ?? 1, 1))
+	const totalMin = minWidths.reduce((sum, w) => sum + w, 0)
+
+	// even minimums don't fit — use minimums, scrollbox handles overflow
+	if (totalMin >= available) return minWidths
+
+	// distribute excess space proportionally
+	const distributable = available - totalMin
+	const excessWidths = contentWidths.map((w, i) => Math.max(0, w - minWidths[i]!))
+	const totalExcess = excessWidths.reduce((sum, w) => sum + w, 0)
+
+	if (totalExcess === 0) return minWidths
+
+	return minWidths.map((min, i) => min + Math.floor((excessWidths[i]! / totalExcess) * distributable))
+}
+
 // -- rendering --
 
 export function renderTable(node: TableNode, key: string) {
 	const borderStyle: Record<string, unknown> = {}
 	if (node.style.borderColor != null) borderStyle['fg'] = node.style.borderColor
 
-	const colWidths = measureColumnWidths(node)
+	const contentWidths = measureColumnWidths(node)
+	const headerWidths = measureHeaderWidths(node)
+	const termWidth = process.stdout.columns || 80
+	const colWidths = distributeColumnWidths(contentWidths, headerWidths, termWidth)
 
 	const rows: ReactNode[] = []
 	for (let i = 0; i < node.children.length; i++) {
