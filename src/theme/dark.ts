@@ -2,9 +2,14 @@ import type { ThemeTokens } from './types.ts'
 
 export const darkTheme: ThemeTokens = {
 	heading: {
-		color: '#7aa2f7',
-		bold: true,
-		prefix: '#',
+		levels: {
+			1: { color: '#ff9e64', bold: true, dim: false }, // legendary — orange
+			2: { color: '#bb9af7', bold: true, dim: false }, // epic — purple
+			3: { color: '#7aa2f7', bold: true, dim: false }, // rare — blue
+			4: { color: '#2ac3de', bold: false, dim: false }, // uncommon — cyan
+			5: { color: '#9ece6a', bold: false, dim: false }, // common — green
+			6: { color: '#c0caf5', bold: false, dim: true }, // mundane — regular text, dimmed
+		},
 	},
 	codeBlock: {
 		borderColor: '#414868',
@@ -13,8 +18,8 @@ export const darkTheme: ThemeTokens = {
 		textColor: '#c0caf5',
 	},
 	blockquote: {
-		borderChar: '│',
 		borderColor: '#565f89',
+		backgroundColor: '#1e2030',
 		textColor: '#9aa5ce',
 	},
 	link: {

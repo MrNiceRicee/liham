@@ -5,11 +5,13 @@ import type { Element, ElementContent, Root, Text } from 'hast'
 import type { Plugin } from 'unified'
 import type { VFile } from 'vfile'
 
+import { TextAttributes } from '@opentui/core'
 import { createElement, type ReactNode } from 'react'
 
 import type { ThemeTokens } from '../theme/types.ts'
 import type { ComponentType } from '../types/components.ts'
 
+import { getListItemBullet } from '../components/block/List.tsx'
 import { sanitizeForTerminal } from './sanitize.ts'
 
 declare module 'unified' {
@@ -76,31 +78,40 @@ const HAST_BLOCK_TAGS = new Set([
 	'ul',
 ])
 
+// components that render children inside <box> (not <text>) need inline wrapping
+// components that render children inside <box> (not <text>) need inline wrapping
+const COMPONENTS_WITH_BOX_CHILDREN = new Set(['li', 'blockquote', 'td', 'th'])
+
+// block containers where whitespace-only text nodes should be stripped
+const STRIP_WHITESPACE_CONTAINERS = new Set(['ul', 'ol', 'table', 'thead', 'tbody', 'tfoot', 'tr'])
+
 function isHastBlockNode(node: ElementContent): boolean {
 	return node.type === 'element' && HAST_BLOCK_TAGS.has(node.tagName)
 }
 
-// creates children with optional block-context wrapping.
-// in block context, consecutive inline hast nodes get grouped into <text> wrappers.
-function createChildrenInner(
+// renders children without block-context wrapping — just maps each child through one()
+function createChildrenFlat(
 	state: CompilerState,
 	node: { children: ElementContent[] },
 	parentKey: string,
-	wrapInlines: boolean,
+	stripWhitespace: boolean,
 ): ReactNode[] {
-	if (!wrapInlines) {
-		const results: ReactNode[] = []
-		for (let i = 0; i < node.children.length; i++) {
-			const child = node.children[i]!
-			const result = one(state, child, `${parentKey}-${String(i)}`)
-			if (result != null) {
-				results.push(result)
-			}
-		}
-		return results
+	const results: ReactNode[] = []
+	for (let i = 0; i < node.children.length; i++) {
+		const child = node.children[i]!
+		if (stripWhitespace && child.type === 'text' && child.value.trim().length === 0) continue
+		const result = one(state, child, `${parentKey}-${String(i)}`)
+		if (result != null) results.push(result)
 	}
+	return results
+}
 
-	// block-context mode: group consecutive inline nodes into <text> wrappers
+// block-context mode: groups consecutive inline hast nodes into <text> wrappers
+function createChildrenWrapped(
+	state: CompilerState,
+	node: { children: ElementContent[] },
+	parentKey: string,
+): ReactNode[] {
 	const results: ReactNode[] = []
 	let inlineGroup: { node: ElementContent; index: number }[] = []
 	let wrapCount = 0
@@ -112,7 +123,9 @@ function createChildrenInner(
 			const result = one(state, item.node, `${parentKey}-${String(item.index)}`)
 			if (result != null) inlineResults.push(result)
 		}
-		if (inlineResults.length > 0) {
+		// skip <text> wrappers that would only contain whitespace
+		const hasContent = inlineResults.some((r) => typeof r !== 'string' || r.trim().length > 0)
+		if (inlineResults.length > 0 && hasContent) {
 			results.push(<text key={`${parentKey}-tw-${String(wrapCount++)}`}>{inlineResults}</text>)
 		}
 		inlineGroup = []
@@ -133,6 +146,18 @@ function createChildrenInner(
 	return results
 }
 
+// creates children with optional block-context wrapping
+function createChildren(
+	state: CompilerState,
+	node: { children: ElementContent[] },
+	parentKey: string,
+	wrapInlines: boolean,
+	stripWhitespace = false,
+): ReactNode[] {
+	if (wrapInlines) return createChildrenWrapped(state, node, parentKey)
+	return createChildrenFlat(state, node, parentKey, stripWhitespace)
+}
+
 function one(state: CompilerState, node: ElementContent | Root, key: string): ReactNode {
 	if (node.type === 'root') {
 		return root(state, node, key)
@@ -148,7 +173,7 @@ function one(state: CompilerState, node: ElementContent | Root, key: string): Re
 }
 
 function root(state: CompilerState, node: Root, key: string): ReactNode {
-	const children = createChildrenInner(
+	const children = createChildren(
 		state,
 		node as unknown as { children: ElementContent[] },
 		key,
@@ -166,13 +191,22 @@ function element(state: CompilerState, node: Element, key: string): ReactNode {
 	const Component = state.components[tagName]
 	const isInline = KNOWN_INLINE_TAGS.has(tagName)
 
-	// components handle their own <text> wrapping internally,
-	// so children should remain raw inline nodes.
-	// the Fallback path renders <box>, which needs inline wrapping.
-	const needsInlineWrapping = Component == null && !isInline
+	// inject bullet marker for list items so the ListItem component can render it
+	if (tagName === 'li') {
+		node.properties = node.properties ?? {}
+		node.properties['data-bullet'] = getListItemBullet(node, state.ancestors)
+	}
+
+	// block elements that render children inside <box> need inline wrapping.
+	// components like Heading/Paragraph wrap children in <text> themselves,
+	// but ListItem/Fallback use <box> — their children need <text> wrappers.
+	const componentUsesBox = COMPONENTS_WITH_BOX_CHILDREN.has(tagName)
+	const needsInlineWrapping = (Component == null && !isInline) || componentUsesBox
+
+	const stripWhitespace = STRIP_WHITESPACE_CONTAINERS.has(tagName)
 
 	state.ancestors.push(node)
-	const children = createChildrenInner(state, node, key, needsInlineWrapping)
+	const children = createChildren(state, node, key, needsInlineWrapping, stripWhitespace)
 	state.ancestors.pop()
 
 	if (Component != null) {
@@ -199,7 +233,7 @@ function element(state: CompilerState, node: Element, key: string): ReactNode {
 		return <span key={key}>{children}</span>
 	}
 
-	// unknown block element — children already wrapped by createChildrenInner
+	// unknown block element — children already wrapped by createChildren
 	return createElement(
 		state.fallback,
 		{ key, node, theme: state.theme },
@@ -276,13 +310,13 @@ function renderItalic(
 }
 
 function renderStrikethrough(
-	state: CompilerState,
+	_state: CompilerState,
 	_node: Element,
 	children: ReactNode[],
 	key: string,
 ): ReactNode {
 	return (
-		<span key={key} fg={state.theme.fallback.textColor}>
+		<span key={key} attributes={TextAttributes.STRIKETHROUGH}>
 			{children}
 		</span>
 	)

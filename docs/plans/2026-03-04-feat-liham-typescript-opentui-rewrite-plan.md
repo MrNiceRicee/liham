@@ -267,29 +267,23 @@ process.on('SIGTERM', () => { renderer.destroy(); process.exit(0) })
 
 ### Research Insights: Abstract Component Layer
 
-**Decouple rehype-terminal from OpenTUI** (architecture review). The plan creates a hard coupling between the rendering pipeline and the TUI framework. If OpenTUI proves unworkable, swapping requires rewriting rehype-terminal entirely.
+**Status: Planned and brainstormed.** See dedicated plan: `docs/plans/2026-03-05-refactor-renderer-abstraction-ir-layer-plan.md` and brainstorm: `docs/brainstorms/2026-03-05-renderer-abstraction-ir-layer-brainstorm.md`.
 
-Recommended architecture:
+The original idea of `TerminalNode[]` has evolved into a full IR (Intermediate Representation) layer with pre-resolved styles. Key changes from the original sketch:
 
+- Renamed from `TerminalNode` to `IRNode` (more accurate -- it's compiler IR, not terminal-specific)
+- IR carries pre-resolved theme styles (colors, bold flags) so renderers don't need theme access
+- Semantic inline nodes for markdown constructs + styled text for syntax highlighting
+- `CustomNode<T>` generic for extensibility
+- `processMarkdown` returns IR; renderer called separately
+- Inline `<text>` wrapping is a renderer concern, not compiler
+
+Architecture:
 ```
-rehype-terminal (hast walker)
-  -> produces TerminalNode[] (abstract representation)
-     -> OpenTUI adapter maps TerminalNode[] to React component tree
-```
-
-The `TerminalNode` discriminated union is the contract:
-
-```typescript
-type TerminalNode =
-  | { type: 'heading'; level: 1 | 2 | 3 | 4 | 5 | 6; children: TerminalNode[] }
-  | { type: 'codeBlock'; lang: string | undefined; value: string }
-  | { type: 'paragraph'; children: TerminalNode[] }
-  | { type: 'image'; src: string; alt: string }
-  | { type: 'text'; value: string; bold?: boolean; italic?: boolean; strikethrough?: boolean }
-  // ...exhaustive, each component
+markdown -> unified (remark/rehype) -> hast -> rehype-ir (compiler) -> IRNode tree -> renderer -> framework JSX
 ```
 
-This adds one layer but makes the OpenTUI dependency swappable. If OpenTUI fails validation, only the adapter rewrites -- the pipeline and terminal node definitions survive.
+This work is tracked as Phase 2c below.
 
 ### Key Technical Decisions
 
@@ -297,7 +291,7 @@ This adds one layer but makes the OpenTUI dependency swappable. If OpenTUI fails
 |----------|--------|-----------|
 | TUI framework | OpenTUI v0.1.x | built-in `<scrollbox>`, React reconciler, Zig backend (see brainstorm). Pin version. |
 | Rendering pipeline | unified.js | remark/rehype plugin ecosystem, proven architecture |
-| Final renderer | custom rehype-terminal | hast -> TerminalNode[] -> React component tree |
+| Final renderer | rehype-ir + renderer/opentui | hast -> IRNode tree -> OpenTUI JSX (see Phase 2c plan) |
 | Image protocol | Kitty Graphics | best quality, Kitty/WezTerm/Ghostty. Virtual placements (U+10EEEE) for scroll safety. |
 | Image fallback | ANSI half-block characters | pixel-approximated block chars (U+2580-U+259F with 24-bit color), not just alt-text |
 | Runtime | bun | required by OpenTUI (Bun-exclusive). Also provides `bun compile`. |
@@ -408,25 +402,39 @@ Build the pipeline AND a minimal OpenTUI app in a single phase. This validates t
 
 ##### Phase 2b: Remaining Components + Full Theme
 
-- [ ] Implement remaining block components:
-  - [ ] `Blockquote.tsx` -- left border, muted color
-  - [ ] `List.tsx` + `ListItem.tsx` -- nested, bullet/number
-  - [ ] `Table.tsx` tree -- formatted with borders (filter whitespace-only text children in table elements)
-  - [ ] `HorizontalRule.tsx` -- full-width line
-  - [ ] `Image.tsx` -- placeholder only (Kitty in Phase 7)
-- [ ] Implement inline components:
-  - [ ] `InlineCode.tsx` -- background-colored span
-  - [ ] `Strong.tsx`, `Emphasis.tsx`, `Strikethrough.tsx` -- inline formatting via OpenTUI intrinsics
-  - [ ] `Link.tsx` -- OSC 8 hyperlink with URL sanitization:
+Items pulled forward from 2b into 2a (done):
+- [x] `Blockquote.tsx` -- heavy left border + subtle background (`border: ['left']`, `borderStyle: 'heavy'`)
+- [x] `List.tsx` + `ListItem.tsx` -- bullet depth (bullet/circle/square), ordered numbers, task lists (`[x]`/`[ ]`)
+- [x] Inline handling in rehype-terminal: bold, italic, strikethrough (`TextAttributes.STRIKETHROUGH`), inline code, links, images, break, underline
+- [x] Full dark theme (`dark.ts`) with RPG rarity heading colors (Tokyo Night palette)
+
+Remaining 2b items:
+- [ ] `Table.tsx` tree -- formatted with borders (filter whitespace-only text children in table elements)
+- [ ] `HorizontalRule.tsx` -- full-width line
+- [ ] `Image.tsx` -- placeholder only (Kitty in Phase 7)
+- [ ] `Link.tsx` -- OSC 8 hyperlink with URL sanitization:
     - [ ] Whitelist schemes: `http:`, `https:`, `mailto:` only
     - [ ] Strip control characters from URLs (`\x07`, `\x1b`, `\x00`)
     - [ ] Max URL length: 2048 characters
-- [ ] Complete theme module:
-  - [ ] `dark.ts` + `light.ts` -- full theme tokens for all components
-  - [ ] `detect.ts` -- OSC 11 query before alt screen
-- [ ] Comprehensive tests for all component types
+- [ ] `light.ts` theme
+- [ ] `detect.ts` -- OSC 11 query before alt screen
 
 **Success criteria:** All GFM elements render correctly. Theme auto-detection works.
+
+##### Phase 2c: Renderer Abstraction (IR Layer)
+
+**Dedicated plan:** `docs/plans/2026-03-05-refactor-renderer-abstraction-ir-layer-plan.md`
+
+Decouple the hast-to-JSX compiler from OpenTUI by introducing an IR layer. Split `rehype-terminal.tsx` into `rehype-ir.ts` (compiler producing `IRNode` tree) and `renderer/opentui/` (IR -> OpenTUI JSX). See the dedicated plan for full phase breakdown.
+
+- [ ] IR type definitions (`src/ir/types.ts`)
+- [ ] Compiler (`src/pipeline/rehype-ir.ts`) with pre-resolved styles + custom handlers
+- [ ] OpenTUI renderer (`src/renderer/opentui/`)
+- [ ] Pipeline wiring (`processMarkdown` returns IR, renderer called separately)
+- [ ] Two-layer test strategy (IR unit tests + integration tests)
+- [ ] Cleanup (remove `rehype-terminal.tsx`, `src/components/`, `src/types/components.ts`)
+
+**After 2c:** Resume remaining 2b items (Table, HorizontalRule, Image, OSC 8 links, light theme, theme detection) in the new architecture pattern: add IR node type to `ir/types.ts`, add compiler handler to `rehype-ir.ts`, add renderer component to `renderer/opentui/`. Phases 3+ are unchanged — they consume the rendered `ReactNode` output, which the pipeline still produces via IR → renderer.
 
 #### Phase 3: App Shell, Source Pane, and Split Layout
 

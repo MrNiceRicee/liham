@@ -30,14 +30,29 @@ async function main() {
 
 	const renderer = await createCliRenderer({ exitOnCtrlC: false })
 
-	const cleanup = () => {
+	const cleanup = (code = 0) => {
 		renderer.destroy()
-		process.exit(0)
+		process.exit(code)
 	}
-	process.on('SIGINT', cleanup)
-	process.on('SIGTERM', cleanup)
 
-	createRoot(renderer).render(<App content={result.value} />)
+	// ensure terminal is restored on any crash
+	process.on('uncaughtException', (err) => {
+		renderer.destroy()
+		console.error(`fatal: ${err.message}`)
+		process.exit(1)
+	})
+
+	process.on('SIGINT', () => cleanup())
+	process.on('SIGTERM', () => cleanup())
+
+	try {
+		createRoot(renderer).render(<App content={result.value} />)
+	} catch (err: unknown) {
+		const message = err instanceof Error ? err.message : 'unknown render error'
+		renderer.destroy()
+		console.error(`render error: ${message}`)
+		process.exit(1)
+	}
 }
 
 await main()

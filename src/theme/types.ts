@@ -1,7 +1,11 @@
-export interface HeadingTokens {
+export interface HeadingLevelTokens {
 	color: string
 	bold: boolean
-	prefix: string
+	dim: boolean
+}
+
+export interface HeadingTokens {
+	levels: Record<1 | 2 | 3 | 4 | 5 | 6, HeadingLevelTokens>
 }
 
 export interface CodeBlockTokens {
@@ -12,8 +16,8 @@ export interface CodeBlockTokens {
 }
 
 export interface BlockquoteTokens {
-	borderChar: string
 	borderColor: string
+	backgroundColor: string
 	textColor: string
 }
 

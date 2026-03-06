@@ -86,9 +86,26 @@ func init() {
 }
 
 var completionCmd = &cobra.Command{
-	Use:   "completion [bash|zsh|fish|powershell]",
-	Short: "generate shell completion script",
-	Args:  cobra.ExactArgs(1),
+	Use:       "completion [bash|zsh|fish|powershell]",
+	Short:     "generate shell completion script",
+	Long: `Generate a shell completion script for liham.
+
+To load completions:
+
+  bash:
+    source <(liham completion bash)
+
+  zsh:
+    eval "$(liham completion zsh)"
+
+  fish:
+    liham completion fish | source
+
+  powershell:
+    liham completion powershell | Out-String | Invoke-Expression
+
+To load completions on every session, add the above to your shell's rc file.`,
+	Args:      cobra.ExactArgs(1),
 	ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		switch args[0] {
