@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util'
 import type { LayoutMode } from '../app/state.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 
+import { generateBashCompletion, generateZshCompletion } from './completions.ts'
 import { processMarkdown } from '../pipeline/processor.ts'
 import { boot } from '../renderer/opentui/boot.tsx'
 import { darkTheme } from '../theme/dark.ts'
@@ -68,6 +69,8 @@ options:
 
   -i, --info               Show detected theme and terminal info, then exit
 
+  --completions <shell>    Output shell completion script (zsh, bash)
+
   -h, --help               Show this help message
 
 examples:
@@ -79,6 +82,7 @@ examples:
 // -- arg parsing --
 
 const options = {
+	completions: { type: 'string' as const },
 	help: { type: 'boolean' as const, short: 'h' },
 	info: { type: 'boolean' as const, short: 'i' },
 	layout: { type: 'string' as const, short: 'l', default: 'side' },
@@ -113,6 +117,19 @@ function parseCliArgs(): CliMode {
 
 	if (values.help) {
 		console.log(USAGE)
+		process.exit(0)
+	}
+
+	if (values.completions != null) {
+		if (values.completions === 'zsh') {
+			console.log(generateZshCompletion())
+		} else if (values.completions === 'bash') {
+			console.log(generateBashCompletion())
+		} else {
+			console.error(`unknown shell: '${values.completions}'`)
+			console.error('available: zsh, bash')
+			process.exit(1)
+		}
 		process.exit(0)
 	}
 
