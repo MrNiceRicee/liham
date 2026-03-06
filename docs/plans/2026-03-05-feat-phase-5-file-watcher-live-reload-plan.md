@@ -1,7 +1,7 @@
 ---
 title: "Phase 5: File Watcher — Live Reload on File Changes"
 type: feat
-status: active
+status: completed
 date: 2026-03-05
 ---
 
@@ -373,37 +373,37 @@ try {
 
 ### Functional Requirements
 
-- [ ] File changes detected via parent-directory watching
-- [ ] Preview and source panes update on file change
-- [ ] Render time stat updates on each reload
-- [ ] 80ms debounce coalesces rapid save events
-- [ ] Vim/Emacs/JetBrains temp files filtered — no spurious re-renders
-- [ ] File deletion stops watcher, shows "file deleted" warning in status bar
-- [ ] Watcher starts on viewer entry (both CLI direct and browser-open paths)
-- [ ] Watcher stops on return-to-browser transition
-- [ ] Watcher stops on quit (all exit paths: q, Esc, Ctrl+C)
-- [ ] Opening a different file from browser stops old watcher, starts new one
-- [ ] `--no-watch` flag disables watching entirely
-- [ ] Pipeline error on re-render keeps last good preview, updates source raw text
-- [ ] File read failure on re-render is silently ignored (matches Go v1)
-- [ ] Scroll position preserved across content updates
-- [ ] In-flight pipeline results discarded when newer change arrives (stale detection)
-- [ ] Watcher initialization failure degrades to static mode (no crash)
+- [x] File changes detected via parent-directory watching
+- [x] Preview and source panes update on file change
+- [x] Render time stat updates on each reload
+- [x] 80ms debounce coalesces rapid save events
+- [x] Vim/Emacs/JetBrains temp files filtered — no spurious re-renders
+- [x] File deletion stops watcher, shows "file deleted" warning in status bar
+- [x] Watcher starts on viewer entry (both CLI direct and browser-open paths)
+- [x] Watcher stops on return-to-browser transition
+- [x] Watcher stops on quit (all exit paths: q, Esc, Ctrl+C)
+- [x] Opening a different file from browser stops old watcher, starts new one
+- [x] `--no-watch` flag disables watching entirely
+- [x] Pipeline error on re-render keeps last good preview, updates source raw text
+- [x] File read failure on re-render is silently ignored (matches Go v1)
+- [x] Scroll position preserved across content updates
+- [x] In-flight pipeline results discarded when newer change arrives (stale detection)
+- [x] Watcher initialization failure degrades to static mode (no crash)
 
 ### Non-Functional Requirements
 
-- [ ] Latency: file change → preview update < 200ms (for typical files)
-- [ ] No orphaned FSWatcher instances after quit
-- [ ] No `setState` calls after component unmount
+- [x] Latency: file change → preview update < 200ms (for typical files)
+- [x] No orphaned FSWatcher instances after quit
+- [x] No `setState` calls after component unmount
 
 ### Quality Gates
 
-- [ ] `isEditorTemp()` unit tests pass for all editor patterns
-- [ ] `createFileWatcher()` integration tests pass (write, delete, debounce, filter, cleanup)
-- [ ] State machine tests pass for `FileDeleted` action
-- [ ] All existing 214 tests still pass (zero regressions)
-- [ ] Zero ESLint errors (sonarjs cognitive-complexity < 15)
-- [ ] Biome format clean
+- [x] `isEditorTemp()` unit tests pass for all editor patterns
+- [x] `createFileWatcher()` integration tests pass (write, delete, debounce, filter, cleanup)
+- [x] State machine tests pass for `FileDeleted` action
+- [x] All existing 214 tests still pass (zero regressions) — now 234 total
+- [x] Zero ESLint errors (sonarjs cognitive-complexity < 15)
+- [x] Biome format clean
 
 ## Dependencies & Risks
 
