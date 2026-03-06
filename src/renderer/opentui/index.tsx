@@ -11,6 +11,7 @@ import { renderHeading } from './heading.tsx'
 import { renderInlineNode } from './inline.tsx'
 import { renderList, renderListItem } from './list.tsx'
 import { renderParagraph } from './paragraph.tsx'
+import { renderTable, renderTableCell, renderTableRow } from './table.tsx'
 import { renderThematicBreak } from './thematic-break.tsx'
 
 function isCoreNode(node: IRNode): node is CoreIRNode {
@@ -46,6 +47,15 @@ function renderNode(node: IRNode, key: string): ReactNode {
 
 		case 'listItem':
 			return renderListItem(node, key)
+
+		case 'table':
+			return renderTable(node, key)
+
+		case 'tableRow':
+			return renderTableRow(node, key, [])
+
+		case 'tableCell':
+			return renderTableCell(node, key, false, null)
 
 		case 'thematicBreak':
 			return renderThematicBreak(node, key)

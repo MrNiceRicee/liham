@@ -226,6 +226,39 @@ describe('processMarkdown structure', () => {
 	})
 })
 
+describe('GFM table rendering', () => {
+	it('renders table with bordered box', async () => {
+		const tree = await render('| A | B |\n| --- | --- |\n| 1 | 2 |')
+		const boxes = findAll(tree, (el) => {
+			const style = prop<Record<string, unknown>>(el, 'style')
+			return isIntrinsic(el, 'box') && style?.['border'] === true && style?.['borderStyle'] === 'single'
+		})
+		expect(boxes.length).toBeGreaterThanOrEqual(1)
+	})
+
+	it('renders header and data rows', async () => {
+		const tree = await render('| H1 | H2 |\n| --- | --- |\n| d1 | d2 |')
+		const text = collectText(tree)
+		expect(text).toContain('H1')
+		expect(text).toContain('H2')
+		expect(text).toContain('d1')
+		expect(text).toContain('d2')
+	})
+
+	it('renders inline formatting inside table cells', async () => {
+		const tree = await render('| **bold** | `code` |\n| --- | --- |\n| text | text |')
+		const bolds = findAll(tree, (el) => isIntrinsic(el, 'strong'))
+		expect(bolds.length).toBeGreaterThanOrEqual(1)
+		expect(collectText(bolds[0]!.element)).toBe('bold')
+	})
+
+	it('renders header separator line', async () => {
+		const tree = await render('| A | B |\n| --- | --- |\n| 1 | 2 |')
+		const text = collectText(tree)
+		expect(text).toContain('─')
+	})
+})
+
 describe('processMarkdown benchmark fixtures', () => {
 	const fixturesDir = resolve(import.meta.dir, '../../test/fixtures')
 

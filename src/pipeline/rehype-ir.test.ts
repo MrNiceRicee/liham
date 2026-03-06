@@ -254,6 +254,85 @@ describe('IR compiler — inline nodes', () => {
 	})
 })
 
+describe('IR compiler — table nodes', () => {
+	it('produces table with rows and cells', async () => {
+		const md = '| A | B |\n| --- | --- |\n| 1 | 2 |'
+		const ir = await compileToIR(md)
+		const tables = findNodes(ir, 'table')
+		expect(tables.length).toBe(1)
+		const table = tables[0]!
+		if (table.type !== 'table') throw new Error('expected table')
+		expect(table.style.borderColor).toBe(darkTheme.table.borderColor)
+
+		// should have 2 rows: header + data
+		const rows = table.children.filter((c) => c.type === 'tableRow')
+		expect(rows.length).toBe(2)
+	})
+
+	it('marks header row with isHeader=true', async () => {
+		const md = '| H1 | H2 |\n| --- | --- |\n| d1 | d2 |'
+		const ir = await compileToIR(md)
+		const rows = findNodes(ir, 'tableRow')
+		expect(rows.length).toBe(2)
+		const header = rows[0]!
+		const data = rows[1]!
+		if (header.type !== 'tableRow' || data.type !== 'tableRow')
+			throw new Error('expected tableRow')
+		expect(header.isHeader).toBe(true)
+		expect(data.isHeader).toBe(false)
+	})
+
+	it('extracts column alignments', async () => {
+		const md = '| L | C | R |\n| :--- | :---: | ---: |\n| a | b | c |'
+		const ir = await compileToIR(md)
+		const tables = findNodes(ir, 'table')
+		const table = tables[0]!
+		if (table.type !== 'table') throw new Error('expected table')
+		expect(table.alignments).toEqual(['left', 'center', 'right'])
+	})
+
+	it('produces cells with correct content', async () => {
+		const md = '| hello | world |\n| --- | --- |\n| foo | bar |'
+		const ir = await compileToIR(md)
+		const cells = findNodes(ir, 'tableCell')
+		expect(cells.length).toBe(4)
+		const texts = cells.map(collectIRText)
+		expect(texts).toEqual(['hello', 'world', 'foo', 'bar'])
+	})
+
+	it('handles inline formatting in cells', async () => {
+		const md = '| **bold** | `code` |\n| --- | --- |\n| *em* | normal |'
+		const ir = await compileToIR(md)
+		const strongs = findNodes(ir, 'strong')
+		const boldInTable = strongs.find((s) => collectIRText(s) === 'bold')
+		expect(boldInTable).toBeDefined()
+
+		const codes = findNodes(ir, 'inlineCode')
+		const codeInTable = codes.find((c) => c.type === 'inlineCode' && c.value === 'code')
+		expect(codeInTable).toBeDefined()
+	})
+
+	it('handles empty cells', async () => {
+		const md = '| A | |\n| --- | --- |\n| | B |'
+		const ir = await compileToIR(md)
+		const cells = findNodes(ir, 'tableCell')
+		expect(cells.length).toBe(4)
+	})
+
+	it('styles header cells with headerColor and bold', async () => {
+		const md = '| H |\n| --- |\n| D |'
+		const ir = await compileToIR(md)
+		const cells = findNodes(ir, 'tableCell')
+		const headerCell = cells[0]!
+		const dataCell = cells[1]!
+		if (headerCell.type !== 'tableCell' || dataCell.type !== 'tableCell')
+			throw new Error('expected tableCell')
+		expect(headerCell.style.fg).toBe(darkTheme.table.headerColor)
+		expect(headerCell.style.bold).toBe(true)
+		expect(dataCell.style.fg).toBe(darkTheme.table.cellColor)
+	})
+})
+
 describe('IR compiler — sanitization', () => {
 	it('sanitizes text values', async () => {
 		const ir = await compileToIR('hello\x1bworld')

@@ -70,6 +70,26 @@ export interface ListItemNode {
 	children: IRNode[]
 }
 
+export interface TableNode {
+	type: 'table'
+	alignments: ('left' | 'center' | 'right' | null)[]
+	style: BlockStyle
+	children: IRNode[] // TableRowNode[]
+}
+
+export interface TableRowNode {
+	type: 'tableRow'
+	isHeader: boolean
+	style: BlockStyle
+	children: IRNode[] // TableCellNode[]
+}
+
+export interface TableCellNode {
+	type: 'tableCell'
+	style: BlockStyle
+	children: IRNode[]
+}
+
 export interface ThematicBreakNode {
 	type: 'thematicBreak'
 	style: { char: string; color: string }
@@ -164,6 +184,9 @@ export type CoreIRNode =
 	| RootNode
 	| StrikethroughNode
 	| StrongNode
+	| TableCellNode
+	| TableNode
+	| TableRowNode
 	| TextNode
 	| ThematicBreakNode
 	| UnknownBlockNode
@@ -179,6 +202,9 @@ const BLOCK_TYPES = new Set([
 	'blockquote',
 	'list',
 	'listItem',
+	'table',
+	'tableRow',
+	'tableCell',
 	'thematicBreak',
 	'unknown',
 ])

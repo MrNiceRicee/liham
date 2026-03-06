@@ -8,6 +8,7 @@ import type { VFile } from 'vfile'
 import type { IRNode } from '../ir/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 
+import { getHighlightColor } from './hljs-colors.ts'
 import { sanitizeForTerminal } from './sanitize.ts'
 
 declare module 'unified' {
@@ -162,65 +163,6 @@ function getListItemBullet(node: Element, ancestors: Element[]): string {
 	return `${bullets[(depth - 1) % bullets.length]} `
 }
 
-// -- hljs color map --
-
-const HLJS_COLORS: Record<string, string> = {
-	'hljs-addition': '#9ece6a',
-	'hljs-attr': '#7aa2f7',
-	'hljs-attribute': '#bb9af7',
-	'hljs-built_in': '#e0af68',
-	'hljs-bullet': '#89ddff',
-	'hljs-class': '#e0af68',
-	'hljs-code': '#9ece6a',
-	'hljs-comment': '#565f89',
-	'hljs-deletion': '#f7768e',
-	'hljs-doctag': '#7aa2f7',
-	'hljs-emphasis': '#c0caf5',
-	'hljs-formula': '#bb9af7',
-	'hljs-function': '#7aa2f7',
-	'hljs-keyword': '#bb9af7',
-	'hljs-link': '#2ac3de',
-	'hljs-literal': '#ff9e64',
-	'hljs-meta': '#e0af68',
-	'hljs-name': '#f7768e',
-	'hljs-number': '#ff9e64',
-	'hljs-operator': '#89ddff',
-	'hljs-params': '#c0caf5',
-	'hljs-property': '#7aa2f7',
-	'hljs-punctuation': '#89ddff',
-	'hljs-quote': '#565f89',
-	'hljs-regexp': '#2ac3de',
-	'hljs-section': '#7aa2f7',
-	'hljs-selector-attr': '#bb9af7',
-	'hljs-selector-class': '#9ece6a',
-	'hljs-selector-id': '#7aa2f7',
-	'hljs-selector-pseudo': '#9ece6a',
-	'hljs-selector-tag': '#f7768e',
-	'hljs-string': '#9ece6a',
-	'hljs-strong': '#c0caf5',
-	'hljs-subst': '#c0caf5',
-	'hljs-symbol': '#ff9e64',
-	'hljs-tag': '#f7768e',
-	'hljs-template-tag': '#bb9af7',
-	'hljs-template-variable': '#2ac3de',
-	'hljs-title': '#7aa2f7',
-	'hljs-type': '#2ac3de',
-	'hljs-variable': '#c0caf5',
-}
-
-function getHighlightColor(node: Element): string | undefined {
-	const className = node.properties?.['className']
-	if (!Array.isArray(className)) return undefined
-
-	for (const cls of className) {
-		if (typeof cls === 'string') {
-			const color = HLJS_COLORS[cls]
-			if (color != null) return color
-		}
-	}
-	return undefined
-}
-
 // -- heading level extraction --
 
 function getHeadingLevel(tagName: string): 1 | 2 | 3 | 4 | 5 | 6 {
@@ -336,6 +278,93 @@ function compileListItem(state: CompilerState, node: Element): IRNode {
 	}
 }
 
+// -- table compilation --
+
+// extract alignments from the first row's th/td cells (hast stores align per-cell)
+function extractAlignments(node: Element): ('left' | 'center' | 'right' | null)[] {
+	for (const child of node.children) {
+		if (child.type !== 'element') continue
+		// find first tr (may be inside thead)
+		const section =
+			child.tagName === 'thead' || child.tagName === 'tbody' ? child : null
+		const container = section ?? node
+		for (const row of container.children) {
+			if (row.type !== 'element' || row.tagName !== 'tr') continue
+			return row.children
+				.filter((c): c is Element => c.type === 'element' && (c.tagName === 'th' || c.tagName === 'td'))
+				.map((cell) => {
+					const align = cell.properties?.['align']
+					if (align === 'left' || align === 'center' || align === 'right') return align
+					return null
+				})
+		}
+	}
+	return []
+}
+
+const TABLE_SECTIONS = new Set(['thead', 'tbody', 'tfoot'])
+
+function collectTableRows(state: CompilerState, section: Element, isHeader: boolean): IRNode[] {
+	const rows: IRNode[] = []
+	state.ancestors.push(section)
+	for (const child of section.children) {
+		if (child.type === 'text' && child.value.trim().length === 0) continue
+		if (child.type === 'element' && child.tagName === 'tr') {
+			rows.push(compileTableRow(state, child, isHeader))
+		}
+	}
+	state.ancestors.pop()
+	return rows
+}
+
+function compileTable(state: CompilerState, node: Element): IRNode {
+	const alignments = extractAlignments(node)
+	const rows: IRNode[] = []
+
+	state.ancestors.push(node)
+	for (const child of node.children) {
+		if (child.type === 'text' && child.value.trim().length === 0) continue
+		if (child.type !== 'element') continue
+		if (TABLE_SECTIONS.has(child.tagName)) {
+			rows.push(...collectTableRows(state, child, child.tagName === 'thead'))
+		} else if (child.tagName === 'tr') {
+			rows.push(compileTableRow(state, child, false))
+		}
+	}
+	state.ancestors.pop()
+
+	return {
+		type: 'table',
+		alignments,
+		style: { borderColor: state.theme.table.borderColor },
+		children: rows,
+	}
+}
+
+function compileTableRow(state: CompilerState, node: Element, isHeader: boolean): IRNode {
+	const { theme } = state
+	const fg = isHeader ? theme.table.headerColor : theme.table.cellColor
+	return {
+		type: 'tableRow',
+		isHeader,
+		style: { fg },
+		children: withAncestors(state, node).filter((child) => child.type === 'tableCell'),
+	}
+}
+
+function compileTableCell(state: CompilerState, node: Element): IRNode {
+	const { theme } = state
+	const isHeader = node.tagName === 'th'
+	return {
+		type: 'tableCell',
+		style: {
+			fg: isHeader ? theme.table.headerColor : theme.table.cellColor,
+			bold: isHeader ? true : undefined,
+		},
+		children: withAncestors(state, node),
+	}
+}
+
 type BlockCompiler = (state: CompilerState, node: Element) => IRNode
 
 const BLOCK_COMPILERS: Record<string, BlockCompiler> = {
@@ -350,6 +379,10 @@ const BLOCK_COMPILERS: Record<string, BlockCompiler> = {
 	ol: compileList,
 	p: compileParagraph,
 	pre: compilePre,
+	table: compileTable,
+	td: compileTableCell,
+	th: compileTableCell,
+	tr: (state, node) => compileTableRow(state, node, false),
 	ul: compileList,
 }
 

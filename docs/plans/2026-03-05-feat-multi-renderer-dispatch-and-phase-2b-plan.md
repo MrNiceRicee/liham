@@ -255,11 +255,11 @@ Add to `CoreIRNode` union. Add `'table'`, `'tableRow'`, `'tableCell'` to `BLOCK_
 - The IR shape (rows → cells → inline content) is framework-neutral.
 
 **Acceptance criteria:**
-- [ ] GFM tables render with visible borders and header separation
-- [ ] Column alignment (left/center/right) is respected
-- [ ] Tables with inline formatting (bold, code, links) in cells work
-- [ ] Empty cells render correctly
-- [ ] IR tests validate table node structure
+- [x] GFM tables render with visible borders and header separation
+- [x] Column alignment (left/center/right) is respected
+- [x] Tables with inline formatting (bold, code, links) in cells work
+- [x] Empty cells render correctly
+- [x] IR tests validate table node structure
 - [ ] Large tables (>100 rows) show overflow indicator
 
 ---
