@@ -109,6 +109,57 @@ export function initialState(layout: LayoutMode = 'preview-only'): AppState {
 	}
 }
 
+// -- pane dimensions --
+
+const MIN_PANE_WIDTH = 10
+const MIN_PANE_HEIGHT = 5
+const STATUS_BAR_HEIGHT = 2
+
+export interface PaneDimensions {
+	source?: { width: number; height: number }
+	preview?: { width: number; height: number }
+}
+
+export function paneDimensions(
+	layout: LayoutMode,
+	width: number,
+	height: number,
+): PaneDimensions {
+	const contentHeight = Math.max(0, height - STATUS_BAR_HEIGHT)
+
+	switch (layout) {
+		case 'preview-only':
+			return { preview: { width, height: contentHeight } }
+
+		case 'source-only':
+			return { source: { width, height: contentHeight } }
+
+		case 'side': {
+			const half = Math.floor(width / 2)
+			const other = width - half
+			if (half < MIN_PANE_WIDTH || contentHeight < MIN_PANE_HEIGHT) {
+				return { preview: { width, height: contentHeight } }
+			}
+			return {
+				source: { width: half, height: contentHeight },
+				preview: { width: other, height: contentHeight },
+			}
+		}
+
+		case 'top': {
+			const half = Math.floor(contentHeight / 2)
+			const other = contentHeight - half
+			if (width < MIN_PANE_WIDTH || half < MIN_PANE_HEIGHT) {
+				return { preview: { width, height: contentHeight } }
+			}
+			return {
+				source: { width, height: half },
+				preview: { width, height: other },
+			}
+		}
+	}
+}
+
 // -- legend entries --
 
 export interface LegendEntry {

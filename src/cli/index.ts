@@ -205,7 +205,7 @@ async function main() {
 
 	// dispatch to renderer boot — static import for now.
 	// when ink/rezi are added, switch on args.renderer here.
-	await boot({ ir: result.value, theme: theme.tokens, layout: args.layout })
+	await boot({ ir: result.value, theme: theme.tokens, layout: args.layout, raw: markdown })
 }
 
 await main()

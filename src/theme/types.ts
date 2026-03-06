@@ -59,6 +59,11 @@ export interface StatusBarTokens {
 	fg: string
 }
 
+export interface PaneTokens {
+	focusedBorderColor: string
+	unfocusedBorderColor: string
+}
+
 export interface FallbackTokens {
 	textColor: string
 }
@@ -76,4 +81,5 @@ export interface ThemeTokens {
 	table: TableTokens
 	fallback: FallbackTokens
 	statusBar: StatusBarTokens
+	pane: PaneTokens
 }

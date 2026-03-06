@@ -55,4 +55,8 @@ export const darkTheme: ThemeTokens = {
 	statusBar: {
 		fg: '#565f89',
 	},
+	pane: {
+		focusedBorderColor: '#7aa2f7',
+		unfocusedBorderColor: '#3b4261',
+	},
 }

@@ -7,6 +7,7 @@ import {
 	initialState,
 	isSplitLayout,
 	legendEntries,
+	paneDimensions,
 } from './state.ts'
 
 // -- helpers --
@@ -222,6 +223,66 @@ describe('legendEntries', () => {
 		const offEntry = legendEntries(off).find((e) => e.key === 's')
 		expect(onEntry?.label).toBe('sync on')
 		expect(offEntry?.label).toBe('sync off')
+	})
+})
+
+// -- paneDimensions --
+
+describe('paneDimensions', () => {
+	test('preview-only: preview gets full area, no source', () => {
+		const p = paneDimensions('preview-only', 80, 24)
+		expect(p.preview).toEqual({ width: 80, height: 22 })
+		expect(p.source).toBeUndefined()
+	})
+
+	test('source-only: source gets full area, no preview', () => {
+		const p = paneDimensions('source-only', 80, 24)
+		expect(p.source).toEqual({ width: 80, height: 22 })
+		expect(p.preview).toBeUndefined()
+	})
+
+	test('side: both panes get half width', () => {
+		const p = paneDimensions('side', 80, 24)
+		expect(p.source).toEqual({ width: 40, height: 22 })
+		expect(p.preview).toEqual({ width: 40, height: 22 })
+	})
+
+	test('side: odd width gives extra pixel to preview', () => {
+		const p = paneDimensions('side', 81, 24)
+		expect(p.source!.width).toBe(40)
+		expect(p.preview!.width).toBe(41)
+	})
+
+	test('top: both panes get half height', () => {
+		const p = paneDimensions('top', 80, 24)
+		expect(p.source).toEqual({ width: 80, height: 11 })
+		expect(p.preview).toEqual({ width: 80, height: 11 })
+	})
+
+	test('top: odd content height gives extra pixel to preview', () => {
+		const p = paneDimensions('top', 80, 25)
+		// content = 25 - 2 = 23, half = 11, other = 12
+		expect(p.source!.height).toBe(11)
+		expect(p.preview!.height).toBe(12)
+	})
+
+	test('side: small terminal falls back to single-pane', () => {
+		const p = paneDimensions('side', 18, 24)
+		// 18/2 = 9 < MIN_PANE_WIDTH(10), falls back
+		expect(p.preview).toBeDefined()
+		expect(p.source).toBeUndefined()
+	})
+
+	test('top: small terminal falls back to single-pane', () => {
+		const p = paneDimensions('top', 80, 10)
+		// content = 10-2 = 8, half = 4 < MIN_PANE_HEIGHT(5), falls back
+		expect(p.preview).toBeDefined()
+		expect(p.source).toBeUndefined()
+	})
+
+	test('subtracts status bar height from content area', () => {
+		const p = paneDimensions('preview-only', 80, 10)
+		expect(p.preview!.height).toBe(8) // 10 - 2 status bar
 	})
 })
 

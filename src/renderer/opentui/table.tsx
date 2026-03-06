@@ -62,7 +62,7 @@ function measureHeaderWidths(node: TableNode): number[] {
 }
 
 // distributes available terminal width across columns when table overflows.
-// proportional to content width, with header width as minimum per column.
+// narrow columns keep their natural width; only wide columns get squeezed.
 function distributeColumnWidths(
 	contentWidths: number[],
 	headerWidths: number[],
@@ -76,18 +76,34 @@ function distributeColumnWidths(
 
 	if (totalContent <= available) return contentWidths
 
-	const minWidths = contentWidths.map((_, i) => Math.max(headerWidths[i] ?? 1, 1))
-	const totalMin = minWidths.reduce((sum, w) => sum + w, 0)
+	// narrow threshold: columns at or below this keep their natural width
+	const narrowThreshold = Math.max(Math.floor(available / numCols), 1)
 
-	if (totalMin >= available) return minWidths
+	// separate narrow (protected) columns from wide (shrinkable) columns
+	let narrowTotal = 0
+	const isNarrow = contentWidths.map((w) => {
+		if (w <= narrowThreshold) {
+			narrowTotal += w
+			return true
+		}
+		return false
+	})
 
-	const distributable = available - totalMin
-	const excessWidths = contentWidths.map((w, i) => Math.max(0, w - minWidths[i]!))
-	const totalExcess = excessWidths.reduce((sum, w) => sum + w, 0)
+	const remainingForWide = available - narrowTotal
+	const wideWidths = contentWidths.filter((_, i) => !isNarrow[i])
+	const totalWide = wideWidths.reduce((sum, w) => sum + w, 0)
 
-	if (totalExcess === 0) return minWidths
+	if (totalWide === 0 || remainingForWide <= 0) {
+		// fallback: use header widths as minimum
+		return contentWidths.map((_, i) => Math.max(headerWidths[i] ?? 1, 1))
+	}
 
-	return minWidths.map((min, i) => min + Math.floor((excessWidths[i]! / totalExcess) * distributable))
+	return contentWidths.map((w, i) => {
+		if (isNarrow[i]) return w
+		// proportional share of remaining space for wide columns
+		const share = Math.max(Math.floor((w / totalWide) * remainingForWide), headerWidths[i] ?? 1)
+		return share
+	})
 }
 
 // -- word wrapping --
@@ -304,10 +320,10 @@ function buildTableRows(
 	return rows
 }
 
-export function renderTable(node: TableNode, key: string) {
+export function renderTable(node: TableNode, key: string, maxWidth?: number) {
 	const contentWidths = measureColumnWidths(node)
 	const headerWidths = measureHeaderWidths(node)
-	const termWidth = process.stdout.columns || 80
+	const termWidth = maxWidth ?? process.stdout.columns ?? 80
 	const colWidths = distributeColumnWidths(contentWidths, headerWidths, termWidth)
 
 	const borderFg: Record<string, unknown> = {}

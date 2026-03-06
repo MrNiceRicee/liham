@@ -1,6 +1,7 @@
-// opentui app shell — state machine + scrollbox viewport + status bar.
+// opentui app shell — state machine + layout composition + status bar.
 
 import type { KeyEvent } from '@opentui/core'
+import type { ScrollBoxRenderable } from '@opentui/core'
 
 import { useKeyboard, useOnResize, useRenderer, useTerminalDimensions } from '@opentui/react'
 import { useReducer, useRef, type ReactNode } from 'react'
@@ -14,11 +15,15 @@ import {
 	appReducer,
 	initialState,
 	legendEntries,
+	paneDimensions,
 } from '../../app/state.ts'
+import { PreviewPane } from './preview-pane.tsx'
+import { SourcePane } from './source-pane.tsx'
 import { StatusBar } from './status-bar.tsx'
 
 interface AppProps {
 	content: ReactNode
+	raw: string
 	layout: LayoutMode
 	theme: ThemeTokens
 }
@@ -31,6 +36,7 @@ const KEY_MAP: Record<string, (key: Pick<KeyEvent, 'ctrl'>, state: AppState) => 
 		'?': () => ({ type: 'ToggleLegend' }),
 		l: () => ({ type: 'CycleLayout' }),
 		s: () => ({ type: 'ToggleSync' }),
+		tab: (_, state) => ({ type: 'FocusPane', target: state.focus === 'source' ? 'preview' : 'source' }),
 		j: () => ({ type: 'Scroll', direction: 'down' }),
 		k: () => ({ type: 'Scroll', direction: 'up' }),
 		down: () => ({ type: 'Scroll', direction: 'down' }),
@@ -49,13 +55,16 @@ const SHIFT_KEY_MAP: Record<string, () => AppAction> = {
 	g: () => ({ type: 'Scroll', direction: 'bottom' }),
 }
 
-export function App({ content, layout, theme }: Readonly<AppProps>) {
+export function App({ content, raw, layout, theme }: Readonly<AppProps>) {
 	const renderer = useRenderer()
 	const dims = useTerminalDimensions()
 	const [state, dispatch] = useReducer(appReducer, layout, (l) => ({
 		...initialState(l),
 		dimensions: dims,
 	}))
+
+	const sourceRef = useRef<ScrollBoxRenderable | null>(null)
+	const previewRef = useRef<ScrollBoxRenderable | null>(null)
 
 	// debounced resize
 	const resizeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -95,24 +104,55 @@ export function App({ content, layout, theme }: Readonly<AppProps>) {
 		dispatch(action)
 	})
 
+	const panes = paneDimensions(state.layout, state.dimensions.width, state.dimensions.height)
 	const entries = legendEntries(state)
 
 	return (
 		<box style={{ flexDirection: 'column', width: '100%', height: '100%' }}>
-			<scrollbox
-				focused
-				style={{
-					rootOptions: { width: '100%', flexGrow: 1 },
-				}}
-			>
-				<box style={{ flexDirection: 'column', padding: 1 }}>{content}</box>
-			</scrollbox>
+			{renderLayout(state, panes, content, raw, theme, sourceRef, previewRef)}
 			<StatusBar
 				legendVisible={state.legendVisible}
 				entries={entries}
 				layout={state.layout}
 				theme={theme}
 			/>
+		</box>
+	)
+}
+
+function renderLayout(
+	state: AppState,
+	panes: ReturnType<typeof paneDimensions>,
+	content: ReactNode,
+	raw: string,
+	theme: ThemeTokens,
+	sourceRef: React.RefObject<ScrollBoxRenderable | null>,
+	previewRef: React.RefObject<ScrollBoxRenderable | null>,
+): ReactNode {
+	const hasSource = panes.source != null
+	const hasPreview = panes.preview != null
+
+	// single-pane modes
+	if (hasPreview && !hasSource) {
+		return <PreviewPane content={content} focused theme={theme} scrollRef={previewRef} />
+	}
+	if (hasSource && !hasPreview) {
+		return <SourcePane content={raw} focused theme={theme} scrollRef={sourceRef} />
+	}
+
+	// split modes
+	const direction = state.layout === 'side' ? 'row' : 'column'
+	const sourceFocused = state.focus === 'source'
+
+	return (
+		<box style={{ flexDirection: direction, flexGrow: 1 }}>
+			<SourcePane
+				content={raw}
+				focused={sourceFocused}
+				theme={theme}
+				scrollRef={sourceRef}
+			/>
+			<PreviewPane content={content} focused={!sourceFocused} theme={theme} scrollRef={previewRef} />
 		</box>
 	)
 }

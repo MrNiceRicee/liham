@@ -19,14 +19,14 @@ function isCoreNode(node: IRNode): node is CoreIRNode {
 }
 
 // renders a single IR node to OpenTUI JSX
-function renderNode(node: IRNode, key: string): ReactNode {
+function renderNode(node: IRNode, key: string, maxWidth?: number): ReactNode {
 	if (!isCoreNode(node)) return renderCustom(node, key)
 
 	switch (node.type) {
 		case 'root':
 			return (
 				<box key={key} style={{ flexDirection: 'column', width: '100%' }}>
-					{renderChildren(node.children, key)}
+					{renderChildren(node.children, key, maxWidth)}
 				</box>
 			)
 
@@ -49,7 +49,7 @@ function renderNode(node: IRNode, key: string): ReactNode {
 			return renderListItem(node, key)
 
 		case 'table':
-			return renderTable(node, key)
+			return renderTable(node, key, maxWidth)
 
 		case 'tableRow':
 			return renderTableRow(node, key, { colWidths: [] })
@@ -72,7 +72,7 @@ function renderNode(node: IRNode, key: string): ReactNode {
 // renders children with block-context awareness:
 // groups consecutive inline nodes into <text> wrappers,
 // renders block nodes directly.
-export function renderChildren(children: IRNode[], parentKey: string): ReactNode[] {
+export function renderChildren(children: IRNode[], parentKey: string, maxWidth?: number): ReactNode[] {
 	const results: ReactNode[] = []
 	let inlineGroup: { node: IRNode; index: number }[] = []
 	let wrapCount = 0
@@ -95,7 +95,7 @@ export function renderChildren(children: IRNode[], parentKey: string): ReactNode
 		const child = children[i]!
 		if (isBlockNode(child)) {
 			flushInline()
-			const result = renderNode(child, `${parentKey}-${String(i)}`)
+			const result = renderNode(child, `${parentKey}-${String(i)}`, maxWidth)
 			if (result != null) results.push(result)
 		} else {
 			inlineGroup.push({ node: child, index: i })
@@ -107,6 +107,6 @@ export function renderChildren(children: IRNode[], parentKey: string): ReactNode
 }
 
 // public API: renders an IR tree to a React node tree
-export function renderToOpenTUI(ir: IRNode): ReactNode {
-	return renderNode(ir, 'root')
+export function renderToOpenTUI(ir: IRNode, maxWidth?: number): ReactNode {
+	return renderNode(ir, 'root', maxWidth)
 }

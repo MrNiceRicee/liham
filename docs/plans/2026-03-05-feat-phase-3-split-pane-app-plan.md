@@ -159,22 +159,22 @@ Port reference from `main` branch:
 
 **Files:**
 
-- [ ] `src/renderer/opentui/source-pane.tsx` — source viewer component
+- [x] `src/renderer/opentui/source-pane.tsx` — source viewer component
   - Props: `{ content: string; focused: boolean; theme: ThemeTokens; scrollRef: React.RefObject<ScrollBoxRenderable | null> }`
   - `<scrollbox ref={scrollRef} focused={focused} viewportCulling>` wrapping `<text>` with raw markdown
   - No syntax highlighting (matches Go behavior)
   - Raw markdown rendered in chunks (100 lines per `<text>` element) to reduce React element count for large files
   - Dimension styling via `style.rootOptions`
   - Ref-as-prop (not `forwardRef` — React 19 deprecation)
-- [ ] `src/renderer/opentui/preview-pane.tsx` — extracted from current app
+- [x] `src/renderer/opentui/preview-pane.tsx` — extracted from current app
   - Props: `{ content: ReactNode; focused: boolean; scrollRef: React.RefObject<ScrollBoxRenderable | null> }`
   - `<scrollbox ref={scrollRef} focused={focused} viewportCulling>` wrapping rendered content
   - Dimension styling via `style.rootOptions`
-- [ ] `src/cli/index.ts` — pass raw markdown to boot context
+- [x] `src/cli/index.ts` — pass raw markdown to boot context
   - Boot context grows: `{ ir, theme, layout, raw }`
   - Consider defining a `BootContext` interface in `src/types/` to formalize the contract
-- [ ] `src/renderer/opentui/boot.tsx` — accept and pass raw content
-- [ ] `src/renderer/opentui/app.tsx` — compose all layouts
+- [x] `src/renderer/opentui/boot.tsx` — accept and pass raw content
+- [x] `src/renderer/opentui/app.tsx` — compose all layouts
   - `paneDimensions()` inline function (15 lines — extract when it grows):
     - Side: each pane gets `width / 2`, `height - 1` (status bar)
     - Top: each pane gets `width`, `(height - 1) / 2`
@@ -189,7 +189,7 @@ Port reference from `main` branch:
   - `l` key cycles layout and view updates immediately
   - Scroll refs: `useRef<ScrollBoxRenderable>(null)` for each pane, passed as `scrollRef` prop
   - **On layout change:** snapshot `scrollPercent` per-pane in reducer state before unmounting. Restore on remount via `useEffect` that calls `scrollTo()` from stored percent.
-- [ ] `src/app/state.test.ts` — add layout dimension tests
+- [x] `src/app/state.test.ts` — add layout dimension tests
   - Side: both panes get half width
   - Top: both panes get half height
   - Preview-only: source is `undefined` in dimensions
