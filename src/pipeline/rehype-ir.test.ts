@@ -340,6 +340,64 @@ describe('IR compiler — sanitization', () => {
 		expect(text).not.toContain('\x1b')
 		expect(text).toContain('helloworld')
 	})
+
+	it('strips C1 control characters from text', async () => {
+		const ir = await compileToIR('safe\x9bunsafe')
+		const text = collectIRText(ir)
+		expect(text).not.toContain('\x9b')
+		expect(text).toContain('safeunsafe')
+	})
+})
+
+describe('IR compiler — URL sanitization', () => {
+	it('preserves valid https link URL', async () => {
+		const ir = await compileToIR('[click](https://example.com)')
+		const links = findNodes(ir, 'link')
+		const link = links[0]!
+		if (link.type !== 'link') throw new Error('expected link')
+		expect(link.url).toBe('https://example.com')
+	})
+
+	it('strips javascript: URLs from links', async () => {
+		const ir = await compileToIR('[xss](javascript:alert(1))')
+		const links = findNodes(ir, 'link')
+		const link = links[0]!
+		if (link.type !== 'link') throw new Error('expected link')
+		expect(link.url).toBe('')
+	})
+
+	it('strips data: URLs from links', async () => {
+		const ir = await compileToIR('[xss](data:text/html,<script>alert(1)</script>)')
+		const links = findNodes(ir, 'link')
+		const link = links[0]!
+		if (link.type !== 'link') throw new Error('expected link')
+		expect(link.url).toBe('')
+	})
+
+	it('preserves sanitized URL on image nodes', async () => {
+		const ir = await compileToIR('![photo](https://example.com/img.png)')
+		const images = findNodes(ir, 'image')
+		const img = images[0]!
+		if (img.type !== 'image') throw new Error('expected image')
+		expect(img.url).toBe('https://example.com/img.png')
+		expect(img.alt).toBe('photo')
+	})
+
+	it('strips javascript: URLs from images', async () => {
+		const ir = await compileToIR('![xss](javascript:alert(1))')
+		const images = findNodes(ir, 'image')
+		const img = images[0]!
+		if (img.type !== 'image') throw new Error('expected image')
+		expect(img.url).toBeUndefined()
+	})
+
+	it('strips control chars from link URLs', async () => {
+		const ir = await compileToIR('[evil](https://evil.com/\x07inject)')
+		const links = findNodes(ir, 'link')
+		const link = links[0]!
+		if (link.type !== 'link') throw new Error('expected link')
+		expect(link.url).not.toContain('\x07')
+	})
 })
 
 describe('isBlockNode helper', () => {

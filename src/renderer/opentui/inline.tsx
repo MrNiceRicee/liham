@@ -5,7 +5,46 @@ import type { ReactNode } from 'react'
 
 import { TextAttributes } from '@opentui/core'
 
-import type { CoreIRNode, IRNode } from '../../ir/types.ts'
+import type { CoreIRNode, ImageNode, InlineStyle, IRNode, LinkNode } from '../../ir/types.ts'
+
+function renderLink(node: LinkNode, key: string): ReactNode {
+	const children = renderInlineChildren(node.children, key)
+	if (node.url.length === 0) {
+		const props: Record<string, unknown> = {}
+		if (node.style.fg != null) props['fg'] = node.style.fg
+		return (
+			<span key={key} {...props} attributes={TextAttributes.UNDERLINE}>
+				{children}
+			</span>
+		)
+	}
+	return (
+		<a key={key} href={node.url}>
+			{children}
+		</a>
+	)
+}
+
+function renderImage(node: ImageNode, key: string): ReactNode {
+	const props: Record<string, unknown> = {}
+	if (node.style.fg != null) props['fg'] = node.style.fg
+	return (
+		<span key={key} {...props}>
+			{`[image: ${node.alt}]`}
+		</span>
+	)
+}
+
+function renderInlineCode(style: InlineStyle, value: string, key: string): ReactNode {
+	const props: Record<string, unknown> = {}
+	if (style.bg != null) props['bg'] = style.bg
+	if (style.fg != null) props['fg'] = style.fg
+	return (
+		<span key={key} {...props}>
+			{value}
+		</span>
+	)
+}
 
 // renders a single inline IR node to OpenTUI JSX
 export function renderInlineNode(node: IRNode, key: string): ReactNode {
@@ -35,33 +74,14 @@ export function renderInlineNode(node: IRNode, key: string): ReactNode {
 				</span>
 			)
 
-		case 'inlineCode': {
-			const props: Record<string, unknown> = {}
-			if (core.style.bg != null) props['bg'] = core.style.bg
-			if (core.style.fg != null) props['fg'] = core.style.fg
-			return (
-				<span key={key} {...props}>
-					{core.value}
-				</span>
-			)
-		}
+		case 'inlineCode':
+			return renderInlineCode(core.style, core.value, key)
 
 		case 'link':
-			return (
-				<a key={key} href={core.url}>
-					{renderInlineChildren(core.children, key)}
-				</a>
-			)
+			return renderLink(core, key)
 
-		case 'image': {
-			const imgProps: Record<string, unknown> = {}
-			if (core.style.fg != null) imgProps['fg'] = core.style.fg
-			return (
-				<span key={key} {...imgProps}>
-					{`[image: ${core.alt}]`}
-				</span>
-			)
-		}
+		case 'image':
+			return renderImage(core, key)
 
 		case 'break':
 			return '\n'
@@ -69,7 +89,6 @@ export function renderInlineNode(node: IRNode, key: string): ReactNode {
 		case 'checkbox':
 			return <span key={key}>{core.checked ? '[x] ' : '[ ] '}</span>
 
-		// root nodes from code > children flattening
 		case 'root':
 			return <>{renderInlineChildren(core.children, key)}</>
 

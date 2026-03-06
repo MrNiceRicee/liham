@@ -337,15 +337,15 @@ Complete the remaining inline/block elements. Harden sanitization.
 - Consider: restrict grammar subset or disable auto-detection for untrusted input
 
 **Acceptance criteria:**
-- [ ] C1 control characters (`\x80-\x9f`) stripped from all text content
-- [ ] Links render with underline + color, clickable via OSC 8 in supported terminals
-- [ ] `javascript:`, `data:`, `file:` URLs stripped; percent-encoded control chars caught
-- [ ] URL sanitization applied at IR compilation (in `compileAnchor` and image compiler)
-- [ ] OSC 8 skipped for blocklisted terminals (TERM=dumb, linux, Apple_Terminal)
-- [ ] Images render as `[image: alt-text]` placeholder
-- [ ] `ImageNode` preserves sanitized source URL in IR
-- [ ] Thematic breaks render as full-width lines
-- [ ] Sanitizer tests cover C1 controls, OSC 8 injection payloads, percent-encoded bypasses
+- [x] C1 control characters (`\x80-\x9f`) stripped from all text content
+- [x] Links render with underline + color, clickable via OSC 8 in supported terminals
+- [x] `javascript:`, `data:`, `file:` URLs stripped; percent-encoded control chars caught
+- [x] URL sanitization applied at IR compilation (in `compileAnchor` and image compiler)
+- [x] OSC 8 skipped for blocklisted terminals (TERM=dumb, linux, Apple_Terminal)
+- [x] Images render as `[image: alt-text]` placeholder
+- [x] `ImageNode` preserves sanitized source URL in IR
+- [x] Thematic breaks render as full-width lines
+- [x] Sanitizer tests cover C1 controls, OSC 8 injection payloads, percent-encoded bypasses
 
 ---
 

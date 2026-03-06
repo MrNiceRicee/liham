@@ -9,6 +9,7 @@ import type { IRNode } from '../ir/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 
 import { getHighlightColor } from './hljs-colors.ts'
+import { sanitizeUrl } from './sanitize-url.ts'
 import { sanitizeForTerminal } from './sanitize.ts'
 
 declare module 'unified' {
@@ -453,7 +454,7 @@ function compileAnchor(state: CompilerState, node: Element): IRNode {
 	const href = typeof node.properties?.['href'] === 'string' ? node.properties['href'] : ''
 	return {
 		type: 'link',
-		url: href,
+		url: sanitizeUrl(href),
 		style: { fg: state.theme.link.color, underline: state.theme.link.underline },
 		children: withAncestors(state, node),
 	}
@@ -500,9 +501,12 @@ const INLINE_COMPILERS: Record<string, InlineCompiler> = {
 	}),
 	img: (state, node) => {
 		const alt = typeof node.properties?.['alt'] === 'string' ? node.properties['alt'] : 'image'
+		const src = typeof node.properties?.['src'] === 'string' ? node.properties['src'] : ''
+		const url = sanitizeUrl(src)
 		return {
 			type: 'image',
 			alt: sanitizeForTerminal(alt),
+			...(url.length > 0 ? { url } : {}),
 			style: { fg: state.theme.image.fallbackColor },
 		}
 	},
