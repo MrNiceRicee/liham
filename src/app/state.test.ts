@@ -393,6 +393,70 @@ describe('state machine traces', () => {
 	})
 })
 
+// -- RescanComplete --
+
+const makeFile = (name: string, dir = ''): { name: string; relativePath: string; absolutePath: string; directory: string } => ({
+	name,
+	relativePath: dir ? `${dir}/${name}` : name,
+	absolutePath: `/root/${dir ? `${dir}/` : ''}${name}`,
+	directory: dir,
+})
+
+describe('RescanComplete', () => {
+	test('preserves cursor on same file when list changes', () => {
+		const files = [makeFile('a.md'), makeFile('b.md'), makeFile('c.md')]
+		const s = stateWith({
+			browser: { files, filter: '', cursorIndex: 1, scrollPosition: 0, scanStatus: 'complete' },
+		})
+		const newFiles = [makeFile('a.md'), makeFile('b.md'), makeFile('c.md'), makeFile('d.md')]
+		const next = appReducer(s, { type: 'RescanComplete', files: newFiles })
+		expect(next.browser.cursorIndex).toBe(1) // still on b.md
+		expect(next.browser.files).toBe(newFiles)
+	})
+
+	test('clamps cursor when selected file is deleted', () => {
+		const files = [makeFile('a.md'), makeFile('b.md'), makeFile('c.md')]
+		const s = stateWith({
+			browser: { files, filter: '', cursorIndex: 2, scrollPosition: 0, scanStatus: 'complete' },
+		})
+		// c.md deleted, only 2 files remain
+		const newFiles = [makeFile('a.md'), makeFile('b.md')]
+		const next = appReducer(s, { type: 'RescanComplete', files: newFiles })
+		expect(next.browser.cursorIndex).toBe(1) // clamped to last item
+	})
+
+	test('resets to 0 when list is empty', () => {
+		const files = [makeFile('a.md')]
+		const s = stateWith({
+			browser: { files, filter: '', cursorIndex: 0, scrollPosition: 0, scanStatus: 'complete' },
+		})
+		const next = appReducer(s, { type: 'RescanComplete', files: [] })
+		expect(next.browser.cursorIndex).toBe(0)
+		expect(next.browser.files).toEqual([])
+	})
+
+	test('preserves filter text', () => {
+		const files = [makeFile('readme.md')]
+		const s = stateWith({
+			browser: { files, filter: 'read', cursorIndex: 0, scrollPosition: 0, scanStatus: 'complete' },
+		})
+		const newFiles = [makeFile('readme.md'), makeFile('reading.md')]
+		const next = appReducer(s, { type: 'RescanComplete', files: newFiles })
+		expect(next.browser.filter).toBe('read')
+	})
+
+	test('tracks cursor by path when file moves position', () => {
+		const files = [makeFile('a.md'), makeFile('b.md'), makeFile('c.md')]
+		const s = stateWith({
+			browser: { files, filter: '', cursorIndex: 2, scrollPosition: 0, scanStatus: 'complete' },
+		})
+		// new file added before c.md, pushing it to index 3
+		const newFiles = [makeFile('a.md'), makeFile('b.md'), makeFile('b2.md'), makeFile('c.md')]
+		const next = appReducer(s, { type: 'RescanComplete', files: newFiles })
+		expect(next.browser.cursorIndex).toBe(3) // tracked c.md to new position
+	})
+})
+
 // -- FileDeleted --
 
 describe('FileDeleted', () => {

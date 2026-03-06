@@ -59,6 +59,7 @@ export type AppAction =
 	| { type: 'Quit' }
 	// browser actions
 	| { type: 'ScanComplete'; files: FileEntry[] }
+	| { type: 'RescanComplete'; files: FileEntry[] }
 	| { type: 'ScanError'; error: string }
 	| { type: 'FilterUpdate'; text: string }
 	| { type: 'CursorMove'; direction: CursorDirection; filteredLength: number }
@@ -173,6 +174,19 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 				...state,
 				browser: { ...state.browser, files: action.files, scanStatus: 'complete', cursorIndex: 0 },
 			}
+
+		case 'RescanComplete': {
+			const selectedPath = state.browser.files[state.browser.cursorIndex]?.absolutePath
+			let newCursor = 0
+			if (selectedPath != null) {
+				const idx = action.files.findIndex((f) => f.absolutePath === selectedPath)
+				newCursor = idx >= 0 ? idx : Math.min(state.browser.cursorIndex, Math.max(0, action.files.length - 1))
+			}
+			return {
+				...state,
+				browser: { ...state.browser, files: action.files, scanStatus: 'complete', cursorIndex: newCursor },
+			}
+		}
 
 		case 'ScanError':
 			return {
