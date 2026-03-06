@@ -152,7 +152,7 @@ describe('CycleLayout action', () => {
 		let s = initialState()
 
 		for (let i = 0; i < cycle.length; i++) {
-			expect(s.layout).toBe(cycle[i])
+			expect(s.layout).toBe(cycle[i]!)
 			s = appReducer(s, { type: 'CycleLayout' })
 		}
 		// wraps back to preview-only

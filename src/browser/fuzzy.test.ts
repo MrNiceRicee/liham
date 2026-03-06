@@ -144,12 +144,8 @@ describe('fuzzyFilter', () => {
 	})
 
 	test('ties broken alphabetically', () => {
-		// entries with same score should be alphabetical
+		// entries with same score should preserve input order (all score 0)
 		const results = fuzzyFilter('', entries)
-		const paths = results.map((r) => r.entry.relativePath)
-		const sorted = [...paths].sort((a, b) => a.localeCompare(b))
-		// empty query = all score 0, should be in original order (which is already sorted)
-		// actually fuzzyFilter with empty query preserves input order
 		expect(results.length).toBe(entries.length)
 	})
 })

@@ -61,4 +61,12 @@ export const lightTheme: ThemeTokens = {
 		focusedBorderColor: '#34548a',
 		unfocusedBorderColor: '#9699a3',
 	},
+	browser: {
+		directoryColor: '#8990b3',
+		selectedBg: '#d5d6db',
+		selectedFg: '#343b58',
+		matchHighlightColor: '#965027',
+		filterColor: '#2e7de9',
+		fileCountColor: '#8990b3',
+	},
 }

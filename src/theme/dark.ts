@@ -60,4 +60,12 @@ export const darkTheme: ThemeTokens = {
 		focusedBorderColor: '#7aa2f7',
 		unfocusedBorderColor: '#3b4261',
 	},
+	browser: {
+		directoryColor: '#565f89',
+		selectedBg: '#283457',
+		selectedFg: '#c0caf5',
+		matchHighlightColor: '#ff9e64',
+		filterColor: '#7aa2f7',
+		fileCountColor: '#565f89',
+	},
 }

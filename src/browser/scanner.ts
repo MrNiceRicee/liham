@@ -1,7 +1,7 @@
 // directory scanner — recursively finds .md files with depth/count limits.
 
 import { readdir, lstat } from 'node:fs/promises'
-import { join, relative, dirname, extname, basename } from 'node:path'
+import { join, relative, dirname, extname } from 'node:path'
 
 export interface FileEntry {
 	name: string
@@ -56,9 +56,9 @@ export async function scanDirectory(
 	async function walk(dir: string, depth: number): Promise<void> {
 		if (depth > maxDepth || entries.length >= maxFiles) return
 
-		let dirEntries: Awaited<ReturnType<typeof readdir>>
+		let dirEntries: import('node:fs').Dirent[]
 		try {
-			dirEntries = await readdir(dir, { withFileTypes: true })
+			dirEntries = await readdir(dir, { withFileTypes: true }) as import('node:fs').Dirent[]
 		} catch {
 			// skip unreadable directories (EACCES, EPERM, ENOENT)
 			return
@@ -66,12 +66,14 @@ export async function scanDirectory(
 
 		for (const entry of dirEntries) {
 			if (entries.length >= maxFiles) return
-			if (hasControlChars(entry.name)) continue
 
-			const fullPath = join(dir, entry.name)
+			const name = String(entry.name)
+			if (hasControlChars(name)) continue
+
+			const fullPath = join(dir, name)
 
 			if (entry.isDirectory()) {
-				if (excludeDirs.has(entry.name)) continue
+				if (excludeDirs.has(name)) continue
 				await walk(fullPath, depth + 1)
 			} else if (entry.isFile() || entry.isSymbolicLink()) {
 				// check symlinks point to files, not dirs (don't follow symlink dirs)
@@ -84,13 +86,13 @@ export async function scanDirectory(
 					}
 				}
 
-				if (extname(entry.name).toLowerCase() !== '.md') continue
+				if (extname(name).toLowerCase() !== '.md') continue
 
 				const relPath = relative(root, fullPath)
 				const relDir = relative(root, dirname(fullPath))
 
 				entries.push({
-					name: entry.name,
+					name,
 					relativePath: relPath,
 					absolutePath: fullPath,
 					directory: relDir === '.' ? '' : relDir,

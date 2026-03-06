@@ -69,6 +69,15 @@ export interface FallbackTokens {
 	textColor: string
 }
 
+export interface BrowserTokens {
+	directoryColor: string
+	selectedBg: string
+	selectedFg: string
+	matchHighlightColor: string
+	filterColor: string
+	fileCountColor: string
+}
+
 export interface ThemeTokens {
 	heading: HeadingTokens
 	codeBlock: CodeBlockTokens
@@ -83,4 +92,5 @@ export interface ThemeTokens {
 	fallback: FallbackTokens
 	statusBar: StatusBarTokens
 	pane: PaneTokens
+	browser: BrowserTokens
 }

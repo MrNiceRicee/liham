@@ -195,14 +195,16 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 				focus: autoFocus(state.layout, 'preview'),
 			}
 
-		case 'ReturnToBrowser':
+		case 'ReturnToBrowser': {
 			if (!state.fromBrowser) return state
+			// omit currentFile instead of setting undefined (exactOptionalPropertyTypes)
+			const { currentFile: _, ...rest } = state
 			return {
-				...state,
+				...rest,
 				mode: 'browser',
-				currentFile: undefined,
 				focus: 'preview', // preview = browser pane in browser mode
 			}
+		}
 	}
 }
 
