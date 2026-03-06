@@ -17,6 +17,7 @@ export const lightTheme: ThemeTokens = {
 		backgroundColor: '#d5d6db',
 		gutterColor: '#8c8fa1',
 		textColor: '#343b59',
+		languageColor: '#34548a',
 	},
 	blockquote: {
 		borderColor: '#9699a3',

@@ -12,6 +12,7 @@ import {
 	type AppAction,
 	type AppState,
 	type LayoutMode,
+	type ScrollDirection,
 	appReducer,
 	initialState,
 	isSplitLayout,
@@ -56,6 +57,34 @@ const SHIFT_KEY_MAP: Record<string, () => AppAction> = {
 	g: () => ({ type: 'Scroll', direction: 'bottom' }),
 }
 
+// imperatively scroll a scrollbox by direction
+function applyScroll(ref: ScrollBoxRenderable | null, direction: ScrollDirection): void {
+	if (ref == null) return
+	switch (direction) {
+		case 'top':
+			ref.scrollTo(0)
+			break
+		case 'bottom':
+			ref.scrollTo(ref.scrollHeight)
+			break
+		case 'pageUp':
+			ref.scrollBy(-1, 'viewport')
+			break
+		case 'pageDown':
+			ref.scrollBy(1, 'viewport')
+			break
+		case 'halfUp':
+			ref.scrollBy(-0.5, 'viewport')
+			break
+		case 'halfDown':
+			ref.scrollBy(0.5, 'viewport')
+			break
+		// j/k/arrows handled natively by focused scrollbox
+		default:
+			break
+	}
+}
+
 // sync the unfocused pane to match the focused pane's scroll percentage
 function syncScroll(
 	focusedRef: ScrollBoxRenderable | null,
@@ -93,41 +122,35 @@ export function App({ content, raw, layout, theme }: Readonly<AppProps>) {
 	const focusedRef = state.focus === 'source' ? sourceRef : previewRef
 	const otherRef = state.focus === 'source' ? previewRef : sourceRef
 
+	const handleScroll = (direction: ScrollDirection) => {
+		applyScroll(focusedRef.current, direction)
+		if (state.scrollSync && isSplitLayout(state.layout)) {
+			queueMicrotask(() => syncScroll(focusedRef.current, otherRef.current))
+		}
+	}
+
+	const handleAction = (action: AppAction) => {
+		if (action.type === 'Quit') {
+			renderer?.destroy()
+			return
+		}
+		dispatch(action)
+		if (action.type === 'Scroll') handleScroll(action.direction)
+	}
+
 	useKeyboard((key: KeyEvent) => {
-		// shift keys (e.g., G for bottom)
 		if (key.shift) {
 			const shiftAction = SHIFT_KEY_MAP[key.name]
 			if (shiftAction != null) {
-				const action = shiftAction()
-				if (action.type === 'Quit') {
-					renderer?.destroy()
-					return
-				}
-				dispatch(action)
-				if (action.type === 'Scroll' && state.scrollSync && isSplitLayout(state.layout)) {
-					queueMicrotask(() => syncScroll(focusedRef.current, otherRef.current))
-				}
+				handleAction(shiftAction())
 				return
 			}
 		}
 
 		const mapper = KEY_MAP[key.name]
 		if (mapper == null) return
-
 		const action = mapper(key, state)
-		if (action == null) return
-
-		if (action.type === 'Quit') {
-			renderer?.destroy()
-			return
-		}
-
-		dispatch(action)
-
-		// sync after scroll actions — queueMicrotask lets OpenTUI process the scroll first
-		if (action.type === 'Scroll' && state.scrollSync && isSplitLayout(state.layout)) {
-			queueMicrotask(() => syncScroll(focusedRef.current, otherRef.current))
-		}
+		if (action != null) handleAction(action)
 	})
 
 	// mouse click-to-focus handlers

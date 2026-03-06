@@ -13,6 +13,7 @@ export interface CodeBlockTokens {
 	backgroundColor: string
 	gutterColor: string
 	textColor: string
+	languageColor: string
 }
 
 export interface BlockquoteTokens {

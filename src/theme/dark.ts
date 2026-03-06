@@ -16,6 +16,7 @@ export const darkTheme: ThemeTokens = {
 		backgroundColor: '#1a1b26',
 		gutterColor: '#565f89',
 		textColor: '#c0caf5',
+		languageColor: '#7aa2f7',
 	},
 	blockquote: {
 		borderColor: '#565f89',

@@ -245,6 +245,7 @@ function compilePre(state: CompilerState, node: Element): IRNode {
 			bg: theme.codeBlock.backgroundColor,
 			borderColor: theme.codeBlock.borderColor,
 			gutterColor: theme.codeBlock.gutterColor,
+			labelColor: theme.codeBlock.languageColor,
 		},
 		children: withAncestors(state, node),
 	}

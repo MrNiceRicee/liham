@@ -10,6 +10,7 @@ export interface BlockStyle {
 	dim?: boolean
 	fg?: string
 	gutterColor?: string
+	labelColor?: string
 }
 
 export interface InlineStyle {
