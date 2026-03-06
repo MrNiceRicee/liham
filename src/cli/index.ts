@@ -48,8 +48,10 @@ function isLayoutName(value: string): value is LayoutMode {
 const USAGE = `liham — terminal markdown previewer
 
 usage:
-  liham <file.md>
-  liham [options] <file.md>
+  liham                    browse current directory for .md files
+  liham <directory>        browse directory for .md files
+  liham <file.md>          preview a markdown file
+  liham [options] [path]
 
 options:
   -r, --renderer <name>   TUI renderer to use (default: opentui)
@@ -61,7 +63,7 @@ options:
                              dark   dark theme (Tokyo Night)
                              light  light theme (Tokyo Night Light)
 
-  -l, --layout <mode>     Pane layout (default: preview-only)
+  -l, --layout <mode>     Pane layout (default: side)
                            available: ${VALID_LAYOUTS.join(', ')}
 
   -i, --info               Show detected theme and terminal info, then exit
@@ -69,21 +71,27 @@ options:
   -h, --help               Show this help message
 
 examples:
-  liham README.md
-  liham -t dark README.md
-  liham -r opentui README.md`
+  liham                    browse cwd for markdown files
+  liham ./docs             browse docs/ for markdown files
+  liham README.md          preview README.md
+  liham -t dark README.md`
 
 // -- arg parsing --
 
 const options = {
 	help: { type: 'boolean' as const, short: 'h' },
 	info: { type: 'boolean' as const, short: 'i' },
-	layout: { type: 'string' as const, short: 'l', default: 'preview-only' },
+	layout: { type: 'string' as const, short: 'l', default: 'side' },
 	renderer: { type: 'string' as const, short: 'r', default: 'opentui' },
 	theme: { type: 'string' as const, short: 't', default: 'auto' },
 } as const
 
-function parseCliArgs() {
+type CliMode =
+	| { mode: 'info'; layout: LayoutMode; renderer: RendererName; theme: ThemeName }
+	| { mode: 'browser'; dir: string; layout: LayoutMode; renderer: RendererName; theme: ThemeName }
+	| { mode: 'viewer'; filePath: string; layout: LayoutMode; renderer: RendererName; theme: ThemeName }
+
+function parseCliArgs(): CliMode {
 	let values: ReturnType<typeof parseArgs<{ options: typeof options }>>['values']
 	let positionals: string[]
 
@@ -133,16 +141,44 @@ function parseCliArgs() {
 	}
 
 	if (values.info) {
-		return { filePath: undefined, info: true, layout, renderer, theme }
+		return { mode: 'info', layout, renderer, theme }
 	}
 
-	const filePath = positionals[0]
-	if (filePath == null) {
-		console.error(USAGE)
-		process.exit(1)
+	const positional = positionals[0]
+
+	// no positional → browser mode (cwd)
+	if (positional == null) {
+		return { mode: 'browser', dir: process.cwd(), layout, renderer, theme }
 	}
 
-	return { filePath, info: false, layout, renderer, theme }
+	// positional present — will be resolved to file or directory in main()
+	return { mode: 'viewer', filePath: positional, layout, renderer, theme }
+}
+
+// resolve positional arg: file → viewer, directory → browser, missing → error
+async function resolvePositional(
+	positional: string,
+	layout: LayoutMode,
+	renderer: RendererName,
+	theme: ThemeName,
+): Promise<CliMode> {
+	const resolved = resolve(positional)
+
+	try {
+		const { stat } = await import('node:fs/promises')
+		const s = await stat(resolved)
+		if (s.isDirectory()) {
+			return { mode: 'browser', dir: resolved, layout, renderer, theme }
+		}
+		if (s.isFile()) {
+			return { mode: 'viewer', filePath: resolved, layout, renderer, theme }
+		}
+	} catch {
+		// fall through
+	}
+
+	console.error(`cannot find file or directory: ${resolved}`)
+	process.exit(1)
 }
 
 // -- theme resolution --
@@ -170,9 +206,14 @@ async function resolveTheme(themeName: ThemeName): Promise<ResolvedTheme> {
 // -- main --
 
 async function main() {
-	const args = parseCliArgs()
+	let args = parseCliArgs()
 
-	if (args.info) {
+	// resolve positional: detect file vs directory
+	if (args.mode === 'viewer') {
+		args = await resolvePositional(args.filePath, args.layout, args.renderer, args.theme)
+	}
+
+	if (args.mode === 'info') {
 		const theme = await resolveTheme(args.theme)
 		console.log(`theme: ${theme.name}`)
 		console.log(`renderer: ${args.renderer}`)
@@ -183,18 +224,22 @@ async function main() {
 		process.exit(0)
 	}
 
-	const filePath = resolve(args.filePath!)
+	const theme = await resolveTheme(args.theme)
 
-	// read file first — if it fails, exit before starting OSC 11 detection
-	// (OSC 11 response leaks to terminal if process.exit races with stdin listener)
+	if (args.mode === 'browser') {
+		await boot({ mode: 'browser', dir: args.dir, theme: theme.tokens, layout: args.layout })
+		return
+	}
+
+	// viewer mode — read file and run pipeline
+	const filePath = args.filePath
+
 	const markdown = await Bun.file(filePath)
 		.text()
 		.catch(() => {
 			console.error(`cannot read file: ${filePath}`)
 			process.exit(1)
 		})
-
-	const theme = await resolveTheme(args.theme)
 
 	const result = await processMarkdown(markdown, theme.tokens)
 
@@ -203,9 +248,7 @@ async function main() {
 		process.exit(1)
 	}
 
-	// dispatch to renderer boot — static import for now.
-	// when ink/rezi are added, switch on args.renderer here.
-	await boot({ ir: result.value, theme: theme.tokens, layout: args.layout, raw: markdown })
+	await boot({ mode: 'viewer', ir: result.value, theme: theme.tokens, layout: args.layout, raw: markdown })
 }
 
 await main()

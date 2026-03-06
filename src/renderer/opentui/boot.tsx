@@ -11,22 +11,11 @@ import { type LayoutMode, paneDimensions } from '../../app/state.ts'
 import { App } from './app.tsx'
 import { renderToOpenTUI } from './index.tsx'
 
-export interface BootContext {
-	ir: IRNode
-	theme: ThemeTokens
-	layout: LayoutMode
-	raw: string
-}
+export type BootContext =
+	| { mode: 'viewer'; ir: IRNode; theme: ThemeTokens; layout: LayoutMode; raw: string }
+	| { mode: 'browser'; dir: string; theme: ThemeTokens; layout: LayoutMode }
 
 export async function boot(ctx: BootContext): Promise<void> {
-	// compute preview pane width for table layout at render time
-	const termWidth = process.stdout.columns ?? 80
-	const termHeight = process.stdout.rows ?? 24
-	const panes = paneDimensions(ctx.layout, termWidth, termHeight)
-	// subtract pane chrome: border (2) + inner padding (2) = 4 chars
-	const paneChrome = 4
-	const previewWidth = (panes.preview?.width ?? termWidth) - paneChrome
-	const content = renderToOpenTUI(ctx.ir, previewWidth)
 	const renderer = await createCliRenderer({
 		exitOnCtrlC: true,
 		useMouse: true,
@@ -34,9 +23,29 @@ export async function boot(ctx: BootContext): Promise<void> {
 	})
 
 	try {
-		createRoot(renderer).render(
-			<App content={content} raw={ctx.raw} layout={ctx.layout} theme={ctx.theme} />,
-		)
+		if (ctx.mode === 'browser') {
+			createRoot(renderer).render(
+				<App mode="browser" dir={ctx.dir} layout={ctx.layout} theme={ctx.theme} />,
+			)
+		} else {
+			// compute preview pane width for table layout at render time
+			const termWidth = process.stdout.columns ?? 80
+			const termHeight = process.stdout.rows ?? 24
+			const panes = paneDimensions(ctx.layout, termWidth, termHeight)
+			const paneChrome = 4
+			const previewWidth = (panes.preview?.width ?? termWidth) - paneChrome
+			const content = renderToOpenTUI(ctx.ir, previewWidth)
+
+			createRoot(renderer).render(
+				<App
+					mode="viewer"
+					content={content}
+					raw={ctx.raw}
+					layout={ctx.layout}
+					theme={ctx.theme}
+				/>,
+			)
+		}
 	} catch (err: unknown) {
 		renderer.destroy()
 		const message = err instanceof Error ? err.message : 'unknown render error'

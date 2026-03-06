@@ -4,7 +4,7 @@ import type { KeyEvent } from '@opentui/core'
 import type { ScrollBoxRenderable } from '@opentui/core'
 
 import { useKeyboard, useOnResize, useRenderer, useTerminalDimensions } from '@opentui/react'
-import { useReducer, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
 
 import type { ThemeTokens } from '../../theme/types.ts'
 
@@ -19,22 +19,24 @@ import {
 	legendEntries,
 	paneDimensions,
 } from '../../app/state.ts'
+import { fuzzyFilter } from '../../browser/fuzzy.ts'
+import { scanDirectory } from '../../browser/scanner.ts'
+import { processMarkdown } from '../../pipeline/processor.ts'
+import { BrowserPane } from './browser-pane.tsx'
+import { renderToOpenTUI } from './index.tsx'
 import { PreviewPane } from './preview-pane.tsx'
 import { SourcePane } from './source-pane.tsx'
 import { StatusBar } from './status-bar.tsx'
 
-interface AppProps {
-	content: ReactNode
-	raw: string
-	layout: LayoutMode
-	theme: ThemeTokens
-}
+type AppProps =
+	| { mode: 'viewer'; content: ReactNode; raw: string; layout: LayoutMode; theme: ThemeTokens }
+	| { mode: 'browser'; dir: string; layout: LayoutMode; theme: ThemeTokens }
 
-// key-to-action dispatch map — matches BLOCK_COMPILERS pattern for cognitive complexity.
-const KEY_MAP: Record<string, (key: Pick<KeyEvent, 'ctrl'>, state: AppState) => AppAction | null> =
+// -- viewer mode key maps --
+
+const VIEWER_KEY_MAP: Record<string, (key: Pick<KeyEvent, 'ctrl'>, state: AppState) => AppAction | null> =
 	{
 		q: () => ({ type: 'Quit' }),
-		escape: () => ({ type: 'Quit' }),
 		'?': () => ({ type: 'CycleLegend' }),
 		l: () => ({ type: 'CycleLayout' }),
 		s: () => ({ type: 'ToggleSync' }),
@@ -52,12 +54,12 @@ const KEY_MAP: Record<string, (key: Pick<KeyEvent, 'ctrl'>, state: AppState) => 
 		u: (key) => (key.ctrl ? { type: 'Scroll', direction: 'halfUp' } : null),
 	}
 
-// shift+g → bottom (G in Go version)
-const SHIFT_KEY_MAP: Record<string, () => AppAction> = {
+const VIEWER_SHIFT_KEY_MAP: Record<string, () => AppAction> = {
 	g: () => ({ type: 'Scroll', direction: 'bottom' }),
 }
 
-// imperatively scroll a scrollbox by direction
+// -- scroll helpers --
+
 function applyScroll(ref: ScrollBoxRenderable | null, direction: ScrollDirection): void {
 	if (ref == null) return
 	switch (direction) {
@@ -79,13 +81,11 @@ function applyScroll(ref: ScrollBoxRenderable | null, direction: ScrollDirection
 		case 'halfDown':
 			ref.scrollBy(0.5, 'viewport')
 			break
-		// j/k/arrows handled natively by focused scrollbox
 		default:
 			break
 	}
 }
 
-// sync the unfocused pane to match the focused pane's scroll percentage
 function syncScroll(
 	focusedRef: ScrollBoxRenderable | null,
 	otherRef: ScrollBoxRenderable | null,
@@ -98,18 +98,109 @@ function syncScroll(
 	otherRef.scrollTo(targetPos)
 }
 
-export function App({ content, raw, layout, theme }: Readonly<AppProps>) {
+export function App(props: Readonly<AppProps>) {
 	const renderer = useRenderer()
 	const dims = useTerminalDimensions()
-	const [state, dispatch] = useReducer(appReducer, layout, (l) => ({
-		...initialState(l),
+
+	const [state, dispatch] = useReducer(appReducer, props, (p) => ({
+		...initialState(p.layout, p.mode),
 		dimensions: dims,
 	}))
 
 	const sourceRef = useRef<ScrollBoxRenderable | null>(null)
 	const previewRef = useRef<ScrollBoxRenderable | null>(null)
+	const browserRef = useRef<ScrollBoxRenderable | null>(null)
 
-	// debounced resize
+	// browser live preview state
+	const [browserPreviewContent, setBrowserPreviewContent] = useState<ReactNode>(null)
+	const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+	const previewCursorRef = useRef<number>(-1)
+
+	// viewer mode content
+	const viewerContent = props.mode === 'viewer' ? props.content : null
+	const viewerRaw = props.mode === 'viewer' ? props.raw : ''
+
+	// computed filtered list for browser
+	const filteredMatches = useMemo(
+		() => fuzzyFilter(state.browser.filter, state.browser.files),
+		[state.browser.filter, state.browser.files],
+	)
+
+	// -- directory scan on mount (browser mode) --
+	useEffect(() => {
+		if (props.mode !== 'browser') return
+		let cancelled = false
+
+		scanDirectory(props.dir).then(
+			(files) => {
+				if (!cancelled) dispatch({ type: 'ScanComplete', files })
+			},
+			(err: unknown) => {
+				if (!cancelled) {
+					const message = err instanceof Error ? err.message : 'scan failed'
+					dispatch({ type: 'ScanError', error: message })
+				}
+			},
+		)
+
+		return () => { cancelled = true }
+	}, [props.mode === 'browser' ? props.dir : null])
+
+	// -- browser live preview: debounced pipeline on cursor move --
+	useEffect(() => {
+		if (state.mode !== 'browser') return
+		if (filteredMatches.length === 0) {
+			setBrowserPreviewContent(null)
+			return
+		}
+
+		const match = filteredMatches[state.browser.cursorIndex]
+		if (match == null) return
+
+		const cursorSnapshot = state.browser.cursorIndex
+		previewCursorRef.current = cursorSnapshot
+
+		if (previewTimerRef.current != null) clearTimeout(previewTimerRef.current)
+
+		previewTimerRef.current = setTimeout(async () => {
+			// stale check
+			if (previewCursorRef.current !== cursorSnapshot) return
+
+			try {
+				const markdown = await Bun.file(match.entry.absolutePath).text()
+				// stale check after async
+				if (previewCursorRef.current !== cursorSnapshot) return
+
+				const result = await processMarkdown(markdown, props.theme)
+				if (!result.ok) {
+					setBrowserPreviewContent(
+						<text color={props.theme.fallback.textColor}>preview error: {result.error}</text>,
+					)
+					return
+				}
+
+				// stale check after pipeline
+				if (previewCursorRef.current !== cursorSnapshot) return
+
+				const termWidth = state.dimensions.width
+				const panes = paneDimensions(state.layout, termWidth, state.dimensions.height, 'browser')
+				const paneChrome = 4
+				const width = (panes.preview?.width ?? termWidth) - paneChrome
+				const rendered = renderToOpenTUI(result.value, width)
+				setBrowserPreviewContent(rendered)
+			} catch {
+				setBrowserPreviewContent(
+					<text color={props.theme.fallback.textColor}>cannot read file</text>,
+				)
+			}
+		}, 150)
+
+		return () => {
+			if (previewTimerRef.current != null) clearTimeout(previewTimerRef.current)
+		}
+	}, [state.mode, state.browser.cursorIndex, filteredMatches.length])
+
+	// -- debounced resize --
 	const resizeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 	useOnResize((width, height) => {
 		if (resizeTimer.current != null) clearTimeout(resizeTimer.current)
@@ -118,42 +209,96 @@ export function App({ content, raw, layout, theme }: Readonly<AppProps>) {
 		}, 100)
 	})
 
-	// resolve refs for focused/unfocused pane
+	// -- viewer scroll handling --
 	const focusedRef = state.focus === 'source' ? sourceRef : previewRef
 	const otherRef = state.focus === 'source' ? previewRef : sourceRef
 
-	const handleScroll = (direction: ScrollDirection) => {
+	const handleScroll = useCallback((direction: ScrollDirection) => {
 		applyScroll(focusedRef.current, direction)
 		if (state.scrollSync && isSplitLayout(state.layout)) {
 			queueMicrotask(() => syncScroll(focusedRef.current, otherRef.current))
 		}
-	}
+	}, [state.scrollSync, state.layout, state.focus])
 
-	const handleAction = (action: AppAction) => {
+	const handleAction = useCallback((action: AppAction) => {
 		if (action.type === 'Quit') {
 			renderer?.destroy()
 			return
 		}
 		dispatch(action)
 		if (action.type === 'Scroll') handleScroll(action.direction)
-	}
+	}, [handleScroll, renderer])
 
+	// -- handle opening a file from browser --
+	const handleOpenFile = useCallback(async (path: string) => {
+		try {
+			const markdown = await Bun.file(path).text()
+			const result = await processMarkdown(markdown, props.theme)
+
+			if (!result.ok) {
+				// stay in browser, show error in preview
+				setBrowserPreviewContent(
+					<text color={props.theme.fallback.textColor}>pipeline error: {result.error}</text>,
+				)
+				return
+			}
+
+			dispatch({ type: 'OpenFile', path })
+
+			// set the viewer content after mode transition
+			const termWidth = state.dimensions.width
+			const panes = paneDimensions(state.layout, termWidth, state.dimensions.height, 'viewer')
+			const paneChrome = 4
+			const width = (panes.preview?.width ?? termWidth) - paneChrome
+			const rendered = renderToOpenTUI(result.value, width)
+
+			setViewerFileContent({ content: rendered, raw: markdown })
+		} catch {
+			setBrowserPreviewContent(
+				<text color={props.theme.fallback.textColor}>cannot read file</text>,
+			)
+		}
+	}, [props.theme, state.dimensions, state.layout])
+
+	// dynamic viewer content when opening files from browser
+	const [viewerFileContent, setViewerFileContent] = useState<{ content: ReactNode; raw: string } | null>(null)
+
+	// resolve current content for viewer mode
+	const currentViewerContent = viewerFileContent?.content ?? viewerContent
+	const currentViewerRaw = viewerFileContent?.raw ?? viewerRaw
+
+	// -- keyboard handler --
 	useKeyboard((key: KeyEvent) => {
+		if (state.mode === 'browser') {
+			browserKeyHandler(key, state, dispatch, filteredMatches.length, handleOpenFile, renderer)
+			return
+		}
+
+		// viewer mode — check escape for back-to-browser
+		if (key.name === 'escape') {
+			if (state.fromBrowser) {
+				dispatch({ type: 'ReturnToBrowser' })
+				return
+			}
+			renderer?.destroy()
+			return
+		}
+
 		if (key.shift) {
-			const shiftAction = SHIFT_KEY_MAP[key.name]
+			const shiftAction = VIEWER_SHIFT_KEY_MAP[key.name]
 			if (shiftAction != null) {
 				handleAction(shiftAction())
 				return
 			}
 		}
 
-		const mapper = KEY_MAP[key.name]
+		const mapper = VIEWER_KEY_MAP[key.name]
 		if (mapper == null) return
 		const action = mapper(key, state)
 		if (action != null) handleAction(action)
 	})
 
-	// mouse click-to-focus handlers
+	// -- mouse handlers --
 	const handleSourceMouseDown = () => {
 		if (state.focus !== 'source' && isSplitLayout(state.layout)) {
 			dispatch({ type: 'FocusPane', target: 'source' })
@@ -164,8 +309,6 @@ export function App({ content, raw, layout, theme }: Readonly<AppProps>) {
 			dispatch({ type: 'FocusPane', target: 'preview' })
 		}
 	}
-
-	// mouse scroll sync — scrollbox handles wheel natively, we just sync after
 	const handleSourceMouseScroll = () => {
 		if (state.scrollSync && isSplitLayout(state.layout) && state.focus === 'source') {
 			queueMicrotask(() => syncScroll(sourceRef.current, previewRef.current))
@@ -177,35 +320,190 @@ export function App({ content, raw, layout, theme }: Readonly<AppProps>) {
 		}
 	}
 
-	const panes = paneDimensions(state.layout, state.dimensions.width, state.dimensions.height)
+	const panes = paneDimensions(state.layout, state.dimensions.width, state.dimensions.height, state.mode)
 	const entries = legendEntries(state)
 
 	return (
 		<box style={{ flexDirection: 'column', width: '100%', height: '100%' }}>
-			{renderLayout(state, panes, content, raw, theme, sourceRef, previewRef, {
-				onSourceMouseDown: handleSourceMouseDown,
-				onPreviewMouseDown: handlePreviewMouseDown,
-				onSourceMouseScroll: handleSourceMouseScroll,
-				onPreviewMouseScroll: handlePreviewMouseScroll,
-			})}
+			{state.mode === 'browser'
+				? renderBrowserLayout(
+					state,
+					panes,
+					filteredMatches,
+					browserPreviewContent,
+					props.theme,
+					browserRef,
+					previewRef,
+				)
+				: renderViewerLayout(
+					state,
+					panes,
+					currentViewerContent,
+					currentViewerRaw,
+					props.theme,
+					sourceRef,
+					previewRef,
+					{
+						onSourceMouseDown: handleSourceMouseDown,
+						onPreviewMouseDown: handlePreviewMouseDown,
+						onSourceMouseScroll: handleSourceMouseScroll,
+						onPreviewMouseScroll: handlePreviewMouseScroll,
+					},
+				)}
 			<StatusBar
 				legendPage={state.legendPage}
 				entries={entries}
-				layout={state.layout}
-				theme={theme}
+				layout={state.mode === 'browser' ? 'browser' : state.layout}
+				theme={props.theme}
 			/>
 		</box>
 	)
 }
 
-interface MouseHandlers {
+// -- browser key handler --
+
+function browserKeyHandler(
+	key: KeyEvent,
+	state: AppState,
+	dispatch: React.Dispatch<AppAction>,
+	filteredLength: number,
+	openFile: (path: string) => void,
+	renderer: ReturnType<typeof useRenderer>,
+): void {
+	// ctrl+c handled by exitOnCtrlC in renderer config
+	if (key.ctrl && key.name === 'c') return
+
+	switch (key.name) {
+		case 'escape':
+			if (state.browser.filter.length > 0) {
+				dispatch({ type: 'FilterUpdate', text: '' })
+			} else {
+				renderer?.destroy()
+			}
+			return
+		case 'return':
+			if (filteredLength > 0) {
+				const matches = fuzzyFilter(state.browser.filter, state.browser.files)
+				const selected = matches[state.browser.cursorIndex]
+				if (selected != null) openFile(selected.entry.absolutePath)
+			}
+			return
+		case 'up':
+		case 'k':
+			dispatch({ type: 'CursorMove', direction: 'up', filteredLength })
+			return
+		case 'down':
+		case 'j':
+			dispatch({ type: 'CursorMove', direction: 'down', filteredLength })
+			return
+		case 'home':
+		case 'g':
+			if (!key.shift) {
+				dispatch({ type: 'CursorMove', direction: 'top', filteredLength })
+			} else {
+				dispatch({ type: 'CursorMove', direction: 'bottom', filteredLength })
+			}
+			return
+		case 'end':
+			dispatch({ type: 'CursorMove', direction: 'bottom', filteredLength })
+			return
+		case 'pageup':
+			dispatch({ type: 'CursorMove', direction: 'pageUp', filteredLength })
+			return
+		case 'pagedown':
+			dispatch({ type: 'CursorMove', direction: 'pageDown', filteredLength })
+			return
+		case '?':
+			dispatch({ type: 'CycleLegend' })
+			return
+		case 'tab':
+			// toggle focus between browser and preview in split mode
+			if (isSplitLayout(state.layout)) {
+				dispatch({ type: 'FocusPane', target: state.focus === 'preview' ? 'source' : 'preview' })
+			}
+			return
+		case 'backspace':
+			if (state.browser.filter.length > 0) {
+				dispatch({ type: 'FilterUpdate', text: state.browser.filter.slice(0, -1) })
+			}
+			return
+	}
+
+	// ctrl+w: delete last word
+	if (key.ctrl && key.name === 'w') {
+		const filter = state.browser.filter.trimEnd()
+		const lastSpace = filter.lastIndexOf(' ')
+		dispatch({ type: 'FilterUpdate', text: lastSpace >= 0 ? filter.slice(0, lastSpace) : '' })
+		return
+	}
+
+	// ctrl+u: clear filter
+	if (key.ctrl && key.name === 'u') {
+		dispatch({ type: 'FilterUpdate', text: '' })
+		return
+	}
+
+	// printable characters → append to filter
+	if (key.name.length === 1 && !key.ctrl && !key.meta) {
+		dispatch({ type: 'FilterUpdate', text: state.browser.filter + key.name })
+	}
+}
+
+// -- layout renderers --
+
+import type { FuzzyMatch } from '../../browser/fuzzy.ts'
+
+interface ViewerMouseHandlers {
 	onSourceMouseDown: () => void
 	onPreviewMouseDown: () => void
 	onSourceMouseScroll: () => void
 	onPreviewMouseScroll: () => void
 }
 
-function renderLayout(
+function renderBrowserLayout(
+	state: AppState,
+	panes: ReturnType<typeof paneDimensions>,
+	matches: FuzzyMatch[],
+	previewContent: ReactNode,
+	theme: ThemeTokens,
+	browserRef: React.RefObject<ScrollBoxRenderable | null>,
+	previewRef: React.RefObject<ScrollBoxRenderable | null>,
+): ReactNode {
+	const hasBrowser = panes.browser != null
+	const hasPreview = panes.preview != null
+
+	const browserProps = {
+		matches,
+		filter: state.browser.filter,
+		cursorIndex: state.browser.cursorIndex,
+		totalFiles: state.browser.files.length,
+		scanStatus: state.browser.scanStatus,
+		...(state.browser.scanError != null ? { scanError: state.browser.scanError } : {}),
+		focused: true as const,
+		theme,
+		scrollRef: browserRef,
+	}
+
+	const browserPane = hasBrowser ? <BrowserPane {...browserProps} /> : null
+
+	if (!hasPreview) return browserPane
+
+	const direction = state.layout === 'side' ? 'row' : 'column'
+
+	return (
+		<box style={{ flexDirection: direction, flexGrow: 1 }}>
+			{browserPane}
+			<PreviewPane
+				content={previewContent ?? <text color={theme.fallback.textColor}>select a file to preview</text>}
+				focused={false}
+				theme={theme}
+				scrollRef={previewRef}
+			/>
+		</box>
+	)
+}
+
+function renderViewerLayout(
 	state: AppState,
 	panes: ReturnType<typeof paneDimensions>,
 	content: ReactNode,
@@ -213,12 +511,11 @@ function renderLayout(
 	theme: ThemeTokens,
 	sourceRef: React.RefObject<ScrollBoxRenderable | null>,
 	previewRef: React.RefObject<ScrollBoxRenderable | null>,
-	mouse: MouseHandlers,
+	mouse: ViewerMouseHandlers,
 ): ReactNode {
 	const hasSource = panes.source != null
 	const hasPreview = panes.preview != null
 
-	// single-pane modes
 	if (hasPreview && !hasSource) {
 		return <PreviewPane content={content} focused theme={theme} scrollRef={previewRef} />
 	}
@@ -226,7 +523,6 @@ function renderLayout(
 		return <SourcePane content={raw} focused theme={theme} scrollRef={sourceRef} />
 	}
 
-	// split modes
 	const direction = state.layout === 'side' ? 'row' : 'column'
 	const sourceFocused = state.focus === 'source'
 
