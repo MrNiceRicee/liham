@@ -14,6 +14,7 @@ export async function boot(ctx: { ir: IRNode; theme: ThemeTokens }): Promise<voi
 	const content = renderToOpenTUI(ctx.ir)
 	const renderer = await createCliRenderer({
 		exitOnCtrlC: true,
+		useMouse: false,
 		onDestroy: () => process.exit(0),
 	})
 

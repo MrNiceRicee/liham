@@ -1,6 +1,6 @@
 import type { TableCellNode, TableNode, TableRowNode } from '../../ir/types.ts'
 
-import { renderChildren } from './index.tsx'
+import { renderInlineChildren } from './inline.tsx'
 
 export function renderTable(node: TableNode, key: string) {
 	const style: Record<string, unknown> = {
@@ -60,7 +60,7 @@ export function renderTableCell(
 
 	return (
 		<box key={key} style={{ flexGrow: 1, paddingLeft: 1, paddingRight: 1 }}>
-			<text style={textStyle}>{renderChildren(node.children, key)}</text>
+			<text style={textStyle}>{renderInlineChildren(node.children, key)}</text>
 		</box>
 	)
 }
