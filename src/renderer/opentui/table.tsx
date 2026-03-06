@@ -173,23 +173,41 @@ function renderRowLines(
 		const lineKey = `${key}-l${String(line)}`
 
 		if (useFormatted && line === 0) {
-			// single-line row: render with inline formatting
 			result.push(renderFormattedLine(cells, lineKey, colWidths, borderFg, row.isHeader))
 		} else {
-			// multi-line row or continuation line: plain text padded
-			const segments: string[] = []
-			for (let i = 0; i < colWidths.length; i++) {
-				const cellText = cellLines[i]![line] ?? ''
-				segments.push(` ${cellText.padEnd(colWidths[i]!)} `)
-			}
-			result.push(
-				<text key={lineKey} style={borderFg}>
-					{`│${segments.join('│')}│`}
-				</text>,
-			)
+			result.push(renderPlainLine(cells, cellLines, line, lineKey, colWidths, borderFg))
 		}
 	}
 	return result
+}
+
+// renders a wrapped-row line with border chars in border color, cell text in cell color.
+function renderPlainLine(
+	cells: (TableCellNode | undefined)[],
+	cellLines: string[][],
+	line: number,
+	lineKey: string,
+	colWidths: number[],
+	borderFg: Record<string, unknown>,
+): ReactNode {
+	const parts: ReactNode[] = []
+
+	for (let i = 0; i < colWidths.length; i++) {
+		const cellText = cellLines[i]![line] ?? ''
+		const padded = ` ${cellText.padEnd(colWidths[i]!)} `
+		const cell = cells[i]
+		const cellFg = cell?.style.fg
+
+		parts.push(<span key={`${lineKey}-b${String(i)}`} {...borderFg}>{'│'}</span>)
+		if (cellFg != null) {
+			parts.push(<span key={`${lineKey}-t${String(i)}`} fg={cellFg}>{padded}</span>)
+		} else {
+			parts.push(padded)
+		}
+	}
+	parts.push(<span key={`${lineKey}-br`} {...borderFg}>{'│'}</span>)
+
+	return <text key={lineKey}>{parts}</text>
 }
 
 // pushes formatted cell content + padding into parts array
