@@ -227,13 +227,15 @@ describe('processMarkdown structure', () => {
 })
 
 describe('GFM table rendering', () => {
-	it('renders table with bordered box', async () => {
+	it('renders table with box-drawing border characters', async () => {
 		const tree = await render('| A | B |\n| --- | --- |\n| 1 | 2 |')
-		const boxes = findAll(tree, (el) => {
-			const style = prop<Record<string, unknown>>(el, 'style')
-			return isIntrinsic(el, 'box') && style?.['border'] === true && style?.['borderStyle'] === 'single'
-		})
-		expect(boxes.length).toBeGreaterThanOrEqual(1)
+		const text = collectText(tree)
+		// box-drawing characters for table frame
+		expect(text).toContain('┌')
+		expect(text).toContain('┐')
+		expect(text).toContain('└')
+		expect(text).toContain('┘')
+		expect(text).toContain('│')
 	})
 
 	it('renders header and data rows', async () => {
@@ -252,10 +254,12 @@ describe('GFM table rendering', () => {
 		expect(collectText(bolds[0]!.element)).toBe('bold')
 	})
 
-	it('renders header separator line', async () => {
+	it('renders header separator with cross junction', async () => {
 		const tree = await render('| A | B |\n| --- | --- |\n| 1 | 2 |')
 		const text = collectText(tree)
-		expect(text).toContain('─')
+		expect(text).toContain('├')
+		expect(text).toContain('┼')
+		expect(text).toContain('┤')
 	})
 })
 
