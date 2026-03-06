@@ -21,24 +21,16 @@ function isBoundary(text: string, idx: number): boolean {
 	return prev === '/' || prev === '-' || prev === '_' || prev === '.'
 }
 
-// matches query as a subsequence of text, returns score + positions or null
-export function fuzzyMatch(
-	query: string,
-	text: string,
-): { score: number; positions: number[] } | null {
-	if (query.length === 0) return { score: 0, positions: [] }
-
-	const queryLower = query.toLowerCase()
-	const textLower = text.toLowerCase()
-
-	// quick check: is query a subsequence of text?
+// greedy forward subsequence match — returns matched positions or null
+function findPositions(queryLower: string, textLower: string): number[] | null {
+	// quick subsequence check
 	let qi = 0
 	for (let ti = 0; ti < textLower.length && qi < queryLower.length; ti++) {
 		if (textLower[ti] === queryLower[qi]) qi++
 	}
 	if (qi < queryLower.length) return null
 
-	// greedy forward match collecting positions
+	// collect match positions
 	const positions: number[] = []
 	qi = 0
 	for (let ti = 0; ti < textLower.length && qi < queryLower.length; ti++) {
@@ -47,29 +39,35 @@ export function fuzzyMatch(
 			qi++
 		}
 	}
+	return positions
+}
 
-	// score based on match quality
+// score a position based on context (boundary, consecutive, gap)
+function scorePosition(text: string, positions: number[], i: number): number {
+	const pos = positions[i]!
+	let s = 0
+
+	if (pos === 0) s += START_BONUS
+	if (isBoundary(text, pos)) s += BOUNDARY_BONUS
+	if (i > 0 && pos === positions[i - 1]! + 1) s += CONSECUTIVE_BONUS
+	if (i > 0) s -= (pos - positions[i - 1]! - 1) * GAP_PENALTY
+
+	return s
+}
+
+// matches query as a subsequence of text, returns score + positions or null
+export function fuzzyMatch(
+	query: string,
+	text: string,
+): { score: number; positions: number[] } | null {
+	if (query.length === 0) return { score: 0, positions: [] }
+
+	const positions = findPositions(query.toLowerCase(), text.toLowerCase())
+	if (positions == null) return null
+
 	let score = 0
-
 	for (let i = 0; i < positions.length; i++) {
-		const pos = positions[i]!
-
-		// start-of-string bonus
-		if (pos === 0) score += START_BONUS
-
-		// word boundary bonus
-		if (isBoundary(text, pos)) score += BOUNDARY_BONUS
-
-		// consecutive bonus
-		if (i > 0 && pos === positions[i - 1]! + 1) {
-			score += CONSECUTIVE_BONUS
-		}
-
-		// gap penalty (chars skipped since last match)
-		if (i > 0) {
-			const gap = pos - positions[i - 1]! - 1
-			score -= gap * GAP_PENALTY
-		}
+		score += scorePosition(text, positions, i)
 	}
 
 	return { score, positions }

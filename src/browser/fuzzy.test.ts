@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import type { FileEntry } from './scanner.ts'
+
 import { fuzzyFilter, fuzzyMatch } from './fuzzy.ts'
 
 // -- helpers --

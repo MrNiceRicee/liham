@@ -3,8 +3,8 @@
 import type { ScrollBoxRenderable } from '@opentui/core'
 import type { ReactNode, RefObject } from 'react'
 
-import type { FuzzyMatch } from '../../browser/fuzzy.ts'
 import type { ScanStatus } from '../../app/state.ts'
+import type { FuzzyMatch } from '../../browser/fuzzy.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 
 interface BrowserPaneProps {
@@ -67,56 +67,38 @@ function HighlightedName({
 	return <>{segments}</>
 }
 
-export function BrowserPane({
-	matches,
-	filter,
-	cursorIndex,
-	totalFiles,
-	scanStatus,
-	scanError,
-	focused,
-	theme,
-	scrollRef,
-	onMouseDown,
-	onMouseScroll,
-}: Readonly<BrowserPaneProps>) {
-	const borderColor = focused
-		? theme.pane.focusedBorderColor
-		: theme.pane.unfocusedBorderColor
-
-	const bt = theme.browser
-
-	// build file list items grouped by directory
-	const listItems: ReactNode[] = []
+// build file list items grouped by directory
+function buildFileList(
+	matches: FuzzyMatch[],
+	cursorIndex: number,
+	bt: ThemeTokens['browser'],
+	textColor: string,
+): ReactNode[] {
+	const items: ReactNode[] = []
 	let lastDir: string | undefined
 
 	for (let i = 0; i < matches.length; i++) {
 		const { entry, positions } = matches[i]!
 		const isSelected = i === cursorIndex
 
-		// directory group header
 		if (entry.directory !== lastDir) {
 			lastDir = entry.directory
 			const dirLabel = entry.directory || '.'
-			listItems.push(
+			items.push(
 				<text key={`dir-${dirLabel}`} color={bt.directoryColor} bold>
 					{dirLabel}/
 				</text>,
 			)
 		}
 
-		// file item
 		const prefix = isSelected ? '> ' : '  '
-		const fgColor = isSelected ? bt.selectedFg : theme.paragraph.textColor
-
-		// compute positions relative to just the filename
-		// (positions are relative to relativePath, offset by directory prefix length)
+		const fgColor = isSelected ? bt.selectedFg : textColor
 		const dirOffset = entry.directory ? entry.directory.length + 1 : 0
 		const namePositions = positions
 			.filter((p) => p >= dirOffset)
 			.map((p) => p - dirOffset)
 
-		listItems.push(
+		items.push(
 			<box
 				key={`file-${entry.relativePath}`}
 				style={{
@@ -135,19 +117,32 @@ export function BrowserPane({
 		)
 	}
 
-	// filter bar content
+	return items
+}
+
+export function BrowserPane({
+	matches,
+	filter,
+	cursorIndex,
+	totalFiles,
+	scanStatus,
+	scanError,
+	focused,
+	theme,
+	scrollRef,
+	onMouseDown,
+	onMouseScroll,
+}: Readonly<BrowserPaneProps>) {
+	const borderColor = focused
+		? theme.pane.focusedBorderColor
+		: theme.pane.unfocusedBorderColor
+
+	const bt = theme.browser
 	const matchCount = matches.length
+
 	const countLabel = filter.length > 0
 		? `${String(matchCount)}/${String(totalFiles)}`
 		: String(totalFiles)
-
-	const filterContent = (
-		<box style={{ flexDirection: 'row', width: '100%' }}>
-			<text color={bt.filterColor}>{'> '}{filter}</text>
-			<box style={{ flexGrow: 1 }} />
-			<text color={bt.fileCountColor}>{countLabel}</text>
-		</box>
-	)
 
 	// main content based on scan status
 	let content: ReactNode
@@ -160,7 +155,7 @@ export function BrowserPane({
 	} else if (matchCount === 0) {
 		content = <text color={bt.fileCountColor}>no matches</text>
 	} else {
-		content = listItems
+		content = buildFileList(matches, cursorIndex, bt, theme.paragraph.textColor)
 	}
 
 	return (
@@ -170,7 +165,11 @@ export function BrowserPane({
 				border={['bottom']}
 				style={{ height: 2, width: '100%', rootOptions: { borderColor } }}
 			>
-				{filterContent}
+				<box style={{ flexDirection: 'row', width: '100%' }}>
+					<text color={bt.filterColor}>{'> '}{filter}</text>
+					<box style={{ flexGrow: 1 }} />
+					<text color={bt.fileCountColor}>{countLabel}</text>
+				</box>
 			</box>
 
 			{/* file list */}

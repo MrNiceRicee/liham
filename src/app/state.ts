@@ -122,6 +122,17 @@ function moveCursor(
 	}
 }
 
+function omitCurrentFile(state: AppState): Omit<AppState, 'currentFile'> {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructure to omit
+	const { currentFile, ...rest } = state
+	return rest
+}
+
+function returnToBrowser(state: AppState): AppState {
+	if (!state.fromBrowser) return state
+	return { ...omitCurrentFile(state), mode: 'browser', focus: 'preview' }
+}
+
 export function appReducer(state: AppState, action: AppAction): AppState {
 	switch (action.type) {
 		case 'Resize':
@@ -195,16 +206,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 				focus: autoFocus(state.layout, 'preview'),
 			}
 
-		case 'ReturnToBrowser': {
-			if (!state.fromBrowser) return state
-			// omit currentFile instead of setting undefined (exactOptionalPropertyTypes)
-			const { currentFile: _, ...rest } = state
-			return {
-				...rest,
-				mode: 'browser',
-				focus: 'preview', // preview = browser pane in browser mode
-			}
-		}
+		case 'ReturnToBrowser':
+			return returnToBrowser(state)
 	}
 }
 
@@ -251,43 +254,41 @@ export interface PaneDimensions {
 
 const MIN_BROWSER_WIDTH = 20
 
-export function paneDimensions(
+function browserPaneDimensions(
 	layout: LayoutMode,
 	width: number,
-	height: number,
-	mode: AppMode = 'viewer',
+	contentHeight: number,
 ): PaneDimensions {
-	const contentHeight = Math.max(0, height - STATUS_BAR_HEIGHT)
-
-	// browser mode: file list (optionally + preview)
-	if (mode === 'browser') {
-		if (layout === 'side') {
-			const half = Math.floor(width / 2)
-			const other = width - half
-			if (half < MIN_BROWSER_WIDTH || contentHeight < MIN_PANE_HEIGHT) {
-				return { browser: { width, height: contentHeight } }
-			}
-			return {
-				browser: { width: half, height: contentHeight },
-				preview: { width: other, height: contentHeight },
-			}
+	if (layout === 'side') {
+		const half = Math.floor(width / 2)
+		const other = width - half
+		if (half < MIN_BROWSER_WIDTH || contentHeight < MIN_PANE_HEIGHT) {
+			return { browser: { width, height: contentHeight } }
 		}
-		if (layout === 'top') {
-			const half = Math.floor(contentHeight / 2)
-			const other = contentHeight - half
-			if (width < MIN_BROWSER_WIDTH || half < MIN_PANE_HEIGHT) {
-				return { browser: { width, height: contentHeight } }
-			}
-			return {
-				browser: { width, height: half },
-				preview: { width, height: other },
-			}
+		return {
+			browser: { width: half, height: contentHeight },
+			preview: { width: other, height: contentHeight },
 		}
-		// preview-only and source-only both show browser full width in browser mode
-		return { browser: { width, height: contentHeight } }
 	}
+	if (layout === 'top') {
+		const half = Math.floor(contentHeight / 2)
+		const other = contentHeight - half
+		if (width < MIN_BROWSER_WIDTH || half < MIN_PANE_HEIGHT) {
+			return { browser: { width, height: contentHeight } }
+		}
+		return {
+			browser: { width, height: half },
+			preview: { width, height: other },
+		}
+	}
+	return { browser: { width, height: contentHeight } }
+}
 
-	// viewer mode: same as before
+function viewerPaneDimensions(
+	layout: LayoutMode,
+	width: number,
+	contentHeight: number,
+): PaneDimensions {
 	switch (layout) {
 		case 'preview-only':
 			return { preview: { width, height: contentHeight } }
@@ -319,6 +320,17 @@ export function paneDimensions(
 			}
 		}
 	}
+}
+
+export function paneDimensions(
+	layout: LayoutMode,
+	width: number,
+	height: number,
+	mode: AppMode = 'viewer',
+): PaneDimensions {
+	const contentHeight = Math.max(0, height - STATUS_BAR_HEIGHT)
+	if (mode === 'browser') return browserPaneDimensions(layout, width, contentHeight)
+	return viewerPaneDimensions(layout, width, contentHeight)
 }
 
 // -- legend entries --

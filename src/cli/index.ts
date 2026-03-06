@@ -6,12 +6,12 @@ import { parseArgs } from 'node:util'
 import type { LayoutMode } from '../app/state.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 
-import { generateBashCompletion, generateZshCompletion } from './completions.ts'
 import { processMarkdown } from '../pipeline/processor.ts'
 import { boot } from '../renderer/opentui/boot.tsx'
 import { darkTheme } from '../theme/dark.ts'
 import { detectTheme } from '../theme/detect.ts'
 import { lightTheme } from '../theme/light.ts'
+import { generateBashCompletion, generateZshCompletion } from './completions.ts'
 
 // -- renderer name union — add entries as renderers are implemented --
 

@@ -362,6 +362,81 @@ export function App(props: Readonly<AppProps>) {
 
 // -- browser key handler --
 
+function browserCursorKey(
+	key: KeyEvent,
+	dispatch: React.Dispatch<AppAction>,
+	filteredLength: number,
+): boolean {
+	switch (key.name) {
+		case 'up':
+		case 'k':
+			dispatch({ type: 'CursorMove', direction: 'up', filteredLength })
+			return true
+		case 'down':
+		case 'j':
+			dispatch({ type: 'CursorMove', direction: 'down', filteredLength })
+			return true
+		case 'home':
+		case 'g':
+			dispatch({
+				type: 'CursorMove',
+				direction: key.shift ? 'bottom' : 'top',
+				filteredLength,
+			})
+			return true
+		case 'end':
+			dispatch({ type: 'CursorMove', direction: 'bottom', filteredLength })
+			return true
+		case 'pageup':
+			dispatch({ type: 'CursorMove', direction: 'pageUp', filteredLength })
+			return true
+		case 'pagedown':
+			dispatch({ type: 'CursorMove', direction: 'pageDown', filteredLength })
+			return true
+		default:
+			return false
+	}
+}
+
+function browserFilterKey(
+	key: KeyEvent,
+	state: AppState,
+	dispatch: React.Dispatch<AppAction>,
+): boolean {
+	if (key.name === 'backspace') {
+		if (state.browser.filter.length > 0) {
+			dispatch({ type: 'FilterUpdate', text: state.browser.filter.slice(0, -1) })
+		}
+		return true
+	}
+	if (key.ctrl && key.name === 'w') {
+		const filter = state.browser.filter.trimEnd()
+		const lastSpace = filter.lastIndexOf(' ')
+		dispatch({ type: 'FilterUpdate', text: lastSpace >= 0 ? filter.slice(0, lastSpace) : '' })
+		return true
+	}
+	if (key.ctrl && key.name === 'u') {
+		dispatch({ type: 'FilterUpdate', text: '' })
+		return true
+	}
+	if (key.name.length === 1 && !key.ctrl && !key.meta) {
+		dispatch({ type: 'FilterUpdate', text: state.browser.filter + key.name })
+		return true
+	}
+	return false
+}
+
+function browserOpenSelected(
+	state: AppState,
+	filteredLength: number,
+	openFile: (path: string) => void,
+): void {
+	if (filteredLength === 0) return
+	const matches = fuzzyFilter(state.browser.filter, state.browser.files)
+	const selected = matches[state.browser.cursorIndex]
+	if (selected != null) openFile(selected.entry.absolutePath)
+}
+
 function browserKeyHandler(
 	key: KeyEvent,
 	state: AppState,
@@ -370,83 +445,28 @@ function browserKeyHandler(
 	openFile: (path: string) => void,
 	renderer: ReturnType<typeof useRenderer>,
 ): void {
-	// ctrl+c handled by exitOnCtrlC in renderer config
 	if (key.ctrl && key.name === 'c') return
 
 	switch (key.name) {
 		case 'escape':
-			if (state.browser.filter.length > 0) {
-				dispatch({ type: 'FilterUpdate', text: '' })
-			} else {
-				renderer?.destroy()
-			}
+			if (state.browser.filter.length > 0) dispatch({ type: 'FilterUpdate', text: '' })
+			else renderer?.destroy()
 			return
 		case 'return':
-			if (filteredLength > 0) {
-				const matches = fuzzyFilter(state.browser.filter, state.browser.files)
-				const selected = matches[state.browser.cursorIndex]
-				if (selected != null) openFile(selected.entry.absolutePath)
-			}
-			return
-		case 'up':
-		case 'k':
-			dispatch({ type: 'CursorMove', direction: 'up', filteredLength })
-			return
-		case 'down':
-		case 'j':
-			dispatch({ type: 'CursorMove', direction: 'down', filteredLength })
-			return
-		case 'home':
-		case 'g':
-			if (!key.shift) {
-				dispatch({ type: 'CursorMove', direction: 'top', filteredLength })
-			} else {
-				dispatch({ type: 'CursorMove', direction: 'bottom', filteredLength })
-			}
-			return
-		case 'end':
-			dispatch({ type: 'CursorMove', direction: 'bottom', filteredLength })
-			return
-		case 'pageup':
-			dispatch({ type: 'CursorMove', direction: 'pageUp', filteredLength })
-			return
-		case 'pagedown':
-			dispatch({ type: 'CursorMove', direction: 'pageDown', filteredLength })
+			browserOpenSelected(state, filteredLength, openFile)
 			return
 		case '?':
 			dispatch({ type: 'CycleLegend' })
 			return
 		case 'tab':
-			// toggle focus between browser and preview in split mode
 			if (isSplitLayout(state.layout)) {
 				dispatch({ type: 'FocusPane', target: state.focus === 'preview' ? 'source' : 'preview' })
 			}
 			return
-		case 'backspace':
-			if (state.browser.filter.length > 0) {
-				dispatch({ type: 'FilterUpdate', text: state.browser.filter.slice(0, -1) })
-			}
-			return
 	}
 
-	// ctrl+w: delete last word
-	if (key.ctrl && key.name === 'w') {
-		const filter = state.browser.filter.trimEnd()
-		const lastSpace = filter.lastIndexOf(' ')
-		dispatch({ type: 'FilterUpdate', text: lastSpace >= 0 ? filter.slice(0, lastSpace) : '' })
-		return
-	}
-
-	// ctrl+u: clear filter
-	if (key.ctrl && key.name === 'u') {
-		dispatch({ type: 'FilterUpdate', text: '' })
-		return
-	}
-
-	// printable characters → append to filter
-	if (key.name.length === 1 && !key.ctrl && !key.meta) {
-		dispatch({ type: 'FilterUpdate', text: state.browser.filter + key.name })
-	}
+	if (browserCursorKey(key, dispatch, filteredLength)) return
+	browserFilterKey(key, state, dispatch)
 }
 
 // -- layout renderers --
