@@ -52,10 +52,10 @@ function renderNode(node: IRNode, key: string): ReactNode {
 			return renderTable(node, key)
 
 		case 'tableRow':
-			return renderTableRow(node, key, node.children.length, {})
+			return renderTableRow(node, key, [], {})
 
 		case 'tableCell':
-			return renderTableCell(node, key, false)
+			return renderTableCell(node, key, false, 20)
 
 		case 'thematicBreak':
 			return renderThematicBreak(node, key)
