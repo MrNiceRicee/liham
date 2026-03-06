@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react'
+import type { IRNode } from '../ir/types.ts'
 
 export interface PipelineSuccess {
 	ok: true
-	value: ReactNode
+	value: IRNode
 }
 
 export interface PipelineError {

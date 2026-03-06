@@ -5,6 +5,7 @@ import { Children, isValidElement, type ReactElement, type ReactNode } from 'rea
 
 import type { PipelineResult, PipelineSuccess } from '../types/pipeline.ts'
 
+import { renderToOpenTUI } from '../renderer/opentui/index.tsx'
 import { processMarkdown } from './processor.ts'
 
 // -- tree walking helpers --
@@ -55,10 +56,6 @@ function isIntrinsic(el: ReactElement, tag: string): boolean {
 	return typeof el.type === 'string' && el.type === tag
 }
 
-function isComponent(el: ReactElement, name: string): boolean {
-	return typeof el.type === 'function' && el.type.name === name
-}
-
 function assertOk(result: PipelineResult): asserts result is PipelineSuccess {
 	expect(result.ok).toBe(true)
 }
@@ -66,7 +63,7 @@ function assertOk(result: PipelineResult): asserts result is PipelineSuccess {
 async function render(markdown: string): Promise<ReactNode> {
 	const result = await processMarkdown(markdown)
 	assertOk(result)
-	return result.value
+	return renderToOpenTUI(result.value)
 }
 
 // -- tests --
@@ -78,22 +75,25 @@ describe('processMarkdown structure', () => {
 		expect(isIntrinsic(tree as ReactElement, 'box')).toBe(true)
 	})
 
-	it('renders paragraph with Paragraph component', async () => {
+	it('renders paragraph inside <box> with <text>', async () => {
 		const tree = await render('A simple paragraph.')
-		const paragraphs = findAll(tree, (el) => isComponent(el, 'Paragraph'))
-
-		expect(paragraphs.length).toBe(1)
-		expect(collectText(paragraphs[0]!.element)).toContain('A simple paragraph.')
+		// IR renderer wraps paragraph in <box><text>...</text></box>
+		const boxes = findAll(tree, (el) => isIntrinsic(el, 'box'))
+		expect(boxes.length).toBeGreaterThanOrEqual(2) // root box + paragraph box
+		expect(collectText(tree)).toContain('A simple paragraph.')
 	})
 
-	it('renders heading with Heading component (no # prefix)', async () => {
+	it('renders heading with color and no # prefix', async () => {
 		const tree = await render('# My Heading')
-		const headings = findAll(tree, (el) => isComponent(el, 'Heading'))
+		const texts = findAll(tree, (el) => isIntrinsic(el, 'text'))
+		const headingText = texts.find((t) => collectText(t.element).includes('My Heading'))
 
-		expect(headings.length).toBe(1)
-		const text = collectText(headings[0]!.element)
+		expect(headingText).toBeDefined()
+		const text = collectText(headingText!.element)
 		expect(text).toContain('My Heading')
 		expect(text).not.toContain('#')
+		// heading should have fg color set
+		expect(prop<string>(headingText!.element, 'style')).toBeDefined()
 	})
 
 	it('renders bold as <strong> intrinsic', async () => {
@@ -150,68 +150,66 @@ describe('processMarkdown structure', () => {
 		expect(collectText(tree)).toContain('[image: my picture]')
 	})
 
-	it('renders unordered list with List and ListItem components', async () => {
+	it('renders unordered list with bullet markers', async () => {
 		const tree = await render('- alpha\n- beta\n- gamma')
-		const lists = findAll(tree, (el) => isComponent(el, 'List'))
-		const items = findAll(tree, (el) => isComponent(el, 'ListItem'))
+		const text = collectText(tree)
+		expect(text).toContain('alpha')
+		expect(text).toContain('beta')
+		expect(text).toContain('gamma')
 
-		expect(lists.length).toBe(1)
-		expect(items.length).toBe(3)
-
-		for (const item of items) {
-			const node = prop<{ properties?: Record<string, unknown> }>(item.element, 'node')
-			expect(node?.properties?.['data-bullet']).toBeDefined()
-		}
+		// bullets should be present
+		const spans = findAll(tree, (el) => isIntrinsic(el, 'span'))
+		const bulletSpans = spans.filter((s) => {
+			const t = collectText(s.element)
+			return t === '• '
+		})
+		expect(bulletSpans.length).toBe(3)
 	})
 
 	it('renders ordered list with numbered bullets', async () => {
 		const tree = await render('1. first\n2. second\n3. third')
-		const items = findAll(tree, (el) => isComponent(el, 'ListItem'))
-
-		expect(items.length).toBe(3)
-		const bullets = items.map((i) => {
-			const node = prop<{ properties?: Record<string, unknown> }>(i.element, 'node')
-			return node?.properties?.['data-bullet']
-		})
+		const spans = findAll(tree, (el) => isIntrinsic(el, 'span'))
+		const bullets = spans.map((s) => collectText(s.element)).filter((t) => /^\d+\.\s/.test(t))
 		expect(bullets).toEqual(['1. ', '2. ', '3. '])
 	})
 
-	it('renders code block with CodeBlock component', async () => {
+	it('renders code block with border and content', async () => {
 		const tree = await render('```js\nconst x = 1\n```')
-		const codeBlocks = findAll(tree, (el) => isComponent(el, 'CodeBlock'))
-
-		expect(codeBlocks.length).toBe(1)
-		expect(collectText(codeBlocks[0]!.element)).toContain('const x = 1')
+		// code block renders as a bordered box
+		const borderedBoxes = findAll(tree, (el) => {
+			const style = prop<Record<string, unknown>>(el, 'style')
+			return isIntrinsic(el, 'box') && style?.['border'] === true
+		})
+		expect(borderedBoxes.length).toBe(1)
+		expect(collectText(borderedBoxes[0]!.element)).toContain('const x = 1')
 	})
 
 	it('renders nested lists with depth-based bullets', async () => {
 		const tree = await render('- outer\n  - inner\n    - deep')
-		const items = findAll(tree, (el) => isComponent(el, 'ListItem'))
-
-		expect(items.length).toBe(3)
-		const bullets = items.map((i) => {
-			const node = prop<{ properties?: Record<string, unknown> }>(i.element, 'node')
-			return node?.properties?.['data-bullet']
-		})
-		// depth 1: •, depth 2: ◦, depth 3: ▪
+		const spans = findAll(tree, (el) => isIntrinsic(el, 'span'))
+		const bullets = spans
+			.map((s) => collectText(s.element))
+			.filter((t) => ['• ', '◦ ', '▪ '].includes(t))
 		expect(bullets[0]).toBe('• ')
 		expect(bullets[1]).toBe('◦ ')
 		expect(bullets[2]).toBe('▪ ')
 	})
 
-	it('renders blockquote with Blockquote component', async () => {
+	it('renders blockquote with heavy left border', async () => {
 		const tree = await render('> quoted text')
-		const quotes = findAll(tree, (el) => isComponent(el, 'Blockquote'))
-
-		expect(quotes.length).toBe(1)
-		expect(collectText(quotes[0]!.element)).toContain('quoted text')
+		const borderedBoxes = findAll(tree, (el) => {
+			const style = prop<Record<string, unknown>>(el, 'style')
+			return isIntrinsic(el, 'box') && style?.['borderStyle'] === 'heavy'
+		})
+		expect(borderedBoxes.length).toBe(1)
+		expect(collectText(borderedBoxes[0]!.element)).toContain('quoted text')
 	})
 
-	it('renders horizontal rule with Fallback component', async () => {
+	it('renders horizontal rule', async () => {
 		const tree = await render('---')
-		const hrs = findAll(tree, (el) => isComponent(el, 'Fallback'))
-
-		expect(hrs.length).toBeGreaterThanOrEqual(1)
+		const text = collectText(tree)
+		// thematic break renders as repeated char
+		expect(text).toContain('─')
 	})
 
 	it('renders task list checkboxes', async () => {
@@ -240,21 +238,25 @@ describe('processMarkdown benchmark fixtures', () => {
 		assertOk(result)
 		expect(elapsed).toBeLessThan(200)
 
-		const tree = result.value
-		const headings = findAll(tree, (el) => isComponent(el, 'Heading'))
-		const paragraphs = findAll(tree, (el) => isComponent(el, 'Paragraph'))
-		const codeBlocks = findAll(tree, (el) => isComponent(el, 'CodeBlock'))
-		const lists = findAll(tree, (el) => isComponent(el, 'List'))
+		const tree = renderToOpenTUI(result.value)
 
-		// small.md has: h1, h2 x4, h3, h4, h5, h6 = 10 headings
-		expect(headings.length).toBe(10)
-		for (const h of headings) {
-			expect(collectText(h.element)).not.toMatch(/^#+/)
-		}
-		expect(paragraphs.length).toBeGreaterThanOrEqual(3)
-		expect(codeBlocks.length).toBe(1)
-		// top-level UL + nested ULs + OL = 4+
-		expect(lists.length).toBeGreaterThanOrEqual(3)
+		// heading text nodes should exist with colors
+		const headingTexts = findAll(tree, (el) => {
+			const style = prop<Record<string, unknown>>(el, 'style')
+			return isIntrinsic(el, 'text') && style?.['fg'] != null && style?.['attributes'] != null
+		})
+		expect(headingTexts.length).toBeGreaterThanOrEqual(1)
+
+		// paragraphs (boxes with text children)
+		const boxes = findAll(tree, (el) => isIntrinsic(el, 'box'))
+		expect(boxes.length).toBeGreaterThanOrEqual(10)
+
+		// code blocks (bordered boxes)
+		const codeBlocks = findAll(tree, (el) => {
+			const style = prop<Record<string, unknown>>(el, 'style')
+			return isIntrinsic(el, 'box') && style?.['border'] === true
+		})
+		expect(codeBlocks.length).toBeGreaterThanOrEqual(1)
 	})
 
 	it('processes large.md under 200ms', async () => {

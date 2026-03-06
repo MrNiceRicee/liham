@@ -5,6 +5,7 @@ import { resolve } from 'node:path'
 
 import { App } from './app/App.tsx'
 import { processMarkdown } from './pipeline/processor.ts'
+import { renderToOpenTUI } from './renderer/opentui/index.tsx'
 import { darkTheme } from './theme/dark.ts'
 
 async function main() {
@@ -28,6 +29,8 @@ async function main() {
 
 	console.error(`pipeline: ${elapsed.toFixed(1)}ms`)
 
+	const content = renderToOpenTUI(result.value)
+
 	const renderer = await createCliRenderer({ exitOnCtrlC: false })
 
 	const cleanup = (code = 0) => {
@@ -46,7 +49,7 @@ async function main() {
 	process.on('SIGTERM', () => cleanup())
 
 	try {
-		createRoot(renderer).render(<App content={result.value} />)
+		createRoot(renderer).render(<App content={content} />)
 	} catch (err: unknown) {
 		const message = err instanceof Error ? err.message : 'unknown render error'
 		renderer.destroy()

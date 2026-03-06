@@ -1,5 +1,4 @@
 import type { Root } from 'hast'
-import type { ReactNode } from 'react'
 import type { Plugin } from 'unified'
 
 import rehypeHighlight from 'rehype-highlight'
@@ -8,12 +7,12 @@ import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
 
+import type { IRNode } from '../ir/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 import type { PipelineResult } from '../types/pipeline.ts'
 
-import { componentMap, fallbackComponent } from '../components/index.ts'
 import { darkTheme } from '../theme/dark.ts'
-import rehypeTerminal from './rehype-terminal.tsx'
+import rehypeIR from './rehype-ir.ts'
 
 const PIPELINE_TIMEOUT_MS = 5_000
 
@@ -26,11 +25,7 @@ export function createProcessor(theme: ThemeTokens = darkTheme) {
 			rehypeHighlight as unknown as Plugin<[{ detect: boolean; ignoreMissing: boolean }], Root>,
 			{ detect: true, ignoreMissing: true },
 		)
-		.use(rehypeTerminal, {
-			components: componentMap,
-			fallback: fallbackComponent,
-			theme,
-		})
+		.use(rehypeIR, { theme })
 }
 
 export async function processMarkdown(
@@ -49,7 +44,7 @@ export async function processMarkdown(
 
 		return {
 			ok: true,
-			value: result.result as ReactNode,
+			value: result.result as IRNode,
 		}
 	} catch (err: unknown) {
 		const message = err instanceof Error ? err.message : 'unknown pipeline error'
