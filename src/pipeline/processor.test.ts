@@ -6,6 +6,7 @@ import { Children, isValidElement, type ReactElement, type ReactNode } from 'rea
 import type { PipelineResult, PipelineSuccess } from '../types/pipeline.ts'
 
 import { renderToOpenTUI } from '../renderer/opentui/index.tsx'
+import { darkTheme } from '../theme/dark.ts'
 import { processMarkdown } from './processor.ts'
 
 // -- tree walking helpers --
@@ -61,7 +62,7 @@ function assertOk(result: PipelineResult): asserts result is PipelineSuccess {
 }
 
 async function render(markdown: string): Promise<ReactNode> {
-	const result = await processMarkdown(markdown)
+	const result = await processMarkdown(markdown, darkTheme)
 	assertOk(result)
 	return renderToOpenTUI(result.value)
 }
@@ -224,7 +225,7 @@ describe('processMarkdown structure', () => {
 	})
 
 	it('handles empty markdown gracefully', async () => {
-		const result = await processMarkdown('')
+		const result = await processMarkdown('', darkTheme)
 		expect(result.ok).toBe(true)
 	})
 })
@@ -273,7 +274,7 @@ describe('processMarkdown benchmark fixtures', () => {
 	it('processes small.md with correct structure', async () => {
 		const md = readFileSync(resolve(fixturesDir, 'small.md'), 'utf-8')
 		const start = performance.now()
-		const result = await processMarkdown(md)
+		const result = await processMarkdown(md, darkTheme)
 		const elapsed = performance.now() - start
 
 		assertOk(result)
@@ -303,7 +304,7 @@ describe('processMarkdown benchmark fixtures', () => {
 	it('processes large.md under 200ms', async () => {
 		const md = readFileSync(resolve(fixturesDir, 'large.md'), 'utf-8')
 		const start = performance.now()
-		const result = await processMarkdown(md)
+		const result = await processMarkdown(md, darkTheme)
 		const elapsed = performance.now() - start
 
 		expect(result.ok).toBe(true)

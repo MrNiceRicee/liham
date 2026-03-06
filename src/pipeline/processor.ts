@@ -11,12 +11,11 @@ import type { IRNode } from '../ir/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 import type { PipelineResult } from '../types/pipeline.ts'
 
-import { darkTheme } from '../theme/dark.ts'
 import rehypeIR from './rehype-ir.ts'
 
 const PIPELINE_TIMEOUT_MS = 5_000
 
-export function createProcessor(theme: ThemeTokens = darkTheme) {
+export function createProcessor(theme: ThemeTokens) {
 	return unified()
 		.use(remarkParse)
 		.use(remarkGfm)
@@ -30,7 +29,7 @@ export function createProcessor(theme: ThemeTokens = darkTheme) {
 
 export async function processMarkdown(
 	markdown: string,
-	theme: ThemeTokens = darkTheme,
+	theme: ThemeTokens,
 ): Promise<PipelineResult> {
 	const processor = createProcessor(theme)
 

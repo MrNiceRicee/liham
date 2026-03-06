@@ -1,7 +1,7 @@
 ---
 title: "feat: Multi-Renderer Dispatch + Phase 2b Completion"
 type: feat
-status: active
+status: completed
 date: 2026-03-05
 deepened: 2026-03-05
 origin: docs/brainstorms/2026-03-05-multi-renderer-support-brainstorm.md
@@ -176,7 +176,7 @@ function isRendererName(v: string): v is RendererName {
 - [x] `src/cli/index.ts` is the actual entry point matching `package.json` bin
 - [x] `src/renderer/types.ts` deleted (unused interface)
 - [x] `src/app/App.tsx` moved to `src/renderer/opentui/app.tsx`
-- [ ] `processMarkdown()` requires theme parameter (no default)
+- [x] `processMarkdown()` requires theme parameter (no default)
 - [x] No manual signal handlers — OpenTUI handles them
 - [x] No `process.exit()` calls — use `renderer.destroy()`
 - [x] Existing tests still pass (49 tests, 167 assertions)
