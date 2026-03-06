@@ -1,6 +1,5 @@
 // cli entry point — parses args, validates input, dispatches to renderer boot.
 
-import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
@@ -9,6 +8,8 @@ import type { ThemeTokens } from '../theme/types.ts'
 import { processMarkdown } from '../pipeline/processor.ts'
 import { boot } from '../renderer/opentui/boot.tsx'
 import { darkTheme } from '../theme/dark.ts'
+import { detectTheme } from '../theme/detect.ts'
+import { lightTheme } from '../theme/light.ts'
 
 // -- renderer name union — add entries as renderers are implemented --
 
@@ -44,7 +45,7 @@ options:
                            available: ${VALID_THEMES.join(', ')}
                              auto   detect from terminal background
                              dark   dark theme (Tokyo Night)
-                             light  light theme (not yet implemented)
+                             light  light theme (Tokyo Night Light)
 
   -h, --help               Show this help message
 
@@ -113,13 +114,20 @@ function parseCliArgs() {
 
 // -- theme resolution --
 
-function resolveTheme(themeName: ThemeName): ThemeTokens {
-	// TODO: 'auto' will use OSC 11 detection in Phase D
-	// TODO: 'light' will use lightTheme in Phase D
-	if (themeName === 'light') {
-		console.error('light theme not yet implemented, using dark')
-	}
-	return darkTheme
+function themeTokens(mode: 'dark' | 'light'): ThemeTokens {
+	return mode === 'light' ? lightTheme : darkTheme
+}
+
+async function resolveTheme(themeName: ThemeName): Promise<ThemeTokens> {
+	if (themeName === 'dark') return darkTheme
+	if (themeName === 'light') return lightTheme
+
+	// auto: flag → env var → OSC 11 detection → dark default
+	const envTheme = process.env['LIHAM_THEME']
+	if (envTheme === 'light' || envTheme === 'dark') return themeTokens(envTheme)
+
+	const detected = await detectTheme()
+	return themeTokens(detected ?? 'dark')
 }
 
 // -- main --
@@ -128,15 +136,16 @@ async function main() {
 	const args = parseCliArgs()
 	const resolved = resolve(args.filePath)
 
-	let markdown: string
-	try {
-		markdown = readFileSync(resolved, 'utf-8')
-	} catch {
-		console.error(`cannot read file: ${resolved}`)
-		process.exit(1)
-	}
-
-	const theme = resolveTheme(args.theme)
+	// parallelize theme detection with file read
+	const [theme, markdown] = await Promise.all([
+		resolveTheme(args.theme),
+		Bun.file(resolved)
+			.text()
+			.catch(() => {
+				console.error(`cannot read file: ${resolved}`)
+				process.exit(1)
+			}),
+	])
 
 	const start = performance.now()
 	const result = await processMarkdown(markdown, theme)

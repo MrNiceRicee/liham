@@ -406,15 +406,15 @@ Complete the remaining inline/block elements. Harden sanitization.
 - Detection module has no dependency on theme types — pure utility
 
 **Acceptance criteria:**
-- [ ] `--theme dark` uses dark theme, `--theme light` uses light theme
-- [ ] `--theme auto` (default) runs detection chain: flag → env → OSC 11 → dark
-- [ ] `LIHAM_THEME=light` env var overrides auto-detection
-- [ ] Auto-detection completes within 50ms even on non-responding terminals
-- [ ] Detection skipped for `TERM=linux` and non-TTY stdout
-- [ ] Light theme has good contrast on light terminal backgrounds (Tokyo Night Light)
-- [ ] Theme detection runs before alt-screen (no OSC 11 timeout issue)
-- [ ] Detection and file read happen in parallel (`Promise.all`)
-- [ ] `src/theme/detect.ts` returns `null` on failure — caller picks default
+- [x] `--theme dark` uses dark theme, `--theme light` uses light theme
+- [x] `--theme auto` (default) runs detection chain: flag → env → OSC 11 → dark
+- [x] `LIHAM_THEME=light` env var overrides auto-detection
+- [x] Auto-detection completes within 50ms even on non-responding terminals
+- [x] Detection skipped for `TERM=linux` and non-TTY stdout
+- [x] Light theme has good contrast on light terminal backgrounds (Tokyo Night Light)
+- [x] Theme detection runs before alt-screen (no OSC 11 timeout issue)
+- [x] Detection and file read happen in parallel (`Promise.all`)
+- [x] `src/theme/detect.ts` returns `null` on failure — caller picks default
 
 ## Technical Considerations
 
