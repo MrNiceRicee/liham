@@ -53,4 +53,7 @@ export const lightTheme: ThemeTokens = {
 	fallback: {
 		textColor: '#8c8fa1',
 	},
+	statusBar: {
+		fg: '#8990b3',
+	},
 }

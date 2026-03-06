@@ -3,6 +3,7 @@
 import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
+import type { LayoutMode } from '../app/state.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 
 import { processMarkdown } from '../pipeline/processor.ts'
@@ -29,6 +30,19 @@ function isThemeName(value: string): value is ThemeName {
 	return (VALID_THEMES as readonly string[]).includes(value)
 }
 
+// -- layout name union --
+
+const VALID_LAYOUTS: readonly LayoutMode[] = [
+	'preview-only',
+	'side',
+	'top',
+	'source-only',
+] as const
+
+function isLayoutName(value: string): value is LayoutMode {
+	return (VALID_LAYOUTS as readonly string[]).includes(value)
+}
+
 // -- help text --
 
 const USAGE = `liham — terminal markdown previewer
@@ -47,6 +61,9 @@ options:
                              dark   dark theme (Tokyo Night)
                              light  light theme (Tokyo Night Light)
 
+  -l, --layout <mode>     Pane layout (default: preview-only)
+                           available: ${VALID_LAYOUTS.join(', ')}
+
   -i, --info               Show detected theme and terminal info, then exit
 
   -h, --help               Show this help message
@@ -61,6 +78,7 @@ examples:
 const options = {
 	help: { type: 'boolean' as const, short: 'h' },
 	info: { type: 'boolean' as const, short: 'i' },
+	layout: { type: 'string' as const, short: 'l', default: 'preview-only' },
 	renderer: { type: 'string' as const, short: 'r', default: 'opentui' },
 	theme: { type: 'string' as const, short: 't', default: 'auto' },
 } as const
@@ -106,8 +124,16 @@ function parseCliArgs() {
 		process.exit(1)
 	}
 
+	const layout = values.layout
+	if (!isLayoutName(layout)) {
+		console.error(`unknown layout: '${layout}'`)
+		console.error(`available layouts: ${VALID_LAYOUTS.join(', ')}`)
+		console.error(`\nrun 'liham --help' for usage`)
+		process.exit(1)
+	}
+
 	if (values.info) {
-		return { filePath: undefined, info: true, renderer, theme }
+		return { filePath: undefined, info: true, layout, renderer, theme }
 	}
 
 	const filePath = positionals[0]
@@ -116,7 +142,7 @@ function parseCliArgs() {
 		process.exit(1)
 	}
 
-	return { filePath, info: false, renderer, theme }
+	return { filePath, info: false, layout, renderer, theme }
 }
 
 // -- theme resolution --
@@ -159,16 +185,16 @@ async function main() {
 
 	const filePath = resolve(args.filePath!)
 
-	// parallelize theme detection with file read
-	const [theme, markdown] = await Promise.all([
-		resolveTheme(args.theme),
-		Bun.file(filePath)
-			.text()
-			.catch(() => {
-				console.error(`cannot read file: ${filePath}`)
-				process.exit(1)
-			}),
-	])
+	// read file first — if it fails, exit before starting OSC 11 detection
+	// (OSC 11 response leaks to terminal if process.exit races with stdin listener)
+	const markdown = await Bun.file(filePath)
+		.text()
+		.catch(() => {
+			console.error(`cannot read file: ${filePath}`)
+			process.exit(1)
+		})
+
+	const theme = await resolveTheme(args.theme)
 
 	const result = await processMarkdown(markdown, theme.tokens)
 
@@ -179,7 +205,7 @@ async function main() {
 
 	// dispatch to renderer boot — static import for now.
 	// when ink/rezi are added, switch on args.renderer here.
-	await boot({ ir: result.value, theme: theme.tokens })
+	await boot({ ir: result.value, theme: theme.tokens, layout: args.layout })
 }
 
 await main()

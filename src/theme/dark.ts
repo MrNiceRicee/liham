@@ -52,4 +52,7 @@ export const darkTheme: ThemeTokens = {
 	fallback: {
 		textColor: '#565f89',
 	},
+	statusBar: {
+		fg: '#565f89',
+	},
 }

@@ -55,6 +55,10 @@ export interface TableTokens {
 	cellColor: string
 }
 
+export interface StatusBarTokens {
+	fg: string
+}
+
 export interface FallbackTokens {
 	textColor: string
 }
@@ -71,4 +75,5 @@ export interface ThemeTokens {
 	horizontalRule: HorizontalRuleTokens
 	table: TableTokens
 	fallback: FallbackTokens
+	statusBar: StatusBarTokens
 }

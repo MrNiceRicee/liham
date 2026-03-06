@@ -1,0 +1,269 @@
+import { describe, expect, test } from 'bun:test'
+
+import {
+	type AppState,
+	type LayoutMode,
+	appReducer,
+	initialState,
+	isSplitLayout,
+	legendEntries,
+} from './state.ts'
+
+// -- helpers --
+
+function stateWith(overrides: Partial<AppState>): AppState {
+	return { ...initialState(), ...overrides }
+}
+
+// -- initialState --
+
+describe('initialState', () => {
+	test('defaults to preview-only layout', () => {
+		const s = initialState()
+		expect(s.layout).toBe('preview-only')
+		expect(s.focus).toBe('preview')
+		expect(s.legendVisible).toBe(true)
+		expect(s.scrollSync).toBe(false)
+		expect(s.scrollPercent).toEqual({ source: 0, preview: 0 })
+	})
+
+	test('accepts layout parameter', () => {
+		const s = initialState('side')
+		expect(s.layout).toBe('side')
+		expect(s.focus).toBe('preview')
+	})
+
+	test('auto-focuses source in source-only layout', () => {
+		const s = initialState('source-only')
+		expect(s.focus).toBe('source')
+	})
+
+	test('auto-focuses preview in preview-only layout', () => {
+		const s = initialState('preview-only')
+		expect(s.focus).toBe('preview')
+	})
+})
+
+// -- isSplitLayout --
+
+describe('isSplitLayout', () => {
+	test('side is split', () => expect(isSplitLayout('side')).toBe(true))
+	test('top is split', () => expect(isSplitLayout('top')).toBe(true))
+	test('preview-only is not split', () => expect(isSplitLayout('preview-only')).toBe(false))
+	test('source-only is not split', () => expect(isSplitLayout('source-only')).toBe(false))
+})
+
+// -- Resize --
+
+describe('Resize action', () => {
+	test('updates dimensions', () => {
+		const s = stateWith({ dimensions: { width: 80, height: 24 } })
+		const next = appReducer(s, { type: 'Resize', width: 120, height: 40 })
+		expect(next.dimensions).toEqual({ width: 120, height: 40 })
+	})
+
+	test('returns same reference when dimensions unchanged', () => {
+		const s = stateWith({ dimensions: { width: 80, height: 24 } })
+		const next = appReducer(s, { type: 'Resize', width: 80, height: 24 })
+		expect(next).toBe(s)
+	})
+})
+
+// -- FocusPane --
+
+describe('FocusPane action', () => {
+	test('switches focus in split layout', () => {
+		const s = stateWith({ layout: 'side', focus: 'preview' })
+		const next = appReducer(s, { type: 'FocusPane', target: 'source' })
+		expect(next.focus).toBe('source')
+	})
+
+	test('is no-op in preview-only mode', () => {
+		const s = stateWith({ layout: 'preview-only', focus: 'preview' })
+		const next = appReducer(s, { type: 'FocusPane', target: 'source' })
+		expect(next).toBe(s)
+	})
+
+	test('is no-op in source-only mode', () => {
+		const s = stateWith({ layout: 'source-only', focus: 'source' })
+		const next = appReducer(s, { type: 'FocusPane', target: 'preview' })
+		expect(next).toBe(s)
+	})
+
+	test('returns same reference when already focused', () => {
+		const s = stateWith({ layout: 'side', focus: 'source' })
+		const next = appReducer(s, { type: 'FocusPane', target: 'source' })
+		expect(next).toBe(s)
+	})
+})
+
+// -- ToggleSync --
+
+describe('ToggleSync action', () => {
+	test('toggles sync off → on', () => {
+		const s = stateWith({ scrollSync: false })
+		const next = appReducer(s, { type: 'ToggleSync' })
+		expect(next.scrollSync).toBe(true)
+	})
+
+	test('toggles sync on → off', () => {
+		const s = stateWith({ scrollSync: true })
+		const next = appReducer(s, { type: 'ToggleSync' })
+		expect(next.scrollSync).toBe(false)
+	})
+})
+
+// -- ToggleLegend --
+
+describe('ToggleLegend action', () => {
+	test('hides legend', () => {
+		const s = stateWith({ legendVisible: true })
+		const next = appReducer(s, { type: 'ToggleLegend' })
+		expect(next.legendVisible).toBe(false)
+	})
+
+	test('shows legend', () => {
+		const s = stateWith({ legendVisible: false })
+		const next = appReducer(s, { type: 'ToggleLegend' })
+		expect(next.legendVisible).toBe(true)
+	})
+})
+
+// -- CycleLayout --
+
+describe('CycleLayout action', () => {
+	test('cycles through all layouts in order', () => {
+		const cycle: LayoutMode[] = ['preview-only', 'side', 'top', 'source-only']
+		let s = initialState()
+
+		for (let i = 0; i < cycle.length; i++) {
+			expect(s.layout).toBe(cycle[i])
+			s = appReducer(s, { type: 'CycleLayout' })
+		}
+		// wraps back to preview-only
+		expect(s.layout).toBe('preview-only')
+	})
+
+	test('auto-focuses preview in preview-only', () => {
+		const s = stateWith({ layout: 'source-only', focus: 'source' })
+		const next = appReducer(s, { type: 'CycleLayout' }) // source-only → preview-only
+		expect(next.layout).toBe('preview-only')
+		expect(next.focus).toBe('preview')
+	})
+
+	test('auto-focuses source in source-only', () => {
+		const s = stateWith({ layout: 'top', focus: 'preview' })
+		const next = appReducer(s, { type: 'CycleLayout' }) // top → source-only
+		expect(next.layout).toBe('source-only')
+		expect(next.focus).toBe('source')
+	})
+
+	test('preserves focus in split layouts', () => {
+		const s = stateWith({ layout: 'preview-only', focus: 'preview' })
+		const next = appReducer(s, { type: 'CycleLayout' }) // preview-only → side
+		expect(next.layout).toBe('side')
+		expect(next.focus).toBe('preview')
+	})
+})
+
+// -- Scroll --
+
+describe('Scroll action', () => {
+	test('returns same state reference (scroll handled imperatively)', () => {
+		const s = initialState()
+		const next = appReducer(s, { type: 'Scroll', direction: 'down' })
+		expect(next).toBe(s)
+	})
+})
+
+// -- Quit --
+
+describe('Quit action', () => {
+	test('returns same state reference (quit handled imperatively)', () => {
+		const s = initialState()
+		const next = appReducer(s, { type: 'Quit' })
+		expect(next).toBe(s)
+	})
+})
+
+// -- legendEntries --
+
+describe('legendEntries', () => {
+	test('preview-only shows basic entries', () => {
+		const s = stateWith({ layout: 'preview-only' })
+		const entries = legendEntries(s)
+		const keys = entries.map((e) => e.key)
+		expect(keys).toContain('?')
+		expect(keys).toContain('l')
+		expect(keys).toContain('q')
+		expect(keys).not.toContain('Tab')
+		expect(keys).not.toContain('s')
+	})
+
+	test('split layout shows tab and sync entries', () => {
+		const s = stateWith({ layout: 'side', focus: 'preview', scrollSync: false })
+		const entries = legendEntries(s)
+		const keys = entries.map((e) => e.key)
+		expect(keys).toContain('Tab')
+		expect(keys).toContain('s')
+	})
+
+	test('tab label shows opposite pane name', () => {
+		const s = stateWith({ layout: 'side', focus: 'preview' })
+		const entries = legendEntries(s)
+		const tab = entries.find((e) => e.key === 'Tab')
+		expect(tab?.label).toBe('source')
+	})
+
+	test('sync label reflects sync state', () => {
+		const on = stateWith({ layout: 'side', scrollSync: true })
+		const off = stateWith({ layout: 'side', scrollSync: false })
+		const onEntry = legendEntries(on).find((e) => e.key === 's')
+		const offEntry = legendEntries(off).find((e) => e.key === 's')
+		expect(onEntry?.label).toBe('sync on')
+		expect(offEntry?.label).toBe('sync off')
+	})
+})
+
+// -- integration traces --
+
+describe('state machine traces', () => {
+	test('layout cycle with focus preservation', () => {
+		let s = initialState('side')
+		s = appReducer(s, { type: 'FocusPane', target: 'source' })
+		expect(s.focus).toBe('source')
+
+		s = appReducer(s, { type: 'CycleLayout' }) // side → top
+		expect(s.layout).toBe('top')
+		expect(s.focus).toBe('source') // preserved in split
+
+		s = appReducer(s, { type: 'CycleLayout' }) // top → source-only
+		expect(s.layout).toBe('source-only')
+		expect(s.focus).toBe('source') // auto-focused
+
+		s = appReducer(s, { type: 'CycleLayout' }) // source-only → preview-only
+		expect(s.layout).toBe('preview-only')
+		expect(s.focus).toBe('preview') // auto-focused
+
+		s = appReducer(s, { type: 'CycleLayout' }) // preview-only → side
+		expect(s.layout).toBe('side')
+		expect(s.focus).toBe('preview') // preserved from last state
+	})
+
+	test('resize followed by scroll returns correct state', () => {
+		let s = initialState()
+		s = appReducer(s, { type: 'Resize', width: 120, height: 40 })
+		expect(s.dimensions).toEqual({ width: 120, height: 40 })
+
+		const scrolled = appReducer(s, { type: 'Scroll', direction: 'down' })
+		expect(scrolled).toBe(s) // scroll is imperative, no state change
+	})
+
+	test('toggle legend twice returns to original visibility', () => {
+		const s = initialState()
+		const hidden = appReducer(s, { type: 'ToggleLegend' })
+		expect(hidden.legendVisible).toBe(false)
+		const restored = appReducer(hidden, { type: 'ToggleLegend' })
+		expect(restored.legendVisible).toBe(true)
+	})
+})
