@@ -172,8 +172,9 @@ export function BrowserPane({
 				</box>
 			</box>
 
-			{/* file list */}
+			{/* file list — key includes filter to force clean remount on filter change */}
 			<scrollbox
+				key={`browser-${filter}`}
 				ref={scrollRef}
 				focused={focused}
 				viewportCulling
