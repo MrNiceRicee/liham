@@ -52,7 +52,7 @@ function renderNode(node: IRNode, key: string): ReactNode {
 			return renderTable(node, key)
 
 		case 'tableRow':
-			return renderTableRow(node, key, [], {})
+			return renderTableRow(node, key, { colWidths: [] }, false)
 
 		case 'tableCell':
 			return renderTableCell(node, key, false, 20)

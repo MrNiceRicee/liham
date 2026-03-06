@@ -230,12 +230,17 @@ describe('GFM table rendering', () => {
 	it('renders table with box-drawing border characters', async () => {
 		const tree = await render('| A | B |\n| --- | --- |\n| 1 | 2 |')
 		const text = collectText(tree)
-		// box-drawing characters for table frame
+		// horizontal separators are text content
 		expect(text).toContain('┌')
 		expect(text).toContain('┐')
 		expect(text).toContain('└')
 		expect(text).toContain('┘')
-		expect(text).toContain('│')
+		// vertical │ borders are rendered via OpenTUI box border prop, not text content
+		const rows = findAll(tree, (el) => {
+			const style = prop<Record<string, unknown>>(el, 'style')
+			return isIntrinsic(el, 'box') && Array.isArray(style?.['border'])
+		})
+		expect(rows.length).toBeGreaterThanOrEqual(1)
 	})
 
 	it('renders header and data rows', async () => {

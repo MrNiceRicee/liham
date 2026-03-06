@@ -48,6 +48,7 @@ export const darkTheme: ThemeTokens = {
 		borderColor: '#414868',
 		headerColor: '#7aa2f7',
 		cellColor: '#c0caf5',
+		stripeColor: '#1e2030',
 	},
 	fallback: {
 		textColor: '#565f89',

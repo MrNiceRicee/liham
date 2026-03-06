@@ -336,7 +336,7 @@ function compileTable(state: CompilerState, node: Element): IRNode {
 	return {
 		type: 'table',
 		alignments,
-		style: { borderColor: state.theme.table.borderColor },
+		style: { borderColor: state.theme.table.borderColor, bg: state.theme.table.stripeColor },
 		children: rows,
 	}
 }

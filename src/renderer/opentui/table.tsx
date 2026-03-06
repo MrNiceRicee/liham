@@ -74,17 +74,13 @@ function distributeColumnWidths(
 	const available = terminalWidth - overhead
 	const totalContent = contentWidths.reduce((sum, w) => sum + w, 0)
 
-	// fits? use content-fitted
 	if (totalContent <= available) return contentWidths
 
-	// minimum = header width per column (at least 1 char)
 	const minWidths = contentWidths.map((_, i) => Math.max(headerWidths[i] ?? 1, 1))
 	const totalMin = minWidths.reduce((sum, w) => sum + w, 0)
 
-	// even minimums don't fit — use minimums, scrollbox handles overflow
 	if (totalMin >= available) return minWidths
 
-	// distribute excess space proportionally
 	const distributable = available - totalMin
 	const excessWidths = contentWidths.map((w, i) => Math.max(0, w - minWidths[i]!))
 	const totalExcess = excessWidths.reduce((sum, w) => sum + w, 0)
@@ -96,26 +92,40 @@ function distributeColumnWidths(
 
 // -- rendering --
 
-export function renderTable(node: TableNode, key: string) {
-	const borderStyle: Record<string, unknown> = {}
-	if (node.style.borderColor != null) borderStyle['fg'] = node.style.borderColor
+interface TableContext {
+	borderColor?: string
+	stripeColor?: string
+	colWidths: number[]
+}
 
+export function renderTable(node: TableNode, key: string) {
 	const contentWidths = measureColumnWidths(node)
 	const headerWidths = measureHeaderWidths(node)
 	const termWidth = process.stdout.columns || 80
 	const colWidths = distributeColumnWidths(contentWidths, headerWidths, termWidth)
 
+	const ctx: TableContext = {
+		borderColor: node.style.borderColor,
+		stripeColor: node.style.bg,
+		colWidths,
+	}
+
+	const borderFg: Record<string, unknown> = {}
+	if (ctx.borderColor != null) borderFg['fg'] = ctx.borderColor
+
 	const rows: ReactNode[] = []
+	let dataRowIndex = 0
 	for (let i = 0; i < node.children.length; i++) {
 		const row = node.children[i]!
 		if (row.type !== 'tableRow') continue
 		const rowKey = `${key}-r${String(i)}`
-
-		rows.push(renderTableRow(row, rowKey, colWidths, borderStyle))
+		const stripe = !row.isHeader && dataRowIndex % 2 === 1
+		rows.push(renderTableRow(row, rowKey, ctx, stripe))
+		if (!row.isHeader) dataRowIndex++
 
 		if (row.isHeader && i < node.children.length - 1) {
 			rows.push(
-				<text key={`${rowKey}-sep`} style={borderStyle}>
+				<text key={`${rowKey}-sep`} style={borderFg}>
 					{buildSeparator(colWidths, '├', '┼', '┤', '─')}
 				</text>,
 			)
@@ -124,9 +134,9 @@ export function renderTable(node: TableNode, key: string) {
 
 	return (
 		<box key={key} style={{ flexDirection: 'column', marginBottom: 1 }}>
-			<text style={borderStyle}>{buildSeparator(colWidths, '┌', '┬', '┐', '─')}</text>
+			<text style={borderFg}>{buildSeparator(colWidths, '┌', '┬', '┐', '─')}</text>
 			{rows}
-			<text style={borderStyle}>{buildSeparator(colWidths, '└', '┴', '┘', '─')}</text>
+			<text style={borderFg}>{buildSeparator(colWidths, '└', '┴', '┘', '─')}</text>
 		</box>
 	)
 }
@@ -138,48 +148,76 @@ function buildSeparator(
 	right: string,
 	fill: string,
 ): string {
-	const segments = colWidths.map((w) => fill.repeat(w + 2)) // +2 for cell padding
+	const segments = colWidths.map((w) => fill.repeat(w + 2))
 	return left + segments.join(mid) + right
+}
+
+function buildCellStyle(colIndex: number, cellWidth: number, borderColor?: string) {
+	const style: Record<string, unknown> = {
+		width: cellWidth,
+		paddingLeft: 1,
+		paddingRight: 1,
+	}
+	if (colIndex > 0) {
+		style['border'] = ['left']
+		style['borderStyle'] = 'single'
+		if (borderColor != null) style['borderColor'] = borderColor
+	}
+	return style
+}
+
+function renderCellContent(
+	cell: TableCellNode | undefined,
+	cellKey: string,
+	cellStyle: Record<string, unknown>,
+	isHeader: boolean,
+) {
+	if (cell == null) {
+		return (
+			<box key={cellKey} style={cellStyle}>
+				<text> </text>
+			</box>
+		)
+	}
+
+	const textStyle: Record<string, unknown> = {}
+	if (cell.style.fg != null) textStyle['fg'] = cell.style.fg
+	if (isHeader || cell.style.bold === true) textStyle['attributes'] = 1
+
+	return (
+		<box key={cellKey} style={cellStyle}>
+			<text style={textStyle}>{renderInlineChildren(cell.children, cellKey)}</text>
+		</box>
+	)
 }
 
 export function renderTableRow(
 	node: TableRowNode,
 	key: string,
-	colWidths: number[],
-	borderStyle: Record<string, unknown>,
+	ctx: TableContext,
+	stripe: boolean,
 ) {
 	const cells = node.children.filter((c) => c.type === 'tableCell') as TableCellNode[]
+
+	const rowStyle: Record<string, unknown> = {
+		flexDirection: 'row',
+		border: ['left', 'right'],
+		borderStyle: 'single',
+	}
+	if (ctx.borderColor != null) rowStyle['borderColor'] = ctx.borderColor
+	if (stripe && ctx.stripeColor != null) rowStyle['backgroundColor'] = ctx.stripeColor
+
 	const parts: ReactNode[] = []
-
-	for (let i = 0; i < colWidths.length; i++) {
-		if (i > 0) {
-			parts.push(
-				<text key={`${key}-sep${String(i)}`} style={borderStyle}>
-					{'│'}
-				</text>,
-			)
-		}
-
-		const cell = cells[i]
+	for (let i = 0; i < ctx.colWidths.length; i++) {
 		const cellKey = `${key}-c${String(i)}`
-		const cellWidth = colWidths[i]! + 2 // +2 for padding
-
-		if (cell != null) {
-			parts.push(renderTableCell(cell, cellKey, node.isHeader, cellWidth))
-		} else {
-			parts.push(
-				<box key={cellKey} style={{ width: cellWidth }}>
-					<text>{' '.repeat(cellWidth)}</text>
-				</box>,
-			)
-		}
+		const cellWidth = ctx.colWidths[i]! + 2
+		const cellStyle = buildCellStyle(i, cellWidth, ctx.borderColor)
+		parts.push(renderCellContent(cells[i], cellKey, cellStyle, node.isHeader))
 	}
 
 	return (
-		<box key={key} style={{ flexDirection: 'row' }}>
-			<text style={borderStyle}>{'│'}</text>
+		<box key={key} style={rowStyle}>
 			{parts}
-			<text style={borderStyle}>{'│'}</text>
 		</box>
 	)
 }
