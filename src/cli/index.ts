@@ -47,6 +47,8 @@ options:
                              dark   dark theme (Tokyo Night)
                              light  light theme (Tokyo Night Light)
 
+  -i, --info               Show detected theme and terminal info, then exit
+
   -h, --help               Show this help message
 
 examples:
@@ -58,6 +60,7 @@ examples:
 
 const options = {
 	help: { type: 'boolean' as const, short: 'h' },
+	info: { type: 'boolean' as const, short: 'i' },
 	renderer: { type: 'string' as const, short: 'r', default: 'opentui' },
 	theme: { type: 'string' as const, short: 't', default: 'auto' },
 } as const
@@ -109,58 +112,69 @@ function parseCliArgs() {
 		process.exit(1)
 	}
 
-	return { filePath, renderer, theme }
+	return { filePath, info: values.info === true, renderer, theme }
 }
 
 // -- theme resolution --
 
-function themeTokens(mode: 'dark' | 'light'): ThemeTokens {
-	return mode === 'light' ? lightTheme : darkTheme
+interface ResolvedTheme {
+	name: string
+	tokens: ThemeTokens
 }
 
-async function resolveTheme(themeName: ThemeName): Promise<ThemeTokens> {
-	if (themeName === 'dark') return darkTheme
-	if (themeName === 'light') return lightTheme
+async function resolveTheme(themeName: ThemeName): Promise<ResolvedTheme> {
+	if (themeName === 'dark') return { name: 'dark', tokens: darkTheme }
+	if (themeName === 'light') return { name: 'light', tokens: lightTheme }
 
 	// auto: flag → env var → OSC 11 detection → dark default
 	const envTheme = process.env['LIHAM_THEME']
-	if (envTheme === 'light' || envTheme === 'dark') return themeTokens(envTheme)
+	if (envTheme === 'light') return { name: 'light (env)', tokens: lightTheme }
+	if (envTheme === 'dark') return { name: 'dark (env)', tokens: darkTheme }
 
 	const detected = await detectTheme()
-	return themeTokens(detected ?? 'dark')
+	const mode = detected ?? 'dark'
+	const source = detected != null ? 'detected' : 'default'
+	return { name: `${mode} (${source})`, tokens: mode === 'light' ? lightTheme : darkTheme }
 }
 
 // -- main --
 
 async function main() {
 	const args = parseCliArgs()
-	const resolved = resolve(args.filePath)
+	const filePath = resolve(args.filePath)
 
 	// parallelize theme detection with file read
 	const [theme, markdown] = await Promise.all([
 		resolveTheme(args.theme),
-		Bun.file(resolved)
+		Bun.file(filePath)
 			.text()
 			.catch(() => {
-				console.error(`cannot read file: ${resolved}`)
+				console.error(`cannot read file: ${filePath}`)
 				process.exit(1)
 			}),
 	])
 
-	const start = performance.now()
-	const result = await processMarkdown(markdown, theme)
-	const elapsed = performance.now() - start
+	if (args.info) {
+		console.log(`theme: ${theme.name}`)
+		console.log(`renderer: ${args.renderer}`)
+		console.log(`file: ${filePath}`)
+		console.log(`TERM: ${process.env['TERM'] ?? '(unset)'}`)
+		console.log(`TERM_PROGRAM: ${process.env['TERM_PROGRAM'] ?? '(unset)'}`)
+		console.log(`LIHAM_THEME: ${process.env['LIHAM_THEME'] ?? '(unset)'}`)
+		console.log(`tty: ${String(process.stdout.isTTY ?? false)}`)
+		process.exit(0)
+	}
+
+	const result = await processMarkdown(markdown, theme.tokens)
 
 	if (!result.ok) {
 		console.error(`pipeline error: ${result.error}`)
 		process.exit(1)
 	}
 
-	console.error(`pipeline: ${elapsed.toFixed(1)}ms`)
-
 	// dispatch to renderer boot — static import for now.
 	// when ink/rezi are added, switch on args.renderer here.
-	await boot({ ir: result.value, theme })
+	await boot({ ir: result.value, theme: theme.tokens })
 }
 
 await main()
