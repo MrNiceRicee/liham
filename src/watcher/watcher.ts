@@ -1,7 +1,7 @@
 // file watcher — monitors parent directory for changes to a specific file.
 // ports the Go v1 fsnotify pattern to node:fs watch().
 
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { watch, type FSWatcher } from 'node:fs'
 import { basename, dirname, resolve } from 'node:path'
 
@@ -20,6 +20,23 @@ export interface FileWatcher {
 }
 
 const DEFAULT_DEBOUNCE_MS = 80
+const DEFAULT_DIR_DEBOUNCE_MS = 300
+
+// directory prefixes to ignore in recursive directory watcher
+const EXCLUDED_DIR_PREFIXES = new Set([
+	'.git',
+	'.hg',
+	'.svn',
+	'node_modules',
+	'.next',
+	'dist',
+	'build',
+	'vendor',
+	'target',
+	'__pycache__',
+	'.venv',
+	'coverage',
+])
 
 // editor temp file detection — filters spurious events from atomic saves
 export function isEditorTemp(name: string): boolean {
@@ -85,6 +102,78 @@ export function createFileWatcher(filePath: string, options: WatcherOptions): Fi
 		clearDebounce()
 		debounceTimer = setTimeout(() => {
 			if (!closed) options.onEvent({ type: 'change', path })
+		}, debounceMs)
+	}
+
+	function clearDebounce(): void {
+		if (debounceTimer != null) {
+			clearTimeout(debounceTimer)
+			debounceTimer = null
+		}
+	}
+
+	return {
+		close() {
+			if (closed) return
+			closed = true
+			clearDebounce()
+			fsWatcher.close()
+		},
+	}
+}
+
+// -- directory watcher --
+
+export interface DirectoryWatcherOptions {
+	onEvent: () => void
+	debounceMs?: number
+}
+
+export interface DirectoryWatcher {
+	close(): void
+}
+
+// checks if a filename starts with an excluded directory prefix
+function isExcludedPath(filename: string): boolean {
+	const first = filename.split('/')[0] ?? filename
+	return EXCLUDED_DIR_PREFIXES.has(first)
+}
+
+// watches a directory recursively for any filesystem changes.
+// fires a single onEvent callback (no event type) — the consumer rescans.
+export function createDirectoryWatcher(
+	dirPath: string,
+	options: DirectoryWatcherOptions,
+): DirectoryWatcher {
+	const absDir = resolve(dirPath)
+
+	// verify directory exists before starting watcher
+	const s = statSync(absDir)
+	if (!s.isDirectory()) {
+		throw new Error(`not a directory: ${absDir}`)
+	}
+
+	const debounceMs = options.debounceMs ?? DEFAULT_DIR_DEBOUNCE_MS
+	let debounceTimer: ReturnType<typeof setTimeout> | null = null
+	let closed = false
+
+	const fsWatcher: FSWatcher = watch(absDir, { recursive: true }, (_event, filename) => {
+		if (closed) return
+		if (filename == null || filename === '') return
+		if (isEditorTemp(filename)) return
+		if (isExcludedPath(filename)) return
+
+		resetDebounce()
+	})
+
+	fsWatcher.on('error', () => {
+		// silently ignore — degrade to static mode
+	})
+
+	function resetDebounce(): void {
+		clearDebounce()
+		debounceTimer = setTimeout(() => {
+			if (!closed) options.onEvent()
 		}, debounceMs)
 	}
 

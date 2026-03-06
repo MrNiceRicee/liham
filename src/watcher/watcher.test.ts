@@ -3,7 +3,7 @@ import { mkdir, rm, writeFile, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { createFileWatcher, isEditorTemp, type WatcherEvent } from './watcher.ts'
+import { createDirectoryWatcher, createFileWatcher, isEditorTemp, type WatcherEvent } from './watcher.ts'
 
 // -- isEditorTemp tests --
 
@@ -217,5 +217,152 @@ describe('createFileWatcher', () => {
 			await rm(join(TEST_DIR, '4913'), { force: true })
 			await rm(join(TEST_DIR, 'test.md~'), { force: true })
 		}
+	})
+})
+
+// -- createDirectoryWatcher integration tests --
+
+describe('createDirectoryWatcher', () => {
+	const DIR_TEST_DIR = join(tmpdir(), `liham-dirwatch-test-${Date.now()}`)
+
+	beforeAll(async () => {
+		await mkdir(DIR_TEST_DIR, { recursive: true })
+	})
+
+	afterAll(async () => {
+		await rm(DIR_TEST_DIR, { recursive: true, force: true })
+	})
+
+	test('fires event on .md file creation', async () => {
+		let eventCount = 0
+		const watcher = createDirectoryWatcher(DIR_TEST_DIR, {
+			onEvent: () => { eventCount++ },
+			debounceMs: 50,
+		})
+
+		try {
+			await Bun.sleep(50)
+			await writeFile(join(DIR_TEST_DIR, 'new.md'), '# new')
+			await Bun.sleep(200)
+
+			expect(eventCount).toBeGreaterThanOrEqual(1)
+		} finally {
+			watcher.close()
+			await rm(join(DIR_TEST_DIR, 'new.md'), { force: true })
+		}
+	})
+
+	test('fires event on file deletion', async () => {
+		const deletable = join(DIR_TEST_DIR, 'deletable.md')
+		await writeFile(deletable, '# will be deleted')
+
+		let eventCount = 0
+		const watcher = createDirectoryWatcher(DIR_TEST_DIR, {
+			onEvent: () => { eventCount++ },
+			debounceMs: 50,
+		})
+
+		try {
+			await Bun.sleep(50)
+			await unlink(deletable)
+			await Bun.sleep(200)
+
+			expect(eventCount).toBeGreaterThanOrEqual(1)
+		} finally {
+			watcher.close()
+		}
+	})
+
+	test('fires event on non-.md file creation (rescan filters by extension)', async () => {
+		let eventCount = 0
+		const watcher = createDirectoryWatcher(DIR_TEST_DIR, {
+			onEvent: () => { eventCount++ },
+			debounceMs: 50,
+		})
+
+		try {
+			await Bun.sleep(50)
+			await writeFile(join(DIR_TEST_DIR, 'readme.txt'), 'hello')
+			await Bun.sleep(200)
+
+			expect(eventCount).toBeGreaterThanOrEqual(1)
+		} finally {
+			watcher.close()
+			await rm(join(DIR_TEST_DIR, 'readme.txt'), { force: true })
+		}
+	})
+
+	test('does not fire for editor temp files', async () => {
+		// use a fresh subdirectory to isolate from prior test cleanup events
+		const tempDir = join(DIR_TEST_DIR, 'temp-test')
+		await mkdir(tempDir, { recursive: true })
+
+		let eventCount = 0
+		const watcher = createDirectoryWatcher(tempDir, {
+			onEvent: () => { eventCount++ },
+			debounceMs: 50,
+		})
+
+		try {
+			await Bun.sleep(100)
+			await writeFile(join(tempDir, '4913'), '')
+			await writeFile(join(tempDir, 'file.md~'), '')
+			await Bun.sleep(200)
+
+			expect(eventCount).toBe(0)
+		} finally {
+			watcher.close()
+			await rm(tempDir, { recursive: true, force: true })
+		}
+	})
+
+	test('debounce coalesces rapid events into single callback', async () => {
+		let eventCount = 0
+		const watcher = createDirectoryWatcher(DIR_TEST_DIR, {
+			onEvent: () => { eventCount++ },
+			debounceMs: 100,
+		})
+
+		try {
+			await Bun.sleep(50)
+			await writeFile(join(DIR_TEST_DIR, 'a.md'), '# a')
+			await Bun.sleep(10)
+			await writeFile(join(DIR_TEST_DIR, 'b.md'), '# b')
+			await Bun.sleep(10)
+			await writeFile(join(DIR_TEST_DIR, 'c.md'), '# c')
+			await Bun.sleep(250)
+
+			expect(eventCount).toBe(1)
+		} finally {
+			watcher.close()
+			await rm(join(DIR_TEST_DIR, 'a.md'), { force: true })
+			await rm(join(DIR_TEST_DIR, 'b.md'), { force: true })
+			await rm(join(DIR_TEST_DIR, 'c.md'), { force: true })
+		}
+	})
+
+	test('close() stops further events', async () => {
+		let eventCount = 0
+		const watcher = createDirectoryWatcher(DIR_TEST_DIR, {
+			onEvent: () => { eventCount++ },
+			debounceMs: 50,
+		})
+
+		await Bun.sleep(50)
+		watcher.close()
+
+		await writeFile(join(DIR_TEST_DIR, 'after-close.md'), '# nope')
+		await Bun.sleep(200)
+
+		expect(eventCount).toBe(0)
+		await rm(join(DIR_TEST_DIR, 'after-close.md'), { force: true })
+	})
+
+	test('throws on non-existent directory', () => {
+		expect(() => {
+			createDirectoryWatcher('/tmp/liham-nonexistent-dir-xyz', {
+				onEvent: () => {},
+			})
+		}).toThrow()
 	})
 })
