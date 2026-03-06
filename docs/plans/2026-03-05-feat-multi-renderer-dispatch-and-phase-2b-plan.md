@@ -260,7 +260,7 @@ Add to `CoreIRNode` union. Add `'table'`, `'tableRow'`, `'tableCell'` to `BLOCK_
 - [x] Tables with inline formatting (bold, code, links) in cells work
 - [x] Empty cells render correctly
 - [x] IR tests validate table node structure
-- [ ] Large tables (>100 rows) show overflow indicator
+- [x] Large tables (>100 rows) show overflow indicator
 
 ---
 

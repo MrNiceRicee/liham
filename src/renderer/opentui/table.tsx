@@ -98,6 +98,46 @@ interface TableContext {
 	colWidths: number[]
 }
 
+const MAX_DATA_ROWS = 100
+
+function countDataRows(node: TableNode): number {
+	let count = 0
+	for (const child of node.children) {
+		if (child.type === 'tableRow' && !child.isHeader) count++
+	}
+	return count
+}
+
+function buildTableRows(
+	node: TableNode,
+	key: string,
+	ctx: TableContext,
+	borderFg: Record<string, unknown>,
+): ReactNode[] {
+	const rows: ReactNode[] = []
+	let dataRowIndex = 0
+
+	for (let i = 0; i < node.children.length; i++) {
+		const row = node.children[i]!
+		if (row.type !== 'tableRow') continue
+		if (!row.isHeader && dataRowIndex >= MAX_DATA_ROWS) break
+
+		const rowKey = `${key}-r${String(i)}`
+		const stripe = !row.isHeader && dataRowIndex % 2 === 1
+		rows.push(renderTableRow(row, rowKey, ctx, stripe))
+		if (!row.isHeader) dataRowIndex++
+
+		if (row.isHeader && i < node.children.length - 1) {
+			rows.push(
+				<text key={`${rowKey}-sep`} style={borderFg}>
+					{buildSeparator(ctx.colWidths, '├', '┼', '┤', '─')}
+				</text>,
+			)
+		}
+	}
+	return rows
+}
+
 export function renderTable(node: TableNode, key: string) {
 	const contentWidths = measureColumnWidths(node)
 	const headerWidths = measureHeaderWidths(node)
@@ -113,30 +153,17 @@ export function renderTable(node: TableNode, key: string) {
 	const borderFg: Record<string, unknown> = {}
 	if (ctx.borderColor != null) borderFg['fg'] = ctx.borderColor
 
-	const rows: ReactNode[] = []
-	let dataRowIndex = 0
-	for (let i = 0; i < node.children.length; i++) {
-		const row = node.children[i]!
-		if (row.type !== 'tableRow') continue
-		const rowKey = `${key}-r${String(i)}`
-		const stripe = !row.isHeader && dataRowIndex % 2 === 1
-		rows.push(renderTableRow(row, rowKey, ctx, stripe))
-		if (!row.isHeader) dataRowIndex++
-
-		if (row.isHeader && i < node.children.length - 1) {
-			rows.push(
-				<text key={`${rowKey}-sep`} style={borderFg}>
-					{buildSeparator(colWidths, '├', '┼', '┤', '─')}
-				</text>,
-			)
-		}
-	}
+	const rows = buildTableRows(node, key, ctx, borderFg)
+	const overflowCount = countDataRows(node) - MAX_DATA_ROWS
 
 	return (
 		<box key={key} style={{ flexDirection: 'column', marginBottom: 1 }}>
 			<text style={borderFg}>{buildSeparator(colWidths, '┌', '┬', '┐', '─')}</text>
 			{rows}
 			<text style={borderFg}>{buildSeparator(colWidths, '└', '┴', '┘', '─')}</text>
+			{overflowCount > 0 && (
+				<text style={{ fg: '#565f89' }}>{`… ${String(overflowCount)} more rows`}</text>
+			)}
 		</box>
 	)
 }
