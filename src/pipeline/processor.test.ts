@@ -235,12 +235,8 @@ describe('GFM table rendering', () => {
 		expect(text).toContain('┐')
 		expect(text).toContain('└')
 		expect(text).toContain('┘')
-		// vertical │ borders are rendered via OpenTUI box border prop, not text content
-		const rows = findAll(tree, (el) => {
-			const style = prop<Record<string, unknown>>(el, 'style')
-			return isIntrinsic(el, 'box') && Array.isArray(style?.['border'])
-		})
-		expect(rows.length).toBeGreaterThanOrEqual(1)
+		// vertical borders are now text characters (fully text-based rendering)
+		expect(text).toContain('│')
 	})
 
 	it('renders header and data rows', async () => {
