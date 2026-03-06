@@ -29,7 +29,7 @@ import {
 import { fuzzyFilter } from '../../browser/fuzzy.ts'
 import { scanDirectory } from '../../browser/scanner.ts'
 import { processMarkdown } from '../../pipeline/processor.ts'
-import { createFileWatcher } from '../../watcher/watcher.ts'
+import { createDirectoryWatcher, createFileWatcher } from '../../watcher/watcher.ts'
 import { browserKeyHandler } from './browser-keys.ts'
 import { renderToOpenTUI } from './index.tsx'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
@@ -98,7 +98,7 @@ type AppProps =
 			filePath: string
 			noWatch: boolean
 	  }
-	| { mode: 'browser'; dir: string; layout: LayoutMode; theme: ThemeTokens }
+	| { mode: 'browser'; dir: string; layout: LayoutMode; theme: ThemeTokens; noWatch: boolean }
 
 // -- viewer mode key maps --
 
@@ -263,6 +263,39 @@ export function App(props: Readonly<AppProps>) {
 		)
 	}, [state.mode, state.browser.cursorIndex, filteredMatches.length])
 
+	// -- directory watcher for browser live rescan --
+	useEffect(() => {
+		if (state.mode !== 'browser') return
+		if (props.mode === 'browser' && props.noWatch) return
+		if (state.browser.scanStatus !== 'complete') return
+
+		const browserDir = props.mode === 'browser' ? props.dir : undefined
+		if (browserDir == null) return
+
+		const scanId = { current: 0 }
+
+		try {
+			const watcher = createDirectoryWatcher(browserDir, {
+				onEvent: () => {
+					const id = ++scanId.current
+					scanDirectory(browserDir)
+						.then((files) => {
+							if (scanId.current !== id) return
+							previewCacheRef.current.clear()
+							dispatch({ type: 'RescanComplete', files })
+						})
+						.catch(() => {})
+				},
+			})
+
+			return () => {
+				watcher.close()
+			}
+		} catch {
+			return
+		}
+	}, [state.mode, state.browser.scanStatus])
+
 	// -- debounced resize --
 	const resizeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 	useOnResize((width, height) => {
@@ -324,7 +357,7 @@ export function App(props: Readonly<AppProps>) {
 		const watchedFile = state.currentFile
 		if (watchedFile == null) return
 		if (state.mode !== 'viewer') return
-		if (props.mode === 'viewer' && props.noWatch) return
+		if (props.noWatch) return
 
 		try {
 			const watcher = createFileWatcher(watchedFile, {

@@ -128,6 +128,14 @@ function omitCurrentFile(state: AppState): Omit<AppState, 'currentFile'> {
 	return rest
 }
 
+function rescanCursor(browser: BrowserState, newFiles: FileEntry[]): number {
+	const selectedPath = browser.files[browser.cursorIndex]?.absolutePath
+	if (selectedPath == null) return 0
+	const idx = newFiles.findIndex((f) => f.absolutePath === selectedPath)
+	if (idx >= 0) return idx
+	return Math.min(browser.cursorIndex, Math.max(0, newFiles.length - 1))
+}
+
 function returnToBrowser(state: AppState): AppState {
 	if (!state.fromBrowser) return state
 	return { ...omitCurrentFile(state), mode: 'browser', focus: 'preview', fileDeleted: false }
@@ -175,18 +183,16 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 				browser: { ...state.browser, files: action.files, scanStatus: 'complete', cursorIndex: 0 },
 			}
 
-		case 'RescanComplete': {
-			const selectedPath = state.browser.files[state.browser.cursorIndex]?.absolutePath
-			let newCursor = 0
-			if (selectedPath != null) {
-				const idx = action.files.findIndex((f) => f.absolutePath === selectedPath)
-				newCursor = idx >= 0 ? idx : Math.min(state.browser.cursorIndex, Math.max(0, action.files.length - 1))
-			}
+		case 'RescanComplete':
 			return {
 				...state,
-				browser: { ...state.browser, files: action.files, scanStatus: 'complete', cursorIndex: newCursor },
+				browser: {
+					...state.browser,
+					files: action.files,
+					scanStatus: 'complete',
+					cursorIndex: rescanCursor(state.browser, action.files),
+				},
 			}
-		}
 
 		case 'ScanError':
 			return {

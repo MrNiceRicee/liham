@@ -38,6 +38,24 @@ const EXCLUDED_DIR_PREFIXES = new Set([
 	'coverage',
 ])
 
+// shared debounce helper — avoids duplicate clearDebounce functions
+function createDebouncer(delayMs: number) {
+	let timer: ReturnType<typeof setTimeout> | null = null
+
+	return {
+		schedule(fn: () => void) {
+			this.cancel()
+			timer = setTimeout(fn, delayMs)
+		},
+		cancel() {
+			if (timer != null) {
+				clearTimeout(timer)
+				timer = null
+			}
+		},
+	}
+}
+
 // editor temp file detection — filters spurious events from atomic saves
 export function isEditorTemp(name: string): boolean {
 	const base = basename(name)
@@ -65,9 +83,8 @@ export function createFileWatcher(filePath: string, options: WatcherOptions): Fi
 	const absPath = resolve(filePath)
 	const dir = dirname(absPath)
 	const target = basename(absPath)
-	const debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS
+	const debounce = createDebouncer(options.debounceMs ?? DEFAULT_DEBOUNCE_MS)
 
-	let debounceTimer: ReturnType<typeof setTimeout> | null = null
 	let closed = false
 
 	const fsWatcher: FSWatcher = watch(dir, (event, filename) => {
@@ -78,16 +95,20 @@ export function createFileWatcher(filePath: string, options: WatcherOptions): Fi
 
 		if (event === 'change') {
 			// file contents modified — debounce then notify
-			resetDebounce(absPath)
+			debounce.schedule(() => {
+				if (!closed) options.onEvent({ type: 'change', path: absPath })
+			})
 		} else if (event === 'rename') {
 			// rename fires on create, delete, or rename.
 			// check if file still exists to distinguish create from delete.
 			if (existsSync(absPath)) {
 				// file was recreated (atomic save) — treat as change
-				resetDebounce(absPath)
+				debounce.schedule(() => {
+					if (!closed) options.onEvent({ type: 'change', path: absPath })
+				})
 			} else {
 				// file was deleted or renamed away
-				clearDebounce()
+				debounce.cancel()
 				options.onEvent({ type: 'delete', path: absPath })
 			}
 		}
@@ -98,25 +119,11 @@ export function createFileWatcher(filePath: string, options: WatcherOptions): Fi
 		options.onEvent({ type: 'error', message: err.message })
 	})
 
-	function resetDebounce(path: string): void {
-		clearDebounce()
-		debounceTimer = setTimeout(() => {
-			if (!closed) options.onEvent({ type: 'change', path })
-		}, debounceMs)
-	}
-
-	function clearDebounce(): void {
-		if (debounceTimer != null) {
-			clearTimeout(debounceTimer)
-			debounceTimer = null
-		}
-	}
-
 	return {
 		close() {
 			if (closed) return
 			closed = true
-			clearDebounce()
+			debounce.cancel()
 			fsWatcher.close()
 		},
 	}
@@ -153,8 +160,7 @@ export function createDirectoryWatcher(
 		throw new Error(`not a directory: ${absDir}`)
 	}
 
-	const debounceMs = options.debounceMs ?? DEFAULT_DIR_DEBOUNCE_MS
-	let debounceTimer: ReturnType<typeof setTimeout> | null = null
+	const debounce = createDebouncer(options.debounceMs ?? DEFAULT_DIR_DEBOUNCE_MS)
 	let closed = false
 
 	const fsWatcher: FSWatcher = watch(absDir, { recursive: true }, (_event, filename) => {
@@ -163,32 +169,20 @@ export function createDirectoryWatcher(
 		if (isEditorTemp(filename)) return
 		if (isExcludedPath(filename)) return
 
-		resetDebounce()
+		debounce.schedule(() => {
+			if (!closed) options.onEvent()
+		})
 	})
 
 	fsWatcher.on('error', () => {
 		// silently ignore — degrade to static mode
 	})
 
-	function resetDebounce(): void {
-		clearDebounce()
-		debounceTimer = setTimeout(() => {
-			if (!closed) options.onEvent()
-		}, debounceMs)
-	}
-
-	function clearDebounce(): void {
-		if (debounceTimer != null) {
-			clearTimeout(debounceTimer)
-			debounceTimer = null
-		}
-	}
-
 	return {
 		close() {
 			if (closed) return
 			closed = true
-			clearDebounce()
+			debounce.cancel()
 			fsWatcher.close()
 		},
 	}

@@ -359,8 +359,9 @@ describe('createDirectoryWatcher', () => {
 	})
 
 	test('throws on non-existent directory', () => {
+		const bogusDir = join(tmpdir(), 'liham-nonexistent-dir-xyz')
 		expect(() => {
-			createDirectoryWatcher('/tmp/liham-nonexistent-dir-xyz', {
+			createDirectoryWatcher(bogusDir, {
 				onEvent: () => {},
 			})
 		}).toThrow()

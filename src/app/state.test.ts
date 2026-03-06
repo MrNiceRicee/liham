@@ -395,12 +395,11 @@ describe('state machine traces', () => {
 
 // -- RescanComplete --
 
-const makeFile = (name: string, dir = ''): { name: string; relativePath: string; absolutePath: string; directory: string } => ({
-	name,
-	relativePath: dir ? `${dir}/${name}` : name,
-	absolutePath: `/root/${dir ? `${dir}/` : ''}${name}`,
-	directory: dir,
-})
+function makeFile(name: string, dir = ''): { name: string; relativePath: string; absolutePath: string; directory: string } {
+	const rel = dir ? dir + '/' + name : name
+	const abs = '/root/' + rel
+	return { name, relativePath: rel, absolutePath: abs, directory: dir }
+}
 
 describe('RescanComplete', () => {
 	test('preserves cursor on same file when list changes', () => {

@@ -90,7 +90,7 @@ const options = {
 
 type CliMode =
 	| { mode: 'info'; layout: LayoutMode; renderer: RendererName; theme: ThemeName }
-	| { mode: 'browser'; dir: string; layout: LayoutMode; renderer: RendererName; theme: ThemeName }
+	| { mode: 'browser'; dir: string; layout: LayoutMode; renderer: RendererName; theme: ThemeName; noWatch: boolean }
 	| {
 			mode: 'viewer'
 			filePath: string
@@ -168,12 +168,12 @@ function parseCliArgs(): CliMode {
 
 	const positional = positionals[0]
 
+	const noWatch = values['no-watch'] ?? false
+
 	// no positional → browser mode (cwd)
 	if (positional == null) {
-		return { mode: 'browser', dir: process.cwd(), layout, renderer, theme }
+		return { mode: 'browser', dir: process.cwd(), layout, renderer, theme, noWatch }
 	}
-
-	const noWatch = values['no-watch'] ?? false
 
 	// positional present — will be resolved to file or directory in main()
 	return { mode: 'viewer', filePath: positional, layout, renderer, theme, noWatch }
@@ -193,7 +193,7 @@ async function resolvePositional(
 		const { stat } = await import('node:fs/promises')
 		const s = await stat(resolved)
 		if (s.isDirectory()) {
-			return { mode: 'browser', dir: resolved, layout, renderer, theme }
+			return { mode: 'browser', dir: resolved, layout, renderer, theme, noWatch }
 		}
 		if (s.isFile()) {
 			return { mode: 'viewer', filePath: resolved, layout, renderer, theme, noWatch }
@@ -258,7 +258,7 @@ async function main() {
 	const theme = await resolveTheme(args.theme)
 
 	if (args.mode === 'browser') {
-		await boot({ mode: 'browser', dir: args.dir, theme: theme.tokens, layout: args.layout })
+		await boot({ mode: 'browser', dir: args.dir, theme: theme.tokens, layout: args.layout, noWatch: args.noWatch })
 		return
 	}
 
