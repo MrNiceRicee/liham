@@ -37,28 +37,28 @@ usage:
   liham [options] <file.md>
 
 options:
-  --renderer <name>   TUI renderer to use (default: opentui)
-                      available: ${VALID_RENDERERS.join(', ')}
+  -r, --renderer <name>   TUI renderer to use (default: opentui)
+                           available: ${VALID_RENDERERS.join(', ')}
 
-  --theme <name>      Color theme (default: auto)
-                      available: ${VALID_THEMES.join(', ')}
-                        auto   detect from terminal background
-                        dark   dark theme (Tokyo Night)
-                        light  light theme (not yet implemented)
+  -t, --theme <name>      Color theme (default: auto)
+                           available: ${VALID_THEMES.join(', ')}
+                             auto   detect from terminal background
+                             dark   dark theme (Tokyo Night)
+                             light  light theme (not yet implemented)
 
-  -h, --help          Show this help message
+  -h, --help               Show this help message
 
 examples:
   liham README.md
-  liham --theme dark README.md
-  liham --renderer opentui README.md`
+  liham -t dark README.md
+  liham -r opentui README.md`
 
 // -- arg parsing --
 
 const options = {
 	help: { type: 'boolean' as const, short: 'h' },
-	renderer: { type: 'string' as const, default: 'opentui' },
-	theme: { type: 'string' as const, default: 'auto' },
+	renderer: { type: 'string' as const, short: 'r', default: 'opentui' },
+	theme: { type: 'string' as const, short: 't', default: 'auto' },
 } as const
 
 function parseCliArgs() {
