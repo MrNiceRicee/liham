@@ -12,7 +12,7 @@ import { renderToOpenTUI } from './index.tsx'
 
 export async function boot(ctx: { ir: IRNode; theme: ThemeTokens }): Promise<void> {
 	const content = renderToOpenTUI(ctx.ir)
-	const renderer = await createCliRenderer({ exitOnCtrlC: false })
+	const renderer = await createCliRenderer({ exitOnCtrlC: true })
 
 	try {
 		createRoot(renderer).render(<App content={content} />)

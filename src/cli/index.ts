@@ -28,14 +28,32 @@ function isThemeName(value: string): value is ThemeName {
 	return (VALID_THEMES as readonly string[]).includes(value)
 }
 
-// -- arg parsing --
+// -- help text --
 
-const USAGE = `usage: liham [options] <file.md>
+const USAGE = `liham — terminal markdown previewer
+
+usage:
+  liham <file.md>
+  liham [options] <file.md>
 
 options:
-  --renderer <name>   TUI renderer (default: opentui)
-  --theme <name>      Theme: auto, dark, light (default: auto)
-  -h, --help          Show this help message`
+  --renderer <name>   TUI renderer to use (default: opentui)
+                      available: ${VALID_RENDERERS.join(', ')}
+
+  --theme <name>      Color theme (default: auto)
+                      available: ${VALID_THEMES.join(', ')}
+                        auto   detect from terminal background
+                        dark   dark theme (Tokyo Night)
+                        light  light theme (not yet implemented)
+
+  -h, --help          Show this help message
+
+examples:
+  liham README.md
+  liham --theme dark README.md
+  liham --renderer opentui README.md`
+
+// -- arg parsing --
 
 const options = {
 	help: { type: 'boolean' as const, short: 'h' },
@@ -44,12 +62,24 @@ const options = {
 } as const
 
 function parseCliArgs() {
-	const { values, positionals } = parseArgs({
-		args: process.argv.slice(2),
-		options,
-		allowPositionals: true,
-		strict: true,
-	})
+	let values: ReturnType<typeof parseArgs<{ options: typeof options }>>['values']
+	let positionals: string[]
+
+	try {
+		const parsed = parseArgs({
+			args: process.argv.slice(2),
+			options,
+			allowPositionals: true,
+			strict: true,
+		})
+		values = parsed.values
+		positionals = parsed.positionals
+	} catch (err: unknown) {
+		const message = err instanceof Error ? err.message : 'invalid arguments'
+		console.error(`error: ${message}`)
+		console.error(`\nrun 'liham --help' for usage`)
+		process.exit(1)
+	}
 
 	if (values.help) {
 		console.log(USAGE)
@@ -64,15 +94,17 @@ function parseCliArgs() {
 
 	const renderer = values.renderer
 	if (!isRendererName(renderer)) {
-		console.error(`unknown renderer: ${renderer}`)
-		console.error(`available: ${VALID_RENDERERS.join(', ')}`)
+		console.error(`unknown renderer: '${renderer}'`)
+		console.error(`available renderers: ${VALID_RENDERERS.join(', ')}`)
+		console.error(`\nrun 'liham --help' for usage`)
 		process.exit(1)
 	}
 
 	const theme = values.theme
 	if (!isThemeName(theme)) {
-		console.error(`unknown theme: ${theme}`)
-		console.error(`available: ${VALID_THEMES.join(', ')}`)
+		console.error(`unknown theme: '${theme}'`)
+		console.error(`available themes: ${VALID_THEMES.join(', ')}`)
+		console.error(`\nrun 'liham --help' for usage`)
 		process.exit(1)
 	}
 
