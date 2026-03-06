@@ -53,7 +53,6 @@ export interface TableTokens {
 	borderColor: string
 	headerColor: string
 	cellColor: string
-	stripeColor: string
 }
 
 export interface FallbackTokens {

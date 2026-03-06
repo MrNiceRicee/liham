@@ -94,7 +94,6 @@ function distributeColumnWidths(
 
 interface TableContext {
 	borderColor?: string
-	stripeColor?: string
 	colWidths: number[]
 }
 
@@ -122,12 +121,20 @@ function buildTableRows(
 		if (row.type !== 'tableRow') continue
 		if (!row.isHeader && dataRowIndex >= MAX_DATA_ROWS) break
 
+		// light separator between data rows
+		if (!row.isHeader && dataRowIndex > 0) {
+			rows.push(
+				<text key={`${key}-dsep${String(i)}`} style={borderFg}>
+					{buildSeparator(ctx.colWidths, '├', '┼', '┤', '┄')}
+				</text>,
+			)
+		}
+
 		const rowKey = `${key}-r${String(i)}`
-		const stripe = !row.isHeader && dataRowIndex % 2 === 1
-		rows.push(renderTableRow(row, rowKey, ctx, stripe))
+		rows.push(renderTableRow(row, rowKey, ctx))
 		if (!row.isHeader) dataRowIndex++
 
-		if (row.isHeader && i < node.children.length - 1) {
+		if (row.isHeader) {
 			rows.push(
 				<text key={`${rowKey}-sep`} style={borderFg}>
 					{buildSeparator(ctx.colWidths, '├', '┼', '┤', '─')}
@@ -146,7 +153,6 @@ export function renderTable(node: TableNode, key: string) {
 
 	const ctx: TableContext = {
 		borderColor: node.style.borderColor,
-		stripeColor: node.style.bg,
 		colWidths,
 	}
 
@@ -222,7 +228,6 @@ export function renderTableRow(
 	node: TableRowNode,
 	key: string,
 	ctx: TableContext,
-	stripe: boolean,
 ) {
 	const cells = node.children.filter((c) => c.type === 'tableCell') as TableCellNode[]
 
@@ -232,7 +237,6 @@ export function renderTableRow(
 		borderStyle: 'single',
 	}
 	if (ctx.borderColor != null) rowStyle['borderColor'] = ctx.borderColor
-	if (stripe && ctx.stripeColor != null) rowStyle['backgroundColor'] = ctx.stripeColor
 
 	const parts: ReactNode[] = []
 	for (let i = 0; i < ctx.colWidths.length; i++) {
