@@ -90,9 +90,11 @@ function parseCliArgs() {
 		process.exit(0)
 	}
 
-	const filePath = positionals[0]
-	if (filePath == null) {
-		console.error(USAGE)
+	const theme = values.theme
+	if (!isThemeName(theme)) {
+		console.error(`unknown theme: '${theme}'`)
+		console.error(`available themes: ${VALID_THEMES.join(', ')}`)
+		console.error(`\nrun 'liham --help' for usage`)
 		process.exit(1)
 	}
 
@@ -104,15 +106,17 @@ function parseCliArgs() {
 		process.exit(1)
 	}
 
-	const theme = values.theme
-	if (!isThemeName(theme)) {
-		console.error(`unknown theme: '${theme}'`)
-		console.error(`available themes: ${VALID_THEMES.join(', ')}`)
-		console.error(`\nrun 'liham --help' for usage`)
+	if (values.info) {
+		return { filePath: undefined, info: true, renderer, theme }
+	}
+
+	const filePath = positionals[0]
+	if (filePath == null) {
+		console.error(USAGE)
 		process.exit(1)
 	}
 
-	return { filePath, info: values.info === true, renderer, theme }
+	return { filePath, info: false, renderer, theme }
 }
 
 // -- theme resolution --
@@ -141,7 +145,19 @@ async function resolveTheme(themeName: ThemeName): Promise<ResolvedTheme> {
 
 async function main() {
 	const args = parseCliArgs()
-	const filePath = resolve(args.filePath)
+
+	if (args.info) {
+		const theme = await resolveTheme(args.theme)
+		console.log(`theme: ${theme.name}`)
+		console.log(`renderer: ${args.renderer}`)
+		console.log(`TERM: ${process.env['TERM'] ?? '(unset)'}`)
+		console.log(`TERM_PROGRAM: ${process.env['TERM_PROGRAM'] ?? '(unset)'}`)
+		console.log(`LIHAM_THEME: ${process.env['LIHAM_THEME'] ?? '(unset)'}`)
+		console.log(`tty: ${String(process.stdout.isTTY ?? false)}`)
+		process.exit(0)
+	}
+
+	const filePath = resolve(args.filePath!)
 
 	// parallelize theme detection with file read
 	const [theme, markdown] = await Promise.all([
@@ -153,17 +169,6 @@ async function main() {
 				process.exit(1)
 			}),
 	])
-
-	if (args.info) {
-		console.log(`theme: ${theme.name}`)
-		console.log(`renderer: ${args.renderer}`)
-		console.log(`file: ${filePath}`)
-		console.log(`TERM: ${process.env['TERM'] ?? '(unset)'}`)
-		console.log(`TERM_PROGRAM: ${process.env['TERM_PROGRAM'] ?? '(unset)'}`)
-		console.log(`LIHAM_THEME: ${process.env['LIHAM_THEME'] ?? '(unset)'}`)
-		console.log(`tty: ${String(process.stdout.isTTY ?? false)}`)
-		process.exit(0)
-	}
 
 	const result = await processMarkdown(markdown, theme.tokens)
 
