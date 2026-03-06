@@ -28,6 +28,7 @@ describe('initialState', () => {
 		expect(s.scrollSync).toBe(true)
 		expect(s.scrollPercent).toEqual({ source: 0, preview: 0 })
 		expect(s.fromBrowser).toBe(false)
+		expect(s.fileDeleted).toBe(false)
 	})
 
 	test('accepts layout parameter', () => {
@@ -392,3 +393,32 @@ describe('state machine traces', () => {
 	})
 })
 
+// -- FileDeleted --
+
+describe('FileDeleted', () => {
+	test('sets fileDeleted to true', () => {
+		const s = stateWith({ fileDeleted: false })
+		const next = appReducer(s, { type: 'FileDeleted' })
+		expect(next.fileDeleted).toBe(true)
+	})
+
+	test('OpenFile resets fileDeleted', () => {
+		const s = stateWith({ mode: 'browser', fileDeleted: true })
+		const next = appReducer(s, { type: 'OpenFile', path: '/test/file.md' })
+		expect(next.fileDeleted).toBe(false)
+		expect(next.mode).toBe('viewer')
+		expect(next.currentFile).toBe('/test/file.md')
+	})
+
+	test('ReturnToBrowser resets fileDeleted', () => {
+		const s = stateWith({
+			mode: 'viewer',
+			fromBrowser: true,
+			fileDeleted: true,
+			currentFile: '/test/file.md',
+		})
+		const next = appReducer(s, { type: 'ReturnToBrowser' })
+		expect(next.fileDeleted).toBe(false)
+		expect(next.mode).toBe('browser')
+	})
+})
