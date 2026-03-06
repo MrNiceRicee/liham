@@ -1,3 +1,6 @@
+// opentui app shell — scrollbox viewport with keyboard handling.
+// framework-specific: uses OpenTUI's useKeyboard and useRenderer hooks.
+
 import type { ReactNode } from 'react'
 
 import { useKeyboard, useRenderer } from '@opentui/react'
@@ -12,7 +15,6 @@ export function App({ content }: Readonly<AppProps>) {
 	useKeyboard((key) => {
 		if (key.name === 'q' || key.name === 'escape') {
 			renderer?.destroy()
-			process.exit(0)
 		}
 	})
 

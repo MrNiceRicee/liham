@@ -2,14 +2,14 @@
 	"name": "liham",
 	"version": "2.0.0-alpha.0",
 	"description": "Terminal markdown previewer TUI",
-	"module": "src/index.tsx",
+	"module": "src/cli/index.ts",
 	"type": "module",
 	"private": true,
 	"bin": {
 		"liham": "src/cli/index.ts"
 	},
 	"scripts": {
-		"dev": "bun run src/index.tsx",
+		"dev": "bun run src/cli/index.ts",
 		"lint": "eslint src/",
 		"format": "biome format --write",
 		"format:check": "biome format",
