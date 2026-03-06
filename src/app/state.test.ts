@@ -24,7 +24,7 @@ describe('initialState', () => {
 		expect(s.layout).toBe('preview-only')
 		expect(s.focus).toBe('preview')
 		expect(s.legendVisible).toBe(true)
-		expect(s.scrollSync).toBe(false)
+		expect(s.scrollSync).toBe(true)
 		expect(s.scrollPercent).toEqual({ source: 0, preview: 0 })
 	})
 
@@ -101,16 +101,16 @@ describe('FocusPane action', () => {
 // -- ToggleSync --
 
 describe('ToggleSync action', () => {
-	test('toggles sync off → on', () => {
-		const s = stateWith({ scrollSync: false })
-		const next = appReducer(s, { type: 'ToggleSync' })
-		expect(next.scrollSync).toBe(true)
-	})
-
 	test('toggles sync on → off', () => {
 		const s = stateWith({ scrollSync: true })
 		const next = appReducer(s, { type: 'ToggleSync' })
 		expect(next.scrollSync).toBe(false)
+	})
+
+	test('toggles sync off → on', () => {
+		const s = stateWith({ scrollSync: false })
+		const next = appReducer(s, { type: 'ToggleSync' })
+		expect(next.scrollSync).toBe(true)
 	})
 })
 

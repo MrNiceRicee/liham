@@ -14,6 +14,7 @@ import {
 	type LayoutMode,
 	appReducer,
 	initialState,
+	isSplitLayout,
 	legendEntries,
 	paneDimensions,
 } from '../../app/state.ts'
@@ -55,6 +56,19 @@ const SHIFT_KEY_MAP: Record<string, () => AppAction> = {
 	g: () => ({ type: 'Scroll', direction: 'bottom' }),
 }
 
+// sync the unfocused pane to match the focused pane's scroll percentage
+function syncScroll(
+	focusedRef: ScrollBoxRenderable | null,
+	otherRef: ScrollBoxRenderable | null,
+): void {
+	if (focusedRef == null || otherRef == null) return
+	const srcHeight = focusedRef.scrollHeight
+	if (srcHeight <= 0) return
+	const percent = focusedRef.scrollTop / srcHeight
+	const targetPos = Math.round(percent * otherRef.scrollHeight)
+	otherRef.scrollTo(targetPos)
+}
+
 export function App({ content, raw, layout, theme }: Readonly<AppProps>) {
 	const renderer = useRenderer()
 	const dims = useTerminalDimensions()
@@ -75,6 +89,10 @@ export function App({ content, raw, layout, theme }: Readonly<AppProps>) {
 		}, 100)
 	})
 
+	// resolve refs for focused/unfocused pane
+	const focusedRef = state.focus === 'source' ? sourceRef : previewRef
+	const otherRef = state.focus === 'source' ? previewRef : sourceRef
+
 	useKeyboard((key: KeyEvent) => {
 		// shift keys (e.g., G for bottom)
 		if (key.shift) {
@@ -86,6 +104,9 @@ export function App({ content, raw, layout, theme }: Readonly<AppProps>) {
 					return
 				}
 				dispatch(action)
+				if (action.type === 'Scroll' && state.scrollSync && isSplitLayout(state.layout)) {
+					queueMicrotask(() => syncScroll(focusedRef.current, otherRef.current))
+				}
 				return
 			}
 		}
@@ -102,6 +123,11 @@ export function App({ content, raw, layout, theme }: Readonly<AppProps>) {
 		}
 
 		dispatch(action)
+
+		// sync after scroll actions — queueMicrotask lets OpenTUI process the scroll first
+		if (action.type === 'Scroll' && state.scrollSync && isSplitLayout(state.layout)) {
+			queueMicrotask(() => syncScroll(focusedRef.current, otherRef.current))
+		}
 	})
 
 	const panes = paneDimensions(state.layout, state.dimensions.width, state.dimensions.height)

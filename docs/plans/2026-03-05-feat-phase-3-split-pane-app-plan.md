@@ -241,7 +241,7 @@ Port reference from `main` branch:
 
 **Files:**
 
-- [ ] `src/renderer/opentui/app.tsx` — wire scroll sync
+- [x] `src/renderer/opentui/app.tsx` — wire scroll sync
   - Sync calculation inline (one-liner with zero guard): `sourceHeight <= 0 ? 0 : (sourceTop / sourceHeight) * targetHeight`
   - **Unidirectional sync pattern** (prevents feedback loop):
     - Only the focused pane initiates sync
@@ -257,7 +257,7 @@ Port reference from `main` branch:
     If OpenTUI processes scroll asynchronously, use `queueMicrotask` to read after next tick. Test empirically.
   - `s` key toggles sync via `ToggleSync` action
   - Null-check refs before reading/writing (pane may not exist in current layout)
-- [ ] `src/app/state.test.ts` — add scroll sync tests
+- [x] `src/app/state.test.ts` — add scroll sync tests
   - Proportional sync: 50% source → 50% target
   - Short file (height <= viewport): target stays at 0
   - Zero scroll height: no division by zero
@@ -292,6 +292,30 @@ Port reference from `main` branch:
   - Mouse down in single-pane mode → no focus switch
 
 **Success criteria:** Mouse click switches pane focus. Mouse wheel scrolls focused pane. Scroll sync works with mouse wheel. No double-scroll. All tests pass.
+
+---
+
+### Phase 3f: Multi-Page Key Legend (follow-up)
+
+**Goal:** Replace single-line legend with multi-page cycling. `?` cycles through pages. Shows vim scroll shortcuts on a dedicated page without cluttering the default nav view.
+
+**Design:**
+
+- Change `legendVisible: boolean` → `legendPage: 'off' | 'nav' | 'scroll'` in AppState
+- `?` cycles: `nav` → `scroll` → `off` → `nav`
+- Page `nav` (default): `? more · l layout · Tab source · s sync on · q quit`
+- Page `scroll`: `? more · j/k scroll · g/G top/bottom · pgup/pgdn page · ctrl+d/u half`
+- Page `off`: `[layout] · ? help`
+- Future: add `help` page with deeper navigation (sub-menus)
+- Update `ToggleLegend` action to `CycleLegend` or parameterize
+- `legendEntries()` accepts page, returns entries for that page
+
+**Files:**
+
+- [ ] `src/app/state.ts` — change legendVisible to legendPage, update reducer + legendEntries
+- [ ] `src/renderer/opentui/status-bar.tsx` — accept legendPage instead of legendVisible
+- [ ] `src/renderer/opentui/app.tsx` — pass legendPage
+- [ ] `src/app/state.test.ts` — test page cycling, entries per page
 
 ## System-Wide Impact
 

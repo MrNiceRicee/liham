@@ -103,7 +103,7 @@ export function initialState(layout: LayoutMode = 'preview-only'): AppState {
 		layout,
 		focus: autoFocus(layout, 'preview'),
 		dimensions: { width: 0, height: 0 },
-		scrollSync: false,
+		scrollSync: true,
 		legendVisible: true,
 		scrollPercent: { source: 0, preview: 0 },
 	}
