@@ -1,17 +1,24 @@
 // status bar — flex child at bottom of app, shows contextual key legend.
 
-import type { LegendEntry, LegendPage } from '../../app/state.ts'
+import type { LegendEntry } from '../../app/state.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 
 interface StatusBarProps {
-	legendPage: LegendPage
 	entries: LegendEntry[]
 	layout: string
 	theme: ThemeTokens
+	renderTimeMs?: number
 }
 
-export function StatusBar({ legendPage, entries, layout, theme }: Readonly<StatusBarProps>) {
+function formatRenderTime(ms: number): string {
+	if (ms < 1) return '<1ms'
+	if (ms < 1000) return `${String(Math.round(ms))}ms`
+	return `${(ms / 1000).toFixed(1)}s`
+}
+
+export function StatusBar({ entries, layout, theme, renderTimeMs }: Readonly<StatusBarProps>) {
 	const fg = theme.statusBar.fg
+	const dimFg = theme.statusBar.dimFg
 	const layoutLabel = `[${layout}]`
 
 	const borderColor = fg
@@ -20,20 +27,19 @@ export function StatusBar({ legendPage, entries, layout, theme }: Readonly<Statu
 	const barStyle = { height: 2, width: '100%', flexDirection: 'row' as const, rootOptions: { borderColor } }
 
 	const legend = entries.map((e) => `${e.key} ${e.label}`).join(' · ')
-
-	if (legendPage === 'off') {
-		return (
-			<box border={['top']} style={barStyle}>
-				<text color={fg}>{layoutLabel} · {legend}</text>
-			</box>
-		)
-	}
+	const timeLabel = renderTimeMs != null ? formatRenderTime(renderTimeMs) : null
 
 	return (
 		<box border={['top']} style={barStyle}>
 			<text color={fg}>
 				{layoutLabel} · {legend}
 			</text>
+			{timeLabel != null && (
+				<>
+					<box style={{ flexGrow: 1 }} />
+					<text color={dimFg}>{timeLabel}</text>
+				</>
+			)}
 		</box>
 	)
 }

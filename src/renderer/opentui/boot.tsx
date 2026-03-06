@@ -12,7 +12,7 @@ import { App } from './app.tsx'
 import { renderToOpenTUI } from './index.tsx'
 
 export type BootContext =
-	| { mode: 'viewer'; ir: IRNode; theme: ThemeTokens; layout: LayoutMode; raw: string }
+	| { mode: 'viewer'; ir: IRNode; theme: ThemeTokens; layout: LayoutMode; raw: string; renderTimeMs: number }
 	| { mode: 'browser'; dir: string; theme: ThemeTokens; layout: LayoutMode }
 
 export async function boot(ctx: BootContext): Promise<void> {
@@ -43,6 +43,7 @@ export async function boot(ctx: BootContext): Promise<void> {
 					raw={ctx.raw}
 					layout={ctx.layout}
 					theme={ctx.theme}
+					renderTimeMs={ctx.renderTimeMs}
 				/>,
 			)
 		}

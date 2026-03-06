@@ -1,7 +1,6 @@
 // opentui app shell — state machine + layout composition + status bar.
 
-import type { KeyEvent } from '@opentui/core'
-import type { ScrollBoxRenderable } from '@opentui/core'
+import type { KeyEvent, ScrollBoxRenderable } from '@opentui/core'
 
 import { useKeyboard, useOnResize, useRenderer, useTerminalDimensions } from '@opentui/react'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
@@ -22,25 +21,30 @@ import {
 import { fuzzyFilter } from '../../browser/fuzzy.ts'
 import { scanDirectory } from '../../browser/scanner.ts'
 import { processMarkdown } from '../../pipeline/processor.ts'
-import { BrowserPane } from './browser-pane.tsx'
 import { renderToOpenTUI } from './index.tsx'
-import { PreviewPane } from './preview-pane.tsx'
-import { SourcePane } from './source-pane.tsx'
+import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { StatusBar } from './status-bar.tsx'
 
 // -- browser preview cache helper --
+
+interface PreviewCacheEntry {
+	content: ReactNode
+	renderTimeMs: number
+}
 
 function renderBrowserPreview(
 	filePath: string,
 	cursorSnapshot: number,
 	cursorRef: React.RefObject<number>,
-	cache: Map<string, ReactNode>,
+	cache: Map<string, PreviewCacheEntry>,
 	state: AppState,
 	theme: ThemeTokens,
 	setContent: (content: ReactNode) => void,
+	setRenderTime: (ms: number) => void,
 ): void {
 	void (async () => {
 		try {
+			const t0 = performance.now()
 			const markdown = await Bun.file(filePath).text()
 			if (cursorRef.current !== cursorSnapshot) return
 
@@ -56,8 +60,12 @@ function renderBrowserPreview(
 			const panes = paneDimensions(state.layout, state.dimensions.width, state.dimensions.height, 'browser')
 			const width = (panes.preview?.width ?? state.dimensions.width) - 4
 			const rendered = renderToOpenTUI(result.value, width)
-			cache.set(filePath, rendered)
-			if (cursorRef.current === cursorSnapshot) setContent(rendered)
+			const elapsed = performance.now() - t0
+			cache.set(filePath, { content: rendered, renderTimeMs: elapsed })
+			if (cursorRef.current === cursorSnapshot) {
+				setContent(rendered)
+				setRenderTime(elapsed)
+			}
 		} catch {
 			setContent(<text color={theme.fallback.textColor}>cannot read file</text>)
 		}
@@ -65,7 +73,7 @@ function renderBrowserPreview(
 }
 
 type AppProps =
-	| { mode: 'viewer'; content: ReactNode; raw: string; layout: LayoutMode; theme: ThemeTokens }
+	| { mode: 'viewer'; content: ReactNode; raw: string; layout: LayoutMode; theme: ThemeTokens; renderTimeMs: number }
 	| { mode: 'browser'; dir: string; layout: LayoutMode; theme: ThemeTokens }
 
 // -- viewer mode key maps --
@@ -149,8 +157,13 @@ export function App(props: Readonly<AppProps>) {
 
 	// browser live preview state
 	const [browserPreviewContent, setBrowserPreviewContent] = useState<ReactNode>(null)
-	const previewCacheRef = useRef(new Map<string, ReactNode>())
+	const previewCacheRef = useRef(new Map<string, PreviewCacheEntry>())
 	const previewCursorRef = useRef<number>(-1)
+
+	// render time tracking
+	const [renderTimeMs, setRenderTimeMs] = useState<number | undefined>(
+		props.mode === 'viewer' ? props.renderTimeMs : undefined,
+	)
 
 	// viewer mode content
 	const viewerContent = props.mode === 'viewer' ? props.content : null
@@ -196,7 +209,8 @@ export function App(props: Readonly<AppProps>) {
 		const filePath = match.entry.absolutePath
 		const cached = previewCacheRef.current.get(filePath)
 		if (cached != null) {
-			setBrowserPreviewContent(cached)
+			setBrowserPreviewContent(cached.content)
+			setRenderTimeMs(cached.renderTimeMs)
 			return
 		}
 
@@ -211,6 +225,7 @@ export function App(props: Readonly<AppProps>) {
 			state,
 			props.theme,
 			setBrowserPreviewContent,
+			setRenderTimeMs,
 		)
 	}, [state.mode, state.browser.cursorIndex, filteredMatches.length])
 
@@ -365,10 +380,10 @@ export function App(props: Readonly<AppProps>) {
 					},
 				)}
 			<StatusBar
-				legendPage={state.legendPage}
 				entries={entries}
 				layout={state.mode === 'browser' ? 'browser' : state.layout}
 				theme={props.theme}
+				renderTimeMs={renderTimeMs}
 			/>
 		</box>
 	)
@@ -483,101 +498,3 @@ function browserKeyHandler(
 	browserFilterKey(key, state, dispatch)
 }
 
-// -- layout renderers --
-
-import type { FuzzyMatch } from '../../browser/fuzzy.ts'
-
-interface ViewerMouseHandlers {
-	onSourceMouseDown: () => void
-	onPreviewMouseDown: () => void
-	onSourceMouseScroll: () => void
-	onPreviewMouseScroll: () => void
-}
-
-function renderBrowserLayout(
-	state: AppState,
-	panes: ReturnType<typeof paneDimensions>,
-	matches: FuzzyMatch[],
-	previewContent: ReactNode,
-	theme: ThemeTokens,
-	browserRef: React.RefObject<ScrollBoxRenderable | null>,
-	previewRef: React.RefObject<ScrollBoxRenderable | null>,
-): ReactNode {
-	const hasBrowser = panes.browser != null
-	const hasPreview = panes.preview != null
-
-	const browserProps = {
-		matches,
-		filter: state.browser.filter,
-		cursorIndex: state.browser.cursorIndex,
-		totalFiles: state.browser.files.length,
-		scanStatus: state.browser.scanStatus,
-		...(state.browser.scanError != null ? { scanError: state.browser.scanError } : {}),
-		focused: true as const,
-		theme,
-		scrollRef: browserRef,
-	}
-
-	const browserPane = hasBrowser ? <BrowserPane {...browserProps} /> : null
-
-	if (!hasPreview) return browserPane
-
-	const direction = state.layout === 'side' ? 'row' : 'column'
-
-	return (
-		<box style={{ flexDirection: direction, flexGrow: 1 }}>
-			{browserPane}
-			<PreviewPane
-				content={previewContent ?? <text color={theme.fallback.textColor}>select a file to preview</text>}
-				focused={false}
-				theme={theme}
-				scrollRef={previewRef}
-			/>
-		</box>
-	)
-}
-
-function renderViewerLayout(
-	state: AppState,
-	panes: ReturnType<typeof paneDimensions>,
-	content: ReactNode,
-	raw: string,
-	theme: ThemeTokens,
-	sourceRef: React.RefObject<ScrollBoxRenderable | null>,
-	previewRef: React.RefObject<ScrollBoxRenderable | null>,
-	mouse: ViewerMouseHandlers,
-): ReactNode {
-	const hasSource = panes.source != null
-	const hasPreview = panes.preview != null
-
-	if (hasPreview && !hasSource) {
-		return <PreviewPane content={content} focused theme={theme} scrollRef={previewRef} />
-	}
-	if (hasSource && !hasPreview) {
-		return <SourcePane content={raw} focused theme={theme} scrollRef={sourceRef} />
-	}
-
-	const direction = state.layout === 'side' ? 'row' : 'column'
-	const sourceFocused = state.focus === 'source'
-
-	return (
-		<box style={{ flexDirection: direction, flexGrow: 1 }}>
-			<SourcePane
-				content={raw}
-				focused={sourceFocused}
-				theme={theme}
-				scrollRef={sourceRef}
-				onMouseDown={mouse.onSourceMouseDown}
-				onMouseScroll={mouse.onSourceMouseScroll}
-			/>
-			<PreviewPane
-				content={content}
-				focused={!sourceFocused}
-				theme={theme}
-				scrollRef={previewRef}
-				onMouseDown={mouse.onPreviewMouseDown}
-				onMouseScroll={mouse.onPreviewMouseScroll}
-			/>
-		</box>
-	)
-}

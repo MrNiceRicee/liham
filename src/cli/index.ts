@@ -251,6 +251,7 @@ async function main() {
 	// viewer mode — read file and run pipeline
 	const filePath = args.filePath
 
+	const t0 = performance.now()
 	const markdown = await Bun.file(filePath)
 		.text()
 		.catch(() => {
@@ -265,7 +266,8 @@ async function main() {
 		process.exit(1)
 	}
 
-	await boot({ mode: 'viewer', ir: result.value, theme: theme.tokens, layout: args.layout, raw: markdown })
+	const renderTimeMs = performance.now() - t0
+	await boot({ mode: 'viewer', ir: result.value, theme: theme.tokens, layout: args.layout, raw: markdown, renderTimeMs })
 }
 
 await main()

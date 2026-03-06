@@ -56,6 +56,7 @@ export const lightTheme: ThemeTokens = {
 	},
 	statusBar: {
 		fg: '#8990b3',
+		dimFg: '#a8b1d5',
 	},
 	pane: {
 		focusedBorderColor: '#34548a',

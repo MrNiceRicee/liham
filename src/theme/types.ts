@@ -58,6 +58,7 @@ export interface TableTokens {
 
 export interface StatusBarTokens {
 	fg: string
+	dimFg: string
 }
 
 export interface PaneTokens {
