@@ -34,7 +34,7 @@ const KEY_MAP: Record<string, (key: Pick<KeyEvent, 'ctrl'>, state: AppState) => 
 	{
 		q: () => ({ type: 'Quit' }),
 		escape: () => ({ type: 'Quit' }),
-		'?': () => ({ type: 'ToggleLegend' }),
+		'?': () => ({ type: 'CycleLegend' }),
 		l: () => ({ type: 'CycleLayout' }),
 		s: () => ({ type: 'ToggleSync' }),
 		tab: (_, state) => ({ type: 'FocusPane', target: state.focus === 'source' ? 'preview' : 'source' }),
@@ -130,20 +130,56 @@ export function App({ content, raw, layout, theme }: Readonly<AppProps>) {
 		}
 	})
 
+	// mouse click-to-focus handlers
+	const handleSourceMouseDown = () => {
+		if (state.focus !== 'source' && isSplitLayout(state.layout)) {
+			dispatch({ type: 'FocusPane', target: 'source' })
+		}
+	}
+	const handlePreviewMouseDown = () => {
+		if (state.focus !== 'preview' && isSplitLayout(state.layout)) {
+			dispatch({ type: 'FocusPane', target: 'preview' })
+		}
+	}
+
+	// mouse scroll sync — scrollbox handles wheel natively, we just sync after
+	const handleSourceMouseScroll = () => {
+		if (state.scrollSync && isSplitLayout(state.layout) && state.focus === 'source') {
+			queueMicrotask(() => syncScroll(sourceRef.current, previewRef.current))
+		}
+	}
+	const handlePreviewMouseScroll = () => {
+		if (state.scrollSync && isSplitLayout(state.layout) && state.focus === 'preview') {
+			queueMicrotask(() => syncScroll(previewRef.current, sourceRef.current))
+		}
+	}
+
 	const panes = paneDimensions(state.layout, state.dimensions.width, state.dimensions.height)
 	const entries = legendEntries(state)
 
 	return (
 		<box style={{ flexDirection: 'column', width: '100%', height: '100%' }}>
-			{renderLayout(state, panes, content, raw, theme, sourceRef, previewRef)}
+			{renderLayout(state, panes, content, raw, theme, sourceRef, previewRef, {
+				onSourceMouseDown: handleSourceMouseDown,
+				onPreviewMouseDown: handlePreviewMouseDown,
+				onSourceMouseScroll: handleSourceMouseScroll,
+				onPreviewMouseScroll: handlePreviewMouseScroll,
+			})}
 			<StatusBar
-				legendVisible={state.legendVisible}
+				legendPage={state.legendPage}
 				entries={entries}
 				layout={state.layout}
 				theme={theme}
 			/>
 		</box>
 	)
+}
+
+interface MouseHandlers {
+	onSourceMouseDown: () => void
+	onPreviewMouseDown: () => void
+	onSourceMouseScroll: () => void
+	onPreviewMouseScroll: () => void
 }
 
 function renderLayout(
@@ -154,6 +190,7 @@ function renderLayout(
 	theme: ThemeTokens,
 	sourceRef: React.RefObject<ScrollBoxRenderable | null>,
 	previewRef: React.RefObject<ScrollBoxRenderable | null>,
+	mouse: MouseHandlers,
 ): ReactNode {
 	const hasSource = panes.source != null
 	const hasPreview = panes.preview != null
@@ -177,8 +214,17 @@ function renderLayout(
 				focused={sourceFocused}
 				theme={theme}
 				scrollRef={sourceRef}
+				onMouseDown={mouse.onSourceMouseDown}
+				onMouseScroll={mouse.onSourceMouseScroll}
 			/>
-			<PreviewPane content={content} focused={!sourceFocused} theme={theme} scrollRef={previewRef} />
+			<PreviewPane
+				content={content}
+				focused={!sourceFocused}
+				theme={theme}
+				scrollRef={previewRef}
+				onMouseDown={mouse.onPreviewMouseDown}
+				onMouseScroll={mouse.onPreviewMouseScroll}
+			/>
 		</box>
 	)
 }

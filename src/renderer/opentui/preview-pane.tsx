@@ -10,9 +10,11 @@ interface PreviewPaneProps {
 	focused: boolean
 	theme: ThemeTokens
 	scrollRef: RefObject<ScrollBoxRenderable | null>
+	onMouseDown?: () => void
+	onMouseScroll?: () => void
 }
 
-export function PreviewPane({ content, focused, theme, scrollRef }: Readonly<PreviewPaneProps>) {
+export function PreviewPane({ content, focused, theme, scrollRef, onMouseDown, onMouseScroll }: Readonly<PreviewPaneProps>) {
 	const borderColor = focused
 		? theme.pane.focusedBorderColor
 		: theme.pane.unfocusedBorderColor
@@ -23,6 +25,8 @@ export function PreviewPane({ content, focused, theme, scrollRef }: Readonly<Pre
 			focused={focused}
 			viewportCulling
 			border
+			onMouseDown={onMouseDown}
+			onMouseScroll={onMouseScroll}
 			style={{
 				rootOptions: { width: '100%', flexGrow: 1, borderColor, borderStyle: 'single' },
 			}}

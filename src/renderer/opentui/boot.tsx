@@ -29,7 +29,7 @@ export async function boot(ctx: BootContext): Promise<void> {
 	const content = renderToOpenTUI(ctx.ir, previewWidth)
 	const renderer = await createCliRenderer({
 		exitOnCtrlC: true,
-		useMouse: false,
+		useMouse: true,
 		onDestroy: () => process.exit(0),
 	})
 

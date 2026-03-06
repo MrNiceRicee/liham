@@ -4,12 +4,14 @@ export type LayoutMode = 'preview-only' | 'side' | 'top' | 'source-only'
 
 export type FocusTarget = 'source' | 'preview'
 
+export type LegendPage = 'off' | 'nav' | 'scroll'
+
 export interface AppState {
 	layout: LayoutMode
 	focus: FocusTarget
 	dimensions: { width: number; height: number }
 	scrollSync: boolean
-	legendVisible: boolean
+	legendPage: LegendPage
 	scrollPercent: { source: number; preview: number }
 }
 
@@ -29,7 +31,7 @@ export type AppAction =
 	| { type: 'Resize'; width: number; height: number }
 	| { type: 'FocusPane'; target: FocusTarget }
 	| { type: 'ToggleSync' }
-	| { type: 'ToggleLegend' }
+	| { type: 'CycleLegend' }
 	| { type: 'CycleLayout' }
 	| { type: 'Scroll'; direction: ScrollDirection; target?: FocusTarget }
 	| { type: 'Quit' }
@@ -57,6 +59,13 @@ function oppositeFocus(focus: FocusTarget): FocusTarget {
 	return focus === 'source' ? 'preview' : 'source'
 }
 
+const LEGEND_CYCLE: readonly LegendPage[] = ['nav', 'scroll', 'off'] as const
+
+function nextLegendPage(current: LegendPage): LegendPage {
+	const idx = LEGEND_CYCLE.indexOf(current)
+	return LEGEND_CYCLE[(idx + 1) % LEGEND_CYCLE.length]!
+}
+
 // -- reducer --
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -76,8 +85,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 		case 'ToggleSync':
 			return { ...state, scrollSync: !state.scrollSync }
 
-		case 'ToggleLegend':
-			return { ...state, legendVisible: !state.legendVisible }
+		case 'CycleLegend':
+			return { ...state, legendPage: nextLegendPage(state.legendPage) }
 
 		case 'CycleLayout': {
 			const next = nextLayout(state.layout)
@@ -104,7 +113,7 @@ export function initialState(layout: LayoutMode = 'preview-only'): AppState {
 		focus: autoFocus(layout, 'preview'),
 		dimensions: { width: 0, height: 0 },
 		scrollSync: true,
-		legendVisible: true,
+		legendPage: 'nav',
 		scrollPercent: { source: 0, preview: 0 },
 	}
 }
@@ -168,9 +177,22 @@ export interface LegendEntry {
 }
 
 export function legendEntries(state: AppState): LegendEntry[] {
-	const entries: LegendEntry[] = []
+	if (state.legendPage === 'off') {
+		return [{ key: '?', label: 'help' }]
+	}
 
-	entries.push({ key: '?', label: 'legend' })
+	if (state.legendPage === 'scroll') {
+		return [
+			{ key: '?', label: 'more' },
+			{ key: 'j/k', label: 'scroll' },
+			{ key: 'g/G', label: 'top/bottom' },
+			{ key: 'pgup/pgdn', label: 'page' },
+			{ key: 'ctrl+d/u', label: 'half' },
+		]
+	}
+
+	// nav page
+	const entries: LegendEntry[] = [{ key: '?', label: 'more' }]
 	entries.push({ key: 'l', label: 'layout' })
 
 	if (isSplitLayout(state.layout)) {
@@ -180,6 +202,5 @@ export function legendEntries(state: AppState): LegendEntry[] {
 	}
 
 	entries.push({ key: 'q', label: 'quit' })
-
 	return entries
 }

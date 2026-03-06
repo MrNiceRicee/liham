@@ -10,6 +10,8 @@ interface SourcePaneProps {
 	focused: boolean
 	theme: ThemeTokens
 	scrollRef: RefObject<ScrollBoxRenderable | null>
+	onMouseDown?: () => void
+	onMouseScroll?: () => void
 }
 
 // chunk raw text into groups of lines to reduce React element count
@@ -22,7 +24,7 @@ function chunkLines(text: string, chunkSize: number): string[] {
 	return chunks
 }
 
-export function SourcePane({ content, focused, theme, scrollRef }: Readonly<SourcePaneProps>) {
+export function SourcePane({ content, focused, theme, scrollRef, onMouseDown, onMouseScroll }: Readonly<SourcePaneProps>) {
 	const chunks = chunkLines(content, 100)
 	const borderColor = focused
 		? theme.pane.focusedBorderColor
@@ -34,6 +36,8 @@ export function SourcePane({ content, focused, theme, scrollRef }: Readonly<Sour
 			focused={focused}
 			viewportCulling
 			border
+			onMouseDown={onMouseDown}
+			onMouseScroll={onMouseScroll}
 			style={{
 				rootOptions: { width: '100%', flexGrow: 1, borderColor, borderStyle: 'single' },
 			}}

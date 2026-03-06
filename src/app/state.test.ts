@@ -23,7 +23,7 @@ describe('initialState', () => {
 		const s = initialState()
 		expect(s.layout).toBe('preview-only')
 		expect(s.focus).toBe('preview')
-		expect(s.legendVisible).toBe(true)
+		expect(s.legendPage).toBe('nav')
 		expect(s.scrollSync).toBe(true)
 		expect(s.scrollPercent).toEqual({ source: 0, preview: 0 })
 	})
@@ -114,19 +114,17 @@ describe('ToggleSync action', () => {
 	})
 })
 
-// -- ToggleLegend --
+// -- CycleLegend --
 
-describe('ToggleLegend action', () => {
-	test('hides legend', () => {
-		const s = stateWith({ legendVisible: true })
-		const next = appReducer(s, { type: 'ToggleLegend' })
-		expect(next.legendVisible).toBe(false)
-	})
-
-	test('shows legend', () => {
-		const s = stateWith({ legendVisible: false })
-		const next = appReducer(s, { type: 'ToggleLegend' })
-		expect(next.legendVisible).toBe(true)
+describe('CycleLegend action', () => {
+	test('cycles nav → scroll → off → nav', () => {
+		let s = stateWith({ legendPage: 'nav' })
+		s = appReducer(s, { type: 'CycleLegend' })
+		expect(s.legendPage).toBe('scroll')
+		s = appReducer(s, { type: 'CycleLegend' })
+		expect(s.legendPage).toBe('off')
+		s = appReducer(s, { type: 'CycleLegend' })
+		expect(s.legendPage).toBe('nav')
 	})
 })
 
@@ -224,6 +222,30 @@ describe('legendEntries', () => {
 		expect(onEntry?.label).toBe('sync on')
 		expect(offEntry?.label).toBe('sync off')
 	})
+
+	test('off page shows only ? help', () => {
+		const s = stateWith({ legendPage: 'off' })
+		const entries = legendEntries(s)
+		expect(entries).toEqual([{ key: '?', label: 'help' }])
+	})
+
+	test('scroll page shows vim scroll shortcuts', () => {
+		const s = stateWith({ legendPage: 'scroll' })
+		const entries = legendEntries(s)
+		const keys = entries.map((e) => e.key)
+		expect(keys).toContain('j/k')
+		expect(keys).toContain('g/G')
+		expect(keys).toContain('pgup/pgdn')
+		expect(keys).toContain('ctrl+d/u')
+		expect(keys).toContain('?')
+	})
+
+	test('nav page shows ? as more', () => {
+		const s = stateWith({ legendPage: 'nav' })
+		const entries = legendEntries(s)
+		const q = entries.find((e) => e.key === '?')
+		expect(q?.label).toBe('more')
+	})
 })
 
 // -- paneDimensions --
@@ -286,6 +308,34 @@ describe('paneDimensions', () => {
 	})
 })
 
+// -- mouse-driven focus (reducer behavior) --
+
+describe('mouse-driven FocusPane', () => {
+	test('mouse down in source pane area dispatches FocusPane source', () => {
+		const s = stateWith({ layout: 'side', focus: 'preview' })
+		const next = appReducer(s, { type: 'FocusPane', target: 'source' })
+		expect(next.focus).toBe('source')
+	})
+
+	test('mouse down in preview pane area dispatches FocusPane preview', () => {
+		const s = stateWith({ layout: 'side', focus: 'source' })
+		const next = appReducer(s, { type: 'FocusPane', target: 'preview' })
+		expect(next.focus).toBe('preview')
+	})
+
+	test('mouse down in single-pane mode is no-op', () => {
+		const s = stateWith({ layout: 'preview-only', focus: 'preview' })
+		const next = appReducer(s, { type: 'FocusPane', target: 'source' })
+		expect(next).toBe(s)
+	})
+
+	test('mouse down on already-focused pane is no-op', () => {
+		const s = stateWith({ layout: 'side', focus: 'source' })
+		const next = appReducer(s, { type: 'FocusPane', target: 'source' })
+		expect(next).toBe(s)
+	})
+})
+
 // -- integration traces --
 
 describe('state machine traces', () => {
@@ -320,11 +370,14 @@ describe('state machine traces', () => {
 		expect(scrolled).toBe(s) // scroll is imperative, no state change
 	})
 
-	test('toggle legend twice returns to original visibility', () => {
-		const s = initialState()
-		const hidden = appReducer(s, { type: 'ToggleLegend' })
-		expect(hidden.legendVisible).toBe(false)
-		const restored = appReducer(hidden, { type: 'ToggleLegend' })
-		expect(restored.legendVisible).toBe(true)
+	test('legend cycles through all three pages back to start', () => {
+		let s = initialState()
+		expect(s.legendPage).toBe('nav')
+		s = appReducer(s, { type: 'CycleLegend' })
+		expect(s.legendPage).toBe('scroll')
+		s = appReducer(s, { type: 'CycleLegend' })
+		expect(s.legendPage).toBe('off')
+		s = appReducer(s, { type: 'CycleLegend' })
+		expect(s.legendPage).toBe('nav')
 	})
 })

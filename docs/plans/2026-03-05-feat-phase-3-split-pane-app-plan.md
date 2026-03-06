@@ -209,21 +209,21 @@ Port reference from `main` branch:
 
 **Files:**
 
-- [ ] `src/renderer/opentui/app.tsx` — wire focus from state
+- [x] `src/renderer/opentui/app.tsx` — wire focus from state
   - `state.focus` determines which pane gets `focused={true}` and `scrollRef`
   - Tab dispatches `FocusPane(opposite)` — only in split layouts
   - Pass focus to both `SourcePane` and `PreviewPane` components
   - Only focused pane's scrollbox has `focused={true}` — unfocused scrollbox ignores key events
-- [ ] `src/renderer/opentui/source-pane.tsx` / `preview-pane.tsx` — visual focus
+- [x] `src/renderer/opentui/source-pane.tsx` / `preview-pane.tsx` — visual focus
   - Scrollbox `style.rootOptions.borderStyle: "single"`
   - Focused: `borderColor` from theme accent (e.g., `#7aa2f7`)
   - Unfocused: dim border color from theme (e.g., `#3b4261`)
   - Both border colors added to `ThemeTokens` if not already present
-- [ ] `src/app/state.ts` — focus routing in reducer
+- [x] `src/app/state.ts` — focus routing in reducer
   - `FocusPane(target)`: set focus to target. No-op if target pane doesn't exist in current layout.
   - Single-pane layouts auto-focus the visible pane on `CycleLayout`.
   - Legend shows `Tab focus [source]` or `Tab focus [preview]` in split modes.
-- [ ] `src/app/state.test.ts` — add focus tests
+- [x] `src/app/state.test.ts` — add focus tests
   - Tab toggles focus in split mode
   - Tab is no-op in preview-only mode
   - Scroll actions route to focused pane (target defaults to focused)
@@ -274,9 +274,9 @@ Port reference from `main` branch:
 
 **Files:**
 
-- [ ] `src/renderer/opentui/boot.tsx` — enable mouse
+- [x] `src/renderer/opentui/boot.tsx` — enable mouse
   - `useMouse: true` in `createCliRenderer` config
-- [ ] `src/renderer/opentui/app.tsx` — wire mouse handler
+- [x] `src/renderer/opentui/app.tsx` — wire mouse handler
   - Mouse event parameter: use OpenTUI's actual `RawMouseEvent` type (has `type: "down" | "scroll" | ...`, `x`, `y`, `scroll?: { direction, delta }`)
   - **Click-to-focus:** `type === "down"` → determine which pane was clicked via hit-testing against pane dimensions → `dispatch(FocusPane(target))`
   - **Wheel scroll:** `type === "scroll"` → `dispatch(Scroll({ direction: event.scroll.direction }))` targeting pane under cursor
@@ -284,7 +284,7 @@ Port reference from `main` branch:
     - Let scrollbox handle wheel natively, only dispatch click-to-focus via mouse
     - Or disable scrollbox native wheel and handle all scroll imperatively
   - Wheel scroll triggers same sync logic as keyboard
-- [ ] `src/app/state.test.ts` — add mouse tests
+- [x] `src/app/state.test.ts` — add mouse tests
   - Mouse down in source pane area → FocusPane('source')
   - Mouse down in preview pane area → FocusPane('preview')
   - Mouse down in status bar area → null (no action)
@@ -312,10 +312,10 @@ Port reference from `main` branch:
 
 **Files:**
 
-- [ ] `src/app/state.ts` — change legendVisible to legendPage, update reducer + legendEntries
-- [ ] `src/renderer/opentui/status-bar.tsx` — accept legendPage instead of legendVisible
-- [ ] `src/renderer/opentui/app.tsx` — pass legendPage
-- [ ] `src/app/state.test.ts` — test page cycling, entries per page
+- [x] `src/app/state.ts` — change legendVisible to legendPage, update reducer + legendEntries
+- [x] `src/renderer/opentui/status-bar.tsx` — accept legendPage instead of legendVisible
+- [x] `src/renderer/opentui/app.tsx` — pass legendPage
+- [x] `src/app/state.test.ts` — test page cycling, entries per page
 
 ## System-Wide Impact
 
