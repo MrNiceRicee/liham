@@ -1,18 +1,37 @@
 // app state machine — pure reducer for all app-level state transitions.
 
+import type { FileEntry } from '../browser/scanner.ts'
+
 export type LayoutMode = 'preview-only' | 'side' | 'top' | 'source-only'
 
 export type FocusTarget = 'source' | 'preview'
 
+export type AppMode = 'browser' | 'viewer'
+
 export type LegendPage = 'off' | 'nav' | 'scroll'
 
+export type ScanStatus = 'scanning' | 'complete' | 'error'
+
+export interface BrowserState {
+	files: FileEntry[]
+	filter: string
+	cursorIndex: number
+	scrollPosition: number
+	scanStatus: ScanStatus
+	scanError?: string
+}
+
 export interface AppState {
+	mode: AppMode
 	layout: LayoutMode
 	focus: FocusTarget
 	dimensions: { width: number; height: number }
 	scrollSync: boolean
 	legendPage: LegendPage
 	scrollPercent: { source: number; preview: number }
+	browser: BrowserState
+	currentFile?: string
+	fromBrowser: boolean
 }
 
 // -- actions --
@@ -27,6 +46,8 @@ export type ScrollDirection =
 	| 'halfUp'
 	| 'halfDown'
 
+export type CursorDirection = 'up' | 'down' | 'top' | 'bottom' | 'pageUp' | 'pageDown'
+
 export type AppAction =
 	| { type: 'Resize'; width: number; height: number }
 	| { type: 'FocusPane'; target: FocusTarget }
@@ -35,6 +56,13 @@ export type AppAction =
 	| { type: 'CycleLayout' }
 	| { type: 'Scroll'; direction: ScrollDirection; target?: FocusTarget }
 	| { type: 'Quit' }
+	// browser actions
+	| { type: 'ScanComplete'; files: FileEntry[] }
+	| { type: 'ScanError'; error: string }
+	| { type: 'FilterUpdate'; text: string }
+	| { type: 'CursorMove'; direction: CursorDirection; filteredLength: number }
+	| { type: 'OpenFile'; path: string }
+	| { type: 'ReturnToBrowser' }
 
 // -- layout helpers --
 
@@ -68,6 +96,32 @@ function nextLegendPage(current: LegendPage): LegendPage {
 
 // -- reducer --
 
+const PAGE_SIZE = 10
+
+function moveCursor(
+	current: number,
+	direction: CursorDirection,
+	filteredLength: number,
+): number {
+	if (filteredLength === 0) return 0
+	const max = filteredLength - 1
+
+	switch (direction) {
+		case 'up':
+			return Math.max(0, current - 1)
+		case 'down':
+			return Math.min(max, current + 1)
+		case 'top':
+			return 0
+		case 'bottom':
+			return max
+		case 'pageUp':
+			return Math.max(0, current - PAGE_SIZE)
+		case 'pageDown':
+			return Math.min(max, current + PAGE_SIZE)
+	}
+}
+
 export function appReducer(state: AppState, action: AppAction): AppState {
 	switch (action.type) {
 		case 'Resize':
@@ -89,32 +143,95 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 			return { ...state, legendPage: nextLegendPage(state.legendPage) }
 
 		case 'CycleLayout': {
+			// disabled in browser mode
+			if (state.mode === 'browser') return state
 			const next = nextLayout(state.layout)
 			const focus = autoFocus(next, state.focus)
 			return { ...state, layout: next, focus }
 		}
 
 		case 'Scroll':
-			// scroll actions are handled imperatively via refs in the component.
-			// the reducer just updates scrollPercent for position tracking.
 			return state
 
 		case 'Quit':
-			// quit is handled imperatively in the component (renderer.destroy()).
 			return state
+
+		// -- browser actions --
+
+		case 'ScanComplete':
+			return {
+				...state,
+				browser: { ...state.browser, files: action.files, scanStatus: 'complete', cursorIndex: 0 },
+			}
+
+		case 'ScanError':
+			return {
+				...state,
+				browser: { ...state.browser, scanStatus: 'error', scanError: action.error },
+			}
+
+		case 'FilterUpdate':
+			if (state.browser.filter === action.text) return state
+			return {
+				...state,
+				browser: { ...state.browser, filter: action.text, cursorIndex: 0 },
+			}
+
+		case 'CursorMove': {
+			const next = moveCursor(state.browser.cursorIndex, action.direction, action.filteredLength)
+			if (next === state.browser.cursorIndex) return state
+			return {
+				...state,
+				browser: { ...state.browser, cursorIndex: next },
+			}
+		}
+
+		case 'OpenFile':
+			return {
+				...state,
+				mode: 'viewer',
+				currentFile: action.path,
+				fromBrowser: true,
+				focus: autoFocus(state.layout, 'preview'),
+			}
+
+		case 'ReturnToBrowser':
+			if (!state.fromBrowser) return state
+			return {
+				...state,
+				mode: 'browser',
+				currentFile: undefined,
+				focus: 'preview', // preview = browser pane in browser mode
+			}
 	}
 }
 
 // -- initial state --
 
-export function initialState(layout: LayoutMode = 'preview-only'): AppState {
+function initialBrowserState(): BrowserState {
 	return {
+		files: [],
+		filter: '',
+		cursorIndex: 0,
+		scrollPosition: 0,
+		scanStatus: 'scanning',
+	}
+}
+
+export function initialState(
+	layout: LayoutMode = 'preview-only',
+	mode: AppMode = 'viewer',
+): AppState {
+	return {
+		mode,
 		layout,
 		focus: autoFocus(layout, 'preview'),
 		dimensions: { width: 0, height: 0 },
 		scrollSync: true,
 		legendPage: 'nav',
 		scrollPercent: { source: 0, preview: 0 },
+		browser: initialBrowserState(),
+		fromBrowser: false,
 	}
 }
 
@@ -125,17 +242,50 @@ const MIN_PANE_HEIGHT = 5
 const STATUS_BAR_HEIGHT = 2
 
 export interface PaneDimensions {
+	browser?: { width: number; height: number }
 	source?: { width: number; height: number }
 	preview?: { width: number; height: number }
 }
+
+const MIN_BROWSER_WIDTH = 20
 
 export function paneDimensions(
 	layout: LayoutMode,
 	width: number,
 	height: number,
+	mode: AppMode = 'viewer',
 ): PaneDimensions {
 	const contentHeight = Math.max(0, height - STATUS_BAR_HEIGHT)
 
+	// browser mode: file list (optionally + preview)
+	if (mode === 'browser') {
+		if (layout === 'side') {
+			const half = Math.floor(width / 2)
+			const other = width - half
+			if (half < MIN_BROWSER_WIDTH || contentHeight < MIN_PANE_HEIGHT) {
+				return { browser: { width, height: contentHeight } }
+			}
+			return {
+				browser: { width: half, height: contentHeight },
+				preview: { width: other, height: contentHeight },
+			}
+		}
+		if (layout === 'top') {
+			const half = Math.floor(contentHeight / 2)
+			const other = contentHeight - half
+			if (width < MIN_BROWSER_WIDTH || half < MIN_PANE_HEIGHT) {
+				return { browser: { width, height: contentHeight } }
+			}
+			return {
+				browser: { width, height: half },
+				preview: { width, height: other },
+			}
+		}
+		// preview-only and source-only both show browser full width in browser mode
+		return { browser: { width, height: contentHeight } }
+	}
+
+	// viewer mode: same as before
 	switch (layout) {
 		case 'preview-only':
 			return { preview: { width, height: contentHeight } }
@@ -177,6 +327,21 @@ export interface LegendEntry {
 }
 
 export function legendEntries(state: AppState): LegendEntry[] {
+	// browser mode has its own legend
+	if (state.mode === 'browser') {
+		if (state.legendPage === 'off') {
+			return [{ key: '?', label: 'help' }]
+		}
+		return [
+			{ key: '?', label: 'more' },
+			{ key: '\u2191/\u2193', label: 'navigate' },
+			{ key: 'enter', label: 'open' },
+			{ key: 'esc', label: 'quit' },
+			{ key: 'type', label: 'filter' },
+		]
+	}
+
+	// viewer mode
 	if (state.legendPage === 'off') {
 		return [{ key: '?', label: 'help' }]
 	}
@@ -199,6 +364,10 @@ export function legendEntries(state: AppState): LegendEntry[] {
 		const other = oppositeFocus(state.focus)
 		entries.push({ key: 'Tab', label: other })
 		entries.push({ key: 's', label: state.scrollSync ? 'sync on' : 'sync off' })
+	}
+
+	if (state.fromBrowser) {
+		entries.push({ key: 'esc', label: 'back' })
 	}
 
 	entries.push({ key: 'q', label: 'quit' })
