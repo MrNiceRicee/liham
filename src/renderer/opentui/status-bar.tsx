@@ -8,6 +8,7 @@ interface StatusBarProps {
 	layout: string
 	theme: ThemeTokens
 	renderTimeMs?: number
+	fileDeleted?: boolean
 }
 
 function formatRenderTime(ms: number): string {
@@ -16,7 +17,13 @@ function formatRenderTime(ms: number): string {
 	return `${(ms / 1000).toFixed(1)}s`
 }
 
-export function StatusBar({ entries, layout, theme, renderTimeMs }: Readonly<StatusBarProps>) {
+export function StatusBar({
+	entries,
+	layout,
+	theme,
+	renderTimeMs,
+	fileDeleted,
+}: Readonly<StatusBarProps>) {
 	const fg = theme.statusBar.fg
 	const dimFg = theme.statusBar.dimFg
 	const layoutLabel = `[${layout}]`
@@ -24,7 +31,12 @@ export function StatusBar({ entries, layout, theme, renderTimeMs }: Readonly<Sta
 	const borderColor = fg
 
 	// height: 2 = 1 row border-top + 1 row text (Yoga border-box sizing)
-	const barStyle = { height: 2, width: '100%', flexDirection: 'row' as const, rootOptions: { borderColor } }
+	const barStyle = {
+		height: 2,
+		width: '100%',
+		flexDirection: 'row' as const,
+		rootOptions: { borderColor },
+	}
 
 	const legend = entries.map((e) => `${e.key} ${e.label}`).join(' · ')
 	const timeLabel = renderTimeMs != null ? formatRenderTime(renderTimeMs) : null
@@ -34,12 +46,9 @@ export function StatusBar({ entries, layout, theme, renderTimeMs }: Readonly<Sta
 			<text color={fg}>
 				{layoutLabel} · {legend}
 			</text>
-			{timeLabel != null && (
-				<>
-					<box style={{ flexGrow: 1 }} />
-					<text color={dimFg}>{timeLabel}</text>
-				</>
-			)}
+			<box style={{ flexGrow: 1 }} />
+			{fileDeleted === true && <text color={theme.heading.color}> file deleted </text>}
+			{timeLabel != null && <text color={dimFg}>{timeLabel}</text>}
 		</box>
 	)
 }

@@ -18,6 +18,7 @@ _liham() {
     '--layout[pane layout]:layout:(preview-only side top source-only)'
     '-r[TUI renderer]:renderer:(opentui)'
     '--renderer[TUI renderer]:renderer:(opentui)'
+    '--no-watch[disable file watching]::'
     '--completions[output shell completion script]:shell:(zsh bash)'
   )
 
@@ -53,7 +54,7 @@ export function generateBashCompletion(): string {
   esac
 
   if [[ "$cur" == -* ]]; then
-    COMPREPLY=($(compgen -W "-h --help -i --info -t --theme -l --layout -r --renderer --completions" -- "$cur"))
+    COMPREPLY=($(compgen -W "-h --help -i --info -t --theme -l --layout -r --renderer --no-watch --completions" -- "$cur"))
     return
   fi
 

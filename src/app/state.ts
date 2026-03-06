@@ -32,6 +32,7 @@ export interface AppState {
 	browser: BrowserState
 	currentFile?: string
 	fromBrowser: boolean
+	fileDeleted: boolean
 }
 
 // -- actions --
@@ -63,6 +64,8 @@ export type AppAction =
 	| { type: 'CursorMove'; direction: CursorDirection; filteredLength: number }
 	| { type: 'OpenFile'; path: string }
 	| { type: 'ReturnToBrowser' }
+	// watcher actions
+	| { type: 'FileDeleted' }
 
 // -- layout helpers --
 
@@ -98,11 +101,7 @@ function nextLegendPage(current: LegendPage): LegendPage {
 
 const PAGE_SIZE = 10
 
-function moveCursor(
-	current: number,
-	direction: CursorDirection,
-	filteredLength: number,
-): number {
+function moveCursor(current: number, direction: CursorDirection, filteredLength: number): number {
 	if (filteredLength === 0) return 0
 	const max = filteredLength - 1
 
@@ -130,7 +129,7 @@ function omitCurrentFile(state: AppState): Omit<AppState, 'currentFile'> {
 
 function returnToBrowser(state: AppState): AppState {
 	if (!state.fromBrowser) return state
-	return { ...omitCurrentFile(state), mode: 'browser', focus: 'preview' }
+	return { ...omitCurrentFile(state), mode: 'browser', focus: 'preview', fileDeleted: false }
 }
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -203,11 +202,17 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 				mode: 'viewer',
 				currentFile: action.path,
 				fromBrowser: true,
+				fileDeleted: false,
 				focus: autoFocus(state.layout, 'preview'),
 			}
 
 		case 'ReturnToBrowser':
 			return returnToBrowser(state)
+
+		// -- watcher actions --
+
+		case 'FileDeleted':
+			return { ...state, fileDeleted: true }
 	}
 }
 
@@ -237,6 +242,7 @@ export function initialState(
 		scrollPercent: { source: 0, preview: 0 },
 		browser: initialBrowserState(),
 		fromBrowser: false,
+		fileDeleted: false,
 	}
 }
 

@@ -33,12 +33,7 @@ function isThemeName(value: string): value is ThemeName {
 
 // -- layout name union --
 
-const VALID_LAYOUTS: readonly LayoutMode[] = [
-	'preview-only',
-	'side',
-	'top',
-	'source-only',
-] as const
+const VALID_LAYOUTS: readonly LayoutMode[] = ['preview-only', 'side', 'top', 'source-only'] as const
 
 function isLayoutName(value: string): value is LayoutMode {
 	return (VALID_LAYOUTS as readonly string[]).includes(value)
@@ -69,6 +64,8 @@ options:
 
   -i, --info               Show detected theme and terminal info, then exit
 
+  --no-watch               Disable file watching (no live reload)
+
   --completions <shell>    Output shell completion script (zsh, bash)
 
   -h, --help               Show this help message
@@ -86,6 +83,7 @@ const options = {
 	help: { type: 'boolean' as const, short: 'h' },
 	info: { type: 'boolean' as const, short: 'i' },
 	layout: { type: 'string' as const, short: 'l', default: 'side' },
+	'no-watch': { type: 'boolean' as const, default: false },
 	renderer: { type: 'string' as const, short: 'r', default: 'opentui' },
 	theme: { type: 'string' as const, short: 't', default: 'auto' },
 } as const
@@ -93,7 +91,14 @@ const options = {
 type CliMode =
 	| { mode: 'info'; layout: LayoutMode; renderer: RendererName; theme: ThemeName }
 	| { mode: 'browser'; dir: string; layout: LayoutMode; renderer: RendererName; theme: ThemeName }
-	| { mode: 'viewer'; filePath: string; layout: LayoutMode; renderer: RendererName; theme: ThemeName }
+	| {
+			mode: 'viewer'
+			filePath: string
+			layout: LayoutMode
+			renderer: RendererName
+			theme: ThemeName
+			noWatch: boolean
+	  }
 
 function parseCliArgs(): CliMode {
 	let values: ReturnType<typeof parseArgs<{ options: typeof options }>>['values']
@@ -168,8 +173,10 @@ function parseCliArgs(): CliMode {
 		return { mode: 'browser', dir: process.cwd(), layout, renderer, theme }
 	}
 
+	const noWatch = values['no-watch'] ?? false
+
 	// positional present — will be resolved to file or directory in main()
-	return { mode: 'viewer', filePath: positional, layout, renderer, theme }
+	return { mode: 'viewer', filePath: positional, layout, renderer, theme, noWatch }
 }
 
 // resolve positional arg: file → viewer, directory → browser, missing → error
@@ -178,6 +185,7 @@ async function resolvePositional(
 	layout: LayoutMode,
 	renderer: RendererName,
 	theme: ThemeName,
+	noWatch: boolean,
 ): Promise<CliMode> {
 	const resolved = resolve(positional)
 
@@ -188,7 +196,7 @@ async function resolvePositional(
 			return { mode: 'browser', dir: resolved, layout, renderer, theme }
 		}
 		if (s.isFile()) {
-			return { mode: 'viewer', filePath: resolved, layout, renderer, theme }
+			return { mode: 'viewer', filePath: resolved, layout, renderer, theme, noWatch }
 		}
 	} catch {
 		// fall through
@@ -227,7 +235,13 @@ async function main() {
 
 	// resolve positional: detect file vs directory
 	if (args.mode === 'viewer') {
-		args = await resolvePositional(args.filePath, args.layout, args.renderer, args.theme)
+		args = await resolvePositional(
+			args.filePath,
+			args.layout,
+			args.renderer,
+			args.theme,
+			args.noWatch,
+		)
 	}
 
 	if (args.mode === 'info') {
@@ -267,7 +281,16 @@ async function main() {
 	}
 
 	const renderTimeMs = performance.now() - t0
-	await boot({ mode: 'viewer', ir: result.value, theme: theme.tokens, layout: args.layout, raw: markdown, renderTimeMs })
+	await boot({
+		mode: 'viewer',
+		ir: result.value,
+		theme: theme.tokens,
+		layout: args.layout,
+		raw: markdown,
+		renderTimeMs,
+		filePath,
+		noWatch: args.noWatch,
+	})
 }
 
 await main()
