@@ -5,7 +5,7 @@ import type { Element, ElementContent, Root, Text } from 'hast'
 import type { Plugin } from 'unified'
 import type { VFile } from 'vfile'
 
-import type { IRNode } from '../ir/types.ts'
+import type { IRNode, TableCellNode, TableRowNode } from '../ir/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 
 import { getHighlightColor } from './hljs-colors.ts'
@@ -306,8 +306,8 @@ function extractAlignments(node: Element): ('left' | 'center' | 'right' | null)[
 
 const TABLE_SECTIONS = new Set(['thead', 'tbody', 'tfoot'])
 
-function collectTableRows(state: CompilerState, section: Element, isHeader: boolean): IRNode[] {
-	const rows: IRNode[] = []
+function collectTableRows(state: CompilerState, section: Element, isHeader: boolean): TableRowNode[] {
+	const rows: TableRowNode[] = []
 	state.ancestors.push(section)
 	for (const child of section.children) {
 		if (child.type === 'text' && child.value.trim().length === 0) continue
@@ -321,7 +321,7 @@ function collectTableRows(state: CompilerState, section: Element, isHeader: bool
 
 function compileTable(state: CompilerState, node: Element): IRNode {
 	const alignments = extractAlignments(node)
-	const rows: IRNode[] = []
+	const rows: TableRowNode[] = []
 
 	state.ancestors.push(node)
 	for (const child of node.children) {
@@ -343,14 +343,15 @@ function compileTable(state: CompilerState, node: Element): IRNode {
 	}
 }
 
-function compileTableRow(state: CompilerState, node: Element, isHeader: boolean): IRNode {
+function compileTableRow(state: CompilerState, node: Element, isHeader: boolean): TableRowNode {
 	const { theme } = state
 	const fg = isHeader ? theme.table.headerColor : theme.table.cellColor
+	const cells = withAncestors(state, node).filter((child): child is TableCellNode => child.type === 'tableCell')
 	return {
 		type: 'tableRow',
 		isHeader,
 		style: { fg },
-		children: withAncestors(state, node).filter((child) => child.type === 'tableCell'),
+		children: cells,
 	}
 }
 

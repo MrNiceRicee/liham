@@ -39,11 +39,8 @@ function extractPlainText(nodes: IRNode[]): string {
 function measureColumnWidths(node: TableNode): number[] {
 	const colWidths: number[] = []
 	for (const row of node.children) {
-		if (row.type !== 'tableRow') continue
-		const cells = row.children.filter((c) => c.type === 'tableCell')
-		for (let i = 0; i < cells.length; i++) {
-			const cell = cells[i]!
-			if (cell.type !== 'tableCell') continue
+		for (let i = 0; i < row.children.length; i++) {
+			const cell = row.children[i]!
 			const w = extractPlainText(cell.children).length
 			colWidths[i] = Math.max(colWidths[i] ?? 0, w)
 		}
@@ -53,10 +50,8 @@ function measureColumnWidths(node: TableNode): number[] {
 
 function measureHeaderWidths(node: TableNode): number[] {
 	for (const row of node.children) {
-		if (row.type !== 'tableRow' || !row.isHeader) continue
-		return row.children
-			.filter((c) => c.type === 'tableCell')
-			.map((cell) => (cell.type === 'tableCell' ? extractPlainText(cell.children).length : 0))
+		if (!row.isHeader) continue
+		return row.children.map((cell) => extractPlainText(cell.children).length)
 	}
 	return []
 }
@@ -144,7 +139,7 @@ const MAX_DATA_ROWS = 100
 function countDataRows(node: TableNode): number {
 	let count = 0
 	for (const child of node.children) {
-		if (child.type === 'tableRow' && !child.isHeader) count++
+		if (!child.isHeader) count++
 	}
 	return count
 }
@@ -168,7 +163,7 @@ function renderRowLines(
 	colWidths: number[],
 	borderFg: Record<string, unknown>,
 ): ReactNode[] {
-	const cells = row.children.filter((c) => c.type === 'tableCell') as TableCellNode[]
+	const cells = row.children
 
 	// wrap each cell's text to its column width
 	const cellLines: string[][] = []
@@ -293,7 +288,6 @@ function buildTableRows(
 
 	for (let i = 0; i < node.children.length; i++) {
 		const row = node.children[i]!
-		if (row.type !== 'tableRow') continue
 		if (!row.isHeader && dataRowIndex >= MAX_DATA_ROWS) break
 
 		// light separator between data rows

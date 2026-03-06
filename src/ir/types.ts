@@ -75,14 +75,14 @@ export interface TableNode {
 	type: 'table'
 	alignments: ('left' | 'center' | 'right' | null)[]
 	style: BlockStyle
-	children: IRNode[] // TableRowNode[]
+	children: TableRowNode[]
 }
 
 export interface TableRowNode {
 	type: 'tableRow'
 	isHeader: boolean
 	style: BlockStyle
-	children: IRNode[] // TableCellNode[]
+	children: TableCellNode[]
 }
 
 export interface TableCellNode {

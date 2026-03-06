@@ -28,6 +28,42 @@ import { PreviewPane } from './preview-pane.tsx'
 import { SourcePane } from './source-pane.tsx'
 import { StatusBar } from './status-bar.tsx'
 
+// -- browser preview cache helper --
+
+function renderBrowserPreview(
+	filePath: string,
+	cursorSnapshot: number,
+	cursorRef: React.RefObject<number>,
+	cache: Map<string, ReactNode>,
+	state: AppState,
+	theme: ThemeTokens,
+	setContent: (content: ReactNode) => void,
+): void {
+	void (async () => {
+		try {
+			const markdown = await Bun.file(filePath).text()
+			if (cursorRef.current !== cursorSnapshot) return
+
+			const result = await processMarkdown(markdown, theme)
+			if (cursorRef.current !== cursorSnapshot) return
+
+			if (!result.ok) {
+				const errNode = <text color={theme.fallback.textColor}>preview error: {result.error}</text>
+				setContent(errNode)
+				return
+			}
+
+			const panes = paneDimensions(state.layout, state.dimensions.width, state.dimensions.height, 'browser')
+			const width = (panes.preview?.width ?? state.dimensions.width) - 4
+			const rendered = renderToOpenTUI(result.value, width)
+			cache.set(filePath, rendered)
+			if (cursorRef.current === cursorSnapshot) setContent(rendered)
+		} catch {
+			setContent(<text color={theme.fallback.textColor}>cannot read file</text>)
+		}
+	})()
+}
+
 type AppProps =
 	| { mode: 'viewer'; content: ReactNode; raw: string; layout: LayoutMode; theme: ThemeTokens }
 	| { mode: 'browser'; dir: string; layout: LayoutMode; theme: ThemeTokens }
@@ -113,7 +149,7 @@ export function App(props: Readonly<AppProps>) {
 
 	// browser live preview state
 	const [browserPreviewContent, setBrowserPreviewContent] = useState<ReactNode>(null)
-	const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+	const previewCacheRef = useRef(new Map<string, ReactNode>())
 	const previewCursorRef = useRef<number>(-1)
 
 	// viewer mode content
@@ -146,7 +182,7 @@ export function App(props: Readonly<AppProps>) {
 		return () => { cancelled = true }
 	}, [props.mode === 'browser' ? props.dir : null])
 
-	// -- browser live preview: debounced pipeline on cursor move --
+	// -- browser live preview: cache-first, background load on miss --
 	useEffect(() => {
 		if (state.mode !== 'browser') return
 		if (filteredMatches.length === 0) {
@@ -157,47 +193,25 @@ export function App(props: Readonly<AppProps>) {
 		const match = filteredMatches[state.browser.cursorIndex]
 		if (match == null) return
 
+		const filePath = match.entry.absolutePath
+		const cached = previewCacheRef.current.get(filePath)
+		if (cached != null) {
+			setBrowserPreviewContent(cached)
+			return
+		}
+
 		const cursorSnapshot = state.browser.cursorIndex
 		previewCursorRef.current = cursorSnapshot
 
-		if (previewTimerRef.current != null) clearTimeout(previewTimerRef.current)
-
-		previewTimerRef.current = setTimeout(async () => {
-			// stale check
-			if (previewCursorRef.current !== cursorSnapshot) return
-
-			try {
-				const markdown = await Bun.file(match.entry.absolutePath).text()
-				// stale check after async
-				if (previewCursorRef.current !== cursorSnapshot) return
-
-				const result = await processMarkdown(markdown, props.theme)
-				if (!result.ok) {
-					setBrowserPreviewContent(
-						<text color={props.theme.fallback.textColor}>preview error: {result.error}</text>,
-					)
-					return
-				}
-
-				// stale check after pipeline
-				if (previewCursorRef.current !== cursorSnapshot) return
-
-				const termWidth = state.dimensions.width
-				const panes = paneDimensions(state.layout, termWidth, state.dimensions.height, 'browser')
-				const paneChrome = 4
-				const width = (panes.preview?.width ?? termWidth) - paneChrome
-				const rendered = renderToOpenTUI(result.value, width)
-				setBrowserPreviewContent(rendered)
-			} catch {
-				setBrowserPreviewContent(
-					<text color={props.theme.fallback.textColor}>cannot read file</text>,
-				)
-			}
-		}, 150)
-
-		return () => {
-			if (previewTimerRef.current != null) clearTimeout(previewTimerRef.current)
-		}
+		renderBrowserPreview(
+			filePath,
+			cursorSnapshot,
+			previewCursorRef,
+			previewCacheRef.current,
+			state,
+			props.theme,
+			setBrowserPreviewContent,
+		)
 	}, [state.mode, state.browser.cursorIndex, filteredMatches.length])
 
 	// -- debounced resize --
