@@ -9,12 +9,15 @@ export function renderHeading(node: HeadingNode, key: string) {
 	if (node.style.bold) attrs |= TextAttributes.BOLD
 	if (node.style.dim) attrs |= TextAttributes.DIM
 
-	const style: Record<string, unknown> = { attributes: attrs }
-	if (node.style.fg != null) style['fg'] = node.style.fg
+	const spanProps: Record<string, unknown> = {}
+	if (attrs !== TextAttributes.NONE) spanProps['attributes'] = attrs
+	if (node.style.fg != null) spanProps['fg'] = node.style.fg
 
 	return (
 		<box key={key} style={{ marginBottom: 1 }}>
-			<text style={style}>{renderInlineChildren(node.children, key)}</text>
+			<text>
+				<span {...spanProps}>{renderInlineChildren(node.children, key)}</span>
+			</text>
 		</box>
 	)
 }

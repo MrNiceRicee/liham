@@ -271,8 +271,8 @@ function renderFormattedLine(
 	parts.push('│')
 
 	return (
-		<text key={key} style={borderFg}>
-			{parts}
+		<text key={key}>
+			<span {...borderFg}>{parts}</span>
 		</text>
 	)
 }
@@ -293,8 +293,8 @@ function buildTableRows(
 		// light separator between data rows
 		if (!row.isHeader && dataRowIndex > 0) {
 			rows.push(
-				<text key={`${key}-dsep${String(i)}`} style={borderFg}>
-					{buildSeparator(colWidths, '├', '┼', '┤', '┄')}
+				<text key={`${key}-dsep${String(i)}`}>
+					<span {...borderFg}>{buildSeparator(colWidths, '├', '┼', '┤', '┄')}</span>
 				</text>,
 			)
 		}
@@ -305,8 +305,8 @@ function buildTableRows(
 
 		if (row.isHeader) {
 			rows.push(
-				<text key={`${rowKey}-sep`} style={borderFg}>
-					{buildSeparator(colWidths, '├', '┼', '┤', '─')}
+				<text key={`${rowKey}-sep`}>
+					<span {...borderFg}>{buildSeparator(colWidths, '├', '┼', '┤', '─')}</span>
 				</text>,
 			)
 		}
@@ -328,11 +328,11 @@ export function renderTable(node: TableNode, key: string, maxWidth?: number) {
 
 	return (
 		<box key={key} style={{ flexDirection: 'column', marginBottom: 1 }}>
-			<text style={borderFg}>{buildSeparator(colWidths, '┌', '┬', '┐', '─')}</text>
+			<text><span {...borderFg}>{buildSeparator(colWidths, '┌', '┬', '┐', '─')}</span></text>
 			{rows}
-			<text style={borderFg}>{buildSeparator(colWidths, '└', '┴', '┘', '─')}</text>
+			<text><span {...borderFg}>{buildSeparator(colWidths, '└', '┴', '┘', '─')}</span></text>
 			{overflowCount > 0 && (
-				<text style={{ fg: '#565f89' }}>{`… ${String(overflowCount)} more rows`}</text>
+				<text><span fg="#565f89">{`… ${String(overflowCount)} more rows`}</span></text>
 			)}
 		</box>
 	)
@@ -363,8 +363,10 @@ export function renderTableCell(
 	if (isHeader || node.style.bold === true) textStyle['attributes'] = 1
 
 	return (
-		<text key={key} style={textStyle}>
-			{renderInlineChildren(node.children, key)}
+		<text key={key}>
+			{Object.keys(textStyle).length > 0
+				? <span {...textStyle}>{renderInlineChildren(node.children, key)}</span>
+				: renderInlineChildren(node.children, key)}
 		</text>
 	)
 }

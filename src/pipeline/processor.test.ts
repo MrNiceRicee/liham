@@ -93,8 +93,10 @@ describe('processMarkdown structure', () => {
 		const text = collectText(headingText!.element)
 		expect(text).toContain('My Heading')
 		expect(text).not.toContain('#')
-		// heading should have fg color set
-		expect(prop<string>(headingText!.element, 'style')).toBeDefined()
+		// heading color should be on a span child inside text
+		const spans = findAll(headingText!.element, (el) => isIntrinsic(el, 'span'))
+		const coloredSpan = spans.find((s) => prop(s.element, 'fg') != null)
+		expect(coloredSpan).toBeDefined()
 	})
 
 	it('renders bold as <strong> intrinsic', async () => {
@@ -282,12 +284,11 @@ describe('processMarkdown benchmark fixtures', () => {
 
 		const tree = renderToOpenTUI(result.value)
 
-		// heading text nodes should exist with colors
-		const headingTexts = findAll(tree, (el) => {
-			const style = prop<Record<string, unknown>>(el, 'style')
-			return isIntrinsic(el, 'text') && style?.['fg'] != null && style?.['attributes'] != null
+		// heading color should be on span children inside text elements
+		const headingSpans = findAll(tree, (el) => {
+			return isIntrinsic(el, 'span') && prop(el, 'fg') != null && prop(el, 'attributes') != null
 		})
-		expect(headingTexts.length).toBeGreaterThanOrEqual(1)
+		expect(headingSpans.length).toBeGreaterThanOrEqual(1)
 
 		// paragraphs (boxes with text children)
 		const boxes = findAll(tree, (el) => isIntrinsic(el, 'box'))

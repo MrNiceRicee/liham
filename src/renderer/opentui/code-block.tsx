@@ -18,15 +18,14 @@ export function renderCodeBlock(node: CodeBlockNode, key: string) {
 	}
 	if (node.style.bg != null) boxStyle['backgroundColor'] = node.style.bg
 
-	const textStyle: Record<string, unknown> = {}
-	if (node.style.fg != null) textStyle['fg'] = node.style.fg
+	const fg = node.style.fg
 
 	return (
 		<box key={key} style={boxStyle} title={node.language ?? ''}>
 			{hasHighlightedChildren ? (
-				<text style={textStyle}>{renderInlineChildren(node.children, key)}</text>
+				<text>{fg != null ? <span fg={fg}>{renderInlineChildren(node.children, key)}</span> : renderInlineChildren(node.children, key)}</text>
 			) : (
-				<text style={textStyle}>{node.code}</text>
+				<text>{fg != null ? <span fg={fg}>{node.code}</span> : node.code}</text>
 			)}
 		</box>
 	)
