@@ -207,9 +207,12 @@ describe('processMarkdown structure', () => {
 
 	it('renders horizontal rule', async () => {
 		const tree = await render('---')
-		const text = collectText(tree)
-		// thematic break renders as repeated char
-		expect(text).toContain('─')
+		// thematic break renders as a box with top border
+		const hrBoxes = findAll(tree, (el) => {
+			const border = prop<string[]>(el, 'border')
+			return Array.isArray(border) && border.includes('top')
+		})
+		expect(hrBoxes.length).toBeGreaterThan(0)
 	})
 
 	it('renders task list checkboxes', async () => {

@@ -30,7 +30,7 @@ export const darkTheme: ThemeTokens = {
 		fallbackColor: '#565f89',
 	},
 	inlineCode: {
-		backgroundColor: '#292e42',
+		backgroundColor: '#343b58',
 		textColor: '#c0caf5',
 	},
 	paragraph: {

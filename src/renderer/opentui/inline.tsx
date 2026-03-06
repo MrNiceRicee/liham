@@ -18,8 +18,10 @@ function renderLink(node: LinkNode, key: string): ReactNode {
 			</span>
 		)
 	}
+	const linkProps: Record<string, unknown> = {}
+	if (node.style.fg != null) linkProps['fg'] = node.style.fg
 	return (
-		<a key={key} href={node.url}>
+		<a key={key} href={node.url} {...linkProps}>
 			{children}
 		</a>
 	)
