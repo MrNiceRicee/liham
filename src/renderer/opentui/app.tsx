@@ -287,6 +287,9 @@ export function App(props: Readonly<AppProps>) {
 
 	const mouseHandlers = createMouseHandlers(state, dispatch, sourceRef, previewRef)
 
+	// disable scrollbox focus when media is active (prevents native j/k/arrow handling)
+	const scrollLocked = state.mediaFocusIndex != null || state.mediaModal.kind !== 'closed'
+
 	const viewerLayout = isViewer
 		? renderViewerLayout(
 				state,
@@ -297,6 +300,7 @@ export function App(props: Readonly<AppProps>) {
 				sourceRef,
 				previewRef,
 				mouseHandlers,
+				scrollLocked,
 			)
 		: null
 

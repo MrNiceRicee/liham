@@ -72,19 +72,20 @@ export function renderViewerLayout(
 	sourceRef: React.RefObject<ScrollBoxRenderable | null>,
 	previewRef: React.RefObject<ScrollBoxRenderable | null>,
 	mouse: ViewerMouseHandlers,
+	scrollLocked = false,
 ): ReactNode {
 	const hasSource = panes.source != null
 	const hasPreview = panes.preview != null
 
 	if (hasPreview && !hasSource) {
-		return <PreviewPane content={content} focused theme={theme} scrollRef={previewRef} />
+		return <PreviewPane content={content} focused={!scrollLocked} theme={theme} scrollRef={previewRef} />
 	}
 	if (hasSource && !hasPreview) {
-		return <SourcePane content={raw} focused theme={theme} scrollRef={sourceRef} />
+		return <SourcePane content={raw} focused={!scrollLocked} theme={theme} scrollRef={sourceRef} />
 	}
 
 	const direction = state.layout === 'side' ? 'row' : 'column'
-	const sourceFocused = state.focus === 'source'
+	const sourceFocused = !scrollLocked && state.focus === 'source'
 
 	return (
 		<box style={{ flexDirection: direction, flexGrow: 1 }}>
@@ -100,7 +101,7 @@ export function renderViewerLayout(
 			/>
 			<PreviewPane
 				content={content}
-				focused={!sourceFocused}
+				focused={!scrollLocked && !sourceFocused}
 				theme={theme}
 				scrollRef={previewRef}
 				width={panes.preview?.width}
