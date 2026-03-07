@@ -6,8 +6,9 @@ import type { ImageResult, LoadedImage } from './types.ts'
 const MAX_DECODED_PIXELS = 25_000_000
 
 // lazy sharp reference — initialized on first decode
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports -- dynamic import for lazy loading
-let sharpModule: typeof import('sharp').default | undefined
+// using `any` for the module type since sharp's TS exports vary across versions
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- sharp module type varies
+let sharpModule: any
 let sharpAvailable: boolean | undefined
 
 export async function initSharp(): Promise<boolean> {
@@ -100,7 +101,8 @@ export async function decodeImage(
 }
 
 async function decodeInternal(
-	sharp: NonNullable<typeof sharpModule>,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- sharp module type varies
+	sharp: any,
 	bytes: Uint8Array,
 	targetCols: number,
 	cellPixelWidth: number,

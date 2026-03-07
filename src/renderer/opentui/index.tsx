@@ -8,6 +8,7 @@ import { renderBlockquote } from './blockquote.tsx'
 import { renderCodeBlock } from './code-block.tsx'
 import { renderCustom, renderUnknown } from './fallback.tsx'
 import { renderHeading } from './heading.tsx'
+import { renderImageBlock } from './image.tsx'
 import { renderInlineNode } from './inline.tsx'
 import { renderList, renderListItem } from './list.tsx'
 import { renderParagraph } from './paragraph.tsx'
@@ -47,6 +48,9 @@ function renderNode(node: IRNode, key: string, maxWidth?: number): ReactNode {
 
 		case 'listItem':
 			return renderListItem(node, key)
+
+		case 'image':
+			return renderImageBlock(node, key)
 
 		case 'table':
 			return renderTable(node, key, maxWidth)

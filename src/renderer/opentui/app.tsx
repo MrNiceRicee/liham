@@ -3,6 +3,7 @@
 import type { KeyEvent, ScrollBoxRenderable } from '@opentui/core'
 
 import { useKeyboard, useOnResize, useRenderer, useTerminalDimensions } from '@opentui/react'
+import { dirname } from 'node:path'
 import {
 	useCallback,
 	useEffect,
@@ -13,6 +14,7 @@ import {
 	type ReactNode,
 } from 'react'
 
+import type { ImageCapabilities } from '../../image/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 
 import {
@@ -31,6 +33,7 @@ import { scanDirectory } from '../../browser/scanner.ts'
 import { processMarkdown } from '../../pipeline/processor.ts'
 import { createDirectoryWatcher, createFileWatcher } from '../../watcher/watcher.ts'
 import { browserKeyHandler } from './browser-keys.ts'
+import { ImageContext, type ImageContextValue } from './image-context.tsx'
 import { renderToOpenTUI } from './index.tsx'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { StatusBar } from './status-bar.tsx'
@@ -94,11 +97,12 @@ type AppProps =
 			raw: string
 			layout: LayoutMode
 			theme: ThemeTokens
+			imageCapabilities: ImageCapabilities
 			renderTimeMs: number
 			filePath: string
 			noWatch: boolean
 	  }
-	| { mode: 'browser'; dir: string; layout: LayoutMode; theme: ThemeTokens; noWatch: boolean }
+	| { mode: 'browser'; dir: string; layout: LayoutMode; theme: ThemeTokens; imageCapabilities: ImageCapabilities; noWatch: boolean }
 
 // -- viewer mode key maps --
 
@@ -501,6 +505,38 @@ export function App(props: Readonly<AppProps>) {
 	)
 	const entries = legendEntries(state)
 
+	// image context for viewer mode — provides basePath for relative image resolution
+	const imageCtx: ImageContextValue | undefined = useMemo(() => {
+		if (state.mode !== 'viewer' || state.currentFile == null) return undefined
+		return {
+			basePath: dirname(state.currentFile),
+			capabilities: props.imageCapabilities,
+			bgColor: props.theme.image.placeholderBg,
+		}
+	}, [state.mode, state.currentFile, props.imageCapabilities, props.theme.image.placeholderBg])
+
+	const viewerLayout = state.mode !== 'browser'
+		? renderViewerLayout(
+				state,
+				panes,
+				viewerState.content,
+				viewerState.raw,
+				props.theme,
+				sourceRef,
+				previewRef,
+				{
+					onSourceMouseDown: handleSourceMouseDown,
+					onPreviewMouseDown: handlePreviewMouseDown,
+					onSourceMouseScroll: handleSourceMouseScroll,
+					onPreviewMouseScroll: handlePreviewMouseScroll,
+				},
+			)
+		: null
+
+	const wrappedViewerLayout = imageCtx != null
+		? <ImageContext.Provider value={imageCtx}>{viewerLayout}</ImageContext.Provider>
+		: viewerLayout
+
 	return (
 		<box style={{ flexDirection: 'column', width: '100%', height: '100%' }}>
 			{state.mode === 'browser'
@@ -513,21 +549,7 @@ export function App(props: Readonly<AppProps>) {
 						browserRef,
 						previewRef,
 					)
-				: renderViewerLayout(
-						state,
-						panes,
-						viewerState.content,
-						viewerState.raw,
-						props.theme,
-						sourceRef,
-						previewRef,
-						{
-							onSourceMouseDown: handleSourceMouseDown,
-							onPreviewMouseDown: handlePreviewMouseDown,
-							onSourceMouseScroll: handleSourceMouseScroll,
-							onPreviewMouseScroll: handlePreviewMouseScroll,
-						},
-					)}
+				: wrappedViewerLayout}
 			<StatusBar
 				entries={entries}
 				layout={state.mode === 'browser' ? 'browser' : state.layout}

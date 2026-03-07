@@ -4,12 +4,14 @@ import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
 import type { LayoutMode } from '../app/state.ts'
+import type { ImageCapabilities } from '../image/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 
+import { isSharpAvailable } from '../image/decoder.ts'
+import { detectCapabilities } from '../image/detect.ts'
 import { processMarkdown } from '../pipeline/processor.ts'
 import { boot } from '../renderer/opentui/boot.tsx'
 import { darkTheme } from '../theme/dark.ts'
-import { detectTheme } from '../theme/detect.ts'
 import { lightTheme } from '../theme/light.ts'
 import { generateBashCompletion, generateZshCompletion } from './completions.ts'
 
@@ -206,26 +208,44 @@ async function resolvePositional(
 	process.exit(1)
 }
 
-// -- theme resolution --
+// -- theme + image detection resolution --
 
-interface ResolvedTheme {
-	name: string
+interface ResolvedDetection {
+	themeName: string
 	tokens: ThemeTokens
+	imageCapabilities: ImageCapabilities
 }
 
-async function resolveTheme(themeName: ThemeName): Promise<ResolvedTheme> {
-	if (themeName === 'dark') return { name: 'dark', tokens: darkTheme }
-	if (themeName === 'light') return { name: 'light', tokens: lightTheme }
+async function resolveDetection(themeName: ThemeName): Promise<ResolvedDetection> {
+	// explicit theme skips detection for theme but still detects image
+	if (themeName === 'dark') {
+		const result = await detectCapabilities()
+		return { themeName: 'dark', tokens: darkTheme, imageCapabilities: result.image }
+	}
+	if (themeName === 'light') {
+		const result = await detectCapabilities()
+		return { themeName: 'light', tokens: lightTheme, imageCapabilities: result.image }
+	}
 
-	// auto: flag → env var → OSC 11 detection → dark default
+	// auto: flag → env var → combined detection → dark default
 	const envTheme = process.env['LIHAM_THEME']
-	if (envTheme === 'light') return { name: 'light (env)', tokens: lightTheme }
-	if (envTheme === 'dark') return { name: 'dark (env)', tokens: darkTheme }
+	if (envTheme === 'light') {
+		const result = await detectCapabilities()
+		return { themeName: 'light (env)', tokens: lightTheme, imageCapabilities: result.image }
+	}
+	if (envTheme === 'dark') {
+		const result = await detectCapabilities()
+		return { themeName: 'dark (env)', tokens: darkTheme, imageCapabilities: result.image }
+	}
 
-	const detected = await detectTheme()
-	const mode = detected ?? 'dark'
-	const source = detected != null ? 'detected' : 'default'
-	return { name: `${mode} (${source})`, tokens: mode === 'light' ? lightTheme : darkTheme }
+	const result = await detectCapabilities()
+	const mode = result.theme ?? 'dark'
+	const source = result.theme != null ? 'detected' : 'default'
+	return {
+		themeName: `${mode} (${source})`,
+		tokens: mode === 'light' ? lightTheme : darkTheme,
+		imageCapabilities: result.image,
+	}
 }
 
 // -- main --
@@ -245,20 +265,24 @@ async function main() {
 	}
 
 	if (args.mode === 'info') {
-		const theme = await resolveTheme(args.theme)
-		console.log(`theme: ${theme.name}`)
+		const detection = await resolveDetection(args.theme)
+		console.log(`theme: ${detection.themeName}`)
 		console.log(`renderer: ${args.renderer}`)
+		console.log(`image protocol: ${detection.imageCapabilities.protocol}`)
+		console.log(`cell pixels: ${String(detection.imageCapabilities.cellPixelWidth)}x${String(detection.imageCapabilities.cellPixelHeight)}`)
+		console.log(`sharp: ${String(isSharpAvailable())}`)
 		console.log(`TERM: ${process.env['TERM'] ?? '(unset)'}`)
 		console.log(`TERM_PROGRAM: ${process.env['TERM_PROGRAM'] ?? '(unset)'}`)
 		console.log(`LIHAM_THEME: ${process.env['LIHAM_THEME'] ?? '(unset)'}`)
+		console.log(`LIHAM_IMAGE_PROTOCOL: ${process.env['LIHAM_IMAGE_PROTOCOL'] ?? '(unset)'}`)
 		console.log(`tty: ${String(process.stdout.isTTY ?? false)}`)
 		process.exit(0)
 	}
 
-	const theme = await resolveTheme(args.theme)
+	const detection = await resolveDetection(args.theme)
 
 	if (args.mode === 'browser') {
-		await boot({ mode: 'browser', dir: args.dir, theme: theme.tokens, layout: args.layout, noWatch: args.noWatch })
+		await boot({ mode: 'browser', dir: args.dir, theme: detection.tokens, imageCapabilities: detection.imageCapabilities, layout: args.layout, noWatch: args.noWatch })
 		return
 	}
 
@@ -273,7 +297,7 @@ async function main() {
 			process.exit(1)
 		})
 
-	const result = await processMarkdown(markdown, theme.tokens)
+	const result = await processMarkdown(markdown, detection.tokens)
 
 	if (!result.ok) {
 		console.error(`pipeline error: ${result.error}`)
@@ -284,7 +308,8 @@ async function main() {
 	await boot({
 		mode: 'viewer',
 		ir: result.value,
-		theme: theme.tokens,
+		theme: detection.tokens,
+		imageCapabilities: detection.imageCapabilities,
 		layout: args.layout,
 		raw: markdown,
 		renderTimeMs,
