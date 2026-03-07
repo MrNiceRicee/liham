@@ -412,8 +412,10 @@ export function App(props: Readonly<AppProps>) {
 			: null
 
 	const showModal = state.mode === 'viewer' && state.mediaModal.kind !== 'closed'
-	const showGallery =
-		state.mode === 'viewer' && state.mediaFocusIndex != null && !showModal && mediaCount > 0
+	const galleryFocusIndex = showModal
+		? (state.mediaModal.kind === 'image' ? state.mediaModal.mediaIndex : 0)
+		: state.mediaFocusIndex
+	const showGallery = state.mode === 'viewer' && galleryFocusIndex != null && mediaCount > 0
 
 	const modalElement = showModal ? (
 		<MediaModal
@@ -428,7 +430,7 @@ export function App(props: Readonly<AppProps>) {
 	const galleryElement = showGallery ? (
 		<MediaGallery
 			mediaNodes={viewerState.mediaNodes}
-			focusedIndex={state.mediaFocusIndex!}
+			focusedIndex={galleryFocusIndex!}
 			theme={props.theme}
 			termWidth={state.dimensions.width}
 			termHeight={state.dimensions.height}

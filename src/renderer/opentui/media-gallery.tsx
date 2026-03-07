@@ -79,7 +79,7 @@ export function MediaGallery({
 				right: 1,
 				width: galleryWidth,
 				height: galleryHeight,
-				zIndex: 50,
+				zIndex: 150,
 				flexDirection: 'column',
 				backgroundColor: theme.codeBlock.backgroundColor,
 			}}
