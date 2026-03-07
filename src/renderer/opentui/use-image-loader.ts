@@ -86,6 +86,8 @@ export function useViewportVisibility(
 
 		const check = () => isNearViewport(boxRef.current, scrollRef.current)
 
+		const cleanupRef = { current: () => {} }
+
 		// check after a short delay to let yoga layout settle
 		const initialTimer = setTimeout(() => {
 			if (check()) {
@@ -102,7 +104,6 @@ export function useViewportVisibility(
 			cleanupRef.current = () => { clearInterval(interval) }
 		}, 50)
 
-		const cleanupRef = { current: () => {} }
 		return () => {
 			clearTimeout(initialTimer)
 			cleanupRef.current()
@@ -124,6 +125,7 @@ function coalescedDecode(
 	targetCols: number,
 	ctx: ImageContextValue,
 	url: string,
+	signal: AbortSignal,
 ): Promise<LoadedImage | null> {
 	const cacheKey = cacheKeyForFile(file, targetCols)
 
@@ -140,6 +142,8 @@ function coalescedDecode(
 			ctx.capabilities.cellPixelHeight,
 			purpose,
 			url,
+			{ maxFrames: 1, maxDecodedBytes: 10 * 1024 * 1024 },
+			signal,
 		).then((r) => {
 			inflightDecodes.delete(cacheKey)
 			if (r.ok) {
@@ -186,7 +190,7 @@ export function useImageLoader(
 				return
 			}
 
-			const decoded = await coalescedDecode(fileResult.value, ctx.maxCols, ctx, url)
+			const decoded = await coalescedDecode(fileResult.value, ctx.maxCols, ctx, url, controller.signal)
 			if (isStale()) return
 
 			if (decoded == null) {
@@ -206,6 +210,9 @@ export function useImageLoader(
 
 // acquire semaphore slot, then coalesce the actual fetch
 async function throttledFetch(url: string, signal: AbortSignal): Promise<ImageResult<RemoteFile>> {
+	// skip semaphore if this URL is already being fetched (coalesced)
+	if (inflightFetches.has(url)) return coalescedFetch(url, signal)
+
 	await fetchSemaphore.acquire(signal)
 	try {
 		return await coalescedFetch(url, signal)

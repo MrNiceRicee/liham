@@ -11,8 +11,8 @@ export interface LoadedImage {
 	terminalCols: number
 	byteSize: number
 	source: string
-	frames?: Uint8Array[] // all frames including first (animated GIFs only)
-	delays?: number[] // ms per frame, clamped (animated GIFs only)
+	frames?: Uint8Array[] // all decoded frames (animated GIFs) — renderers may ignore
+	delays?: number[] // ms per frame, clamped (animated GIFs) — renderers may ignore
 }
 
 export interface HalfBlockCell {

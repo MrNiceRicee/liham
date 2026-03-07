@@ -87,7 +87,7 @@ describe('decodeImage', () => {
 		expect(result.ok).toBe(false)
 	})
 
-	test('decodes animated GIF with multiple frames', async () => {
+	test('animated GIF decodes all frames', async () => {
 		const { readFile } = await import('node:fs/promises')
 		const gif = new Uint8Array(await readFile('test/assets/duck-simple.gif'))
 		const result = await decodeImage(gif, 40, 8, 16, 'halfblock', 'duck.gif')
@@ -95,16 +95,13 @@ describe('decodeImage', () => {
 		if (result.ok) {
 			expect(result.value.frames).toBeDefined()
 			expect(result.value.delays).toBeDefined()
-			// capped at 20 frames
 			expect(result.value.frames!.length).toBeLessThanOrEqual(20)
 			expect(result.value.delays!.length).toBe(result.value.frames!.length)
-			// first frame matches rgba
 			expect(result.value.rgba).toBe(result.value.frames![0])
 		}
 	})
 
 	test('animated GIF clamps delays <= 10ms to 100ms', async () => {
-		// create a 2-frame GIF with 0ms delay
 		const sharp = (await import('sharp')).default
 		const frame1 = await sharp({ create: { width: 2, height: 2, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 1 } } }).png().toBuffer()
 		const frame2 = await sharp({ create: { width: 2, height: 2, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } } }).png().toBuffer()
