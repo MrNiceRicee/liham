@@ -23,6 +23,7 @@ const DEFAULT_ANIMATION_LIMITS: AnimationLimits = {
 export interface DecodeOptions {
 	bytes: Uint8Array
 	targetCols: number
+	maxRows?: number
 	cellPixelWidth: number
 	cellPixelHeight: number
 	purpose: 'kitty' | 'halfblock'
@@ -88,6 +89,7 @@ export async function decodeImage(options: DecodeOptions): Promise<ImageResult<L
 			sharpModule,
 			options.bytes,
 			options.targetCols,
+			options.maxRows,
 			options.cellPixelWidth,
 			options.cellPixelHeight,
 			options.purpose,
@@ -109,6 +111,7 @@ async function decodePage(
 	bytes: Uint8Array,
 	page: number,
 	targetWidth: number,
+	targetHeight: number | undefined,
 	purpose: 'kitty' | 'halfblock',
 ): Promise<{ rgba: Uint8Array; width: number; height: number }> {
 	const { data, info } = await sharp(bytes, {
@@ -118,14 +121,19 @@ async function decodePage(
 		failOn: 'error',
 	})
 		.ensureAlpha()
-		.resize(targetWidth, null, { fit: 'inside', kernel: 'lanczos3', withoutEnlargement: true })
+		.resize(targetWidth, targetHeight ?? null, {
+			fit: 'inside',
+			kernel: 'lanczos3',
+			withoutEnlargement: true,
+		})
 		.raw()
 		.toBuffer({ resolveWithObject: true })
 
 	// copy buffer — sharp's pool can recycle the underlying memory
-	const padded = purpose === 'halfblock'
-		? padToEvenHeight(data, info.width, info.height)
-		: { rgba: Uint8Array.from(data), height: info.height }
+	const padded =
+		purpose === 'halfblock'
+			? padToEvenHeight(data, info.width, info.height)
+			: { rgba: Uint8Array.from(data), height: info.height }
 
 	return { rgba: padded.rgba, width: info.width, height: padded.height }
 }
@@ -143,7 +151,11 @@ function terminalDimensions(
 }
 
 // pad RGBA buffer to even height for halfblock rendering
-function padToEvenHeight(data: Uint8Array, width: number, height: number): { rgba: Uint8Array; height: number } {
+function padToEvenHeight(
+	data: Uint8Array,
+	width: number,
+	height: number,
+): { rgba: Uint8Array; height: number } {
 	if (height % 2 === 0) {
 		const copy = new Uint8Array(data.byteLength)
 		copy.set(data)
@@ -160,6 +172,7 @@ async function decodeInternal(
 	sharp: any,
 	bytes: Uint8Array,
 	targetCols: number,
+	maxRows: number | undefined,
 	cellPixelWidth: number,
 	cellPixelHeight: number,
 	purpose: 'kitty' | 'halfblock',
@@ -178,13 +191,40 @@ async function decodeInternal(
 		}
 
 		const targetWidth = purpose === 'halfblock' ? targetCols : targetCols * cellPixelWidth
+		const targetHeight =
+			maxRows != null
+				? purpose === 'halfblock'
+					? maxRows * 2
+					: maxRows * cellPixelHeight
+				: undefined
 		const pageCount = typeof meta.pages === 'number' ? meta.pages : 1
 
 		if (pageCount > 1) {
-			return decodeAnimated(sharp, bytes, targetWidth, purpose, cellPixelWidth, cellPixelHeight, meta, source, limits, shouldContinue)
+			return decodeAnimated(
+				sharp,
+				bytes,
+				targetWidth,
+				targetHeight,
+				purpose,
+				cellPixelWidth,
+				cellPixelHeight,
+				meta,
+				source,
+				limits,
+				shouldContinue,
+			)
 		}
 
-		return decodeSingleFrame(sharp, bytes, targetWidth, purpose, cellPixelWidth, cellPixelHeight, source)
+		return decodeSingleFrame(
+			sharp,
+			bytes,
+			targetWidth,
+			targetHeight,
+			purpose,
+			cellPixelWidth,
+			cellPixelHeight,
+			source,
+		)
 	} catch (cause) {
 		return { ok: false, error: 'image decode failed', cause }
 	}
@@ -195,13 +235,27 @@ async function decodeSingleFrame(
 	sharp: any,
 	bytes: Uint8Array,
 	targetWidth: number,
+	targetHeight: number | undefined,
 	purpose: 'kitty' | 'halfblock',
 	cellPixelWidth: number,
 	cellPixelHeight: number,
 	source: string,
 ): Promise<ImageResult<LoadedImage>> {
-	const { rgba, width, height } = await decodePage(sharp, bytes, 0, targetWidth, purpose)
-	const { terminalCols, terminalRows } = terminalDimensions(width, height, purpose, cellPixelWidth, cellPixelHeight)
+	const { rgba, width, height } = await decodePage(
+		sharp,
+		bytes,
+		0,
+		targetWidth,
+		targetHeight,
+		purpose,
+	)
+	const { terminalCols, terminalRows } = terminalDimensions(
+		width,
+		height,
+		purpose,
+		cellPixelWidth,
+		cellPixelHeight,
+	)
 
 	return {
 		ok: true,
@@ -214,6 +268,7 @@ async function decodeAnimated(
 	sharp: any,
 	bytes: Uint8Array,
 	targetWidth: number,
+	targetHeight: number | undefined,
 	purpose: 'kitty' | 'halfblock',
 	cellPixelWidth: number,
 	cellPixelHeight: number,
@@ -232,7 +287,14 @@ async function decodeAnimated(
 	let finalHeight = 0
 
 	for (let i = 0; i < frameCount; i++) {
-		const { rgba, width, height } = await decodePage(sharp, bytes, i, targetWidth, purpose)
+		const { rgba, width, height } = await decodePage(
+			sharp,
+			bytes,
+			i,
+			targetWidth,
+			targetHeight,
+			purpose,
+		)
 
 		totalDecoded += rgba.byteLength
 		if (totalDecoded > limits.maxDecodedBytes) break
@@ -248,7 +310,13 @@ async function decodeAnimated(
 	}
 
 	const delays = clampDelays(rawDelays, frames.length)
-	const { terminalCols, terminalRows } = terminalDimensions(finalWidth, finalHeight, purpose, cellPixelWidth, cellPixelHeight)
+	const { terminalCols, terminalRows } = terminalDimensions(
+		finalWidth,
+		finalHeight,
+		purpose,
+		cellPixelWidth,
+		cellPixelHeight,
+	)
 
 	return {
 		ok: true,
@@ -268,7 +336,7 @@ async function decodeAnimated(
 
 // clamp delays: <=10ms → 100ms (browser convention), pad if shorter than frame count
 function clampDelays(rawDelays: number[], frameCount: number): number[] {
-	const delays = rawDelays.slice(0, frameCount).map(d => (d <= 10 ? MIN_FRAME_DELAY_MS : d))
+	const delays = rawDelays.slice(0, frameCount).map((d) => (d <= 10 ? MIN_FRAME_DELAY_MS : d))
 	while (delays.length < frameCount) delays.push(MIN_FRAME_DELAY_MS)
 	return delays
 }

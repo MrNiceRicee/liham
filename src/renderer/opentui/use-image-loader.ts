@@ -3,12 +3,17 @@
 
 import type { BoxRenderable, ScrollBoxRenderable } from '@opentui/core'
 
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { type RefObject, useEffect, useRef, useState } from 'react'
 
 import type { ImageResult, LoadedFile, LoadedImage, RemoteFile } from '../../media/types.ts'
 import type { ImageContextValue } from './image-context.tsx'
 
-import { createImageCache, localCacheKey, remoteCacheKey, type ImageCache } from '../../media/cache.ts'
+import {
+	createImageCache,
+	type ImageCache,
+	localCacheKey,
+	remoteCacheKey,
+} from '../../media/cache.ts'
 import { decodeImage } from '../../media/decoder.ts'
 import { fetchRemoteImage } from '../../media/fetcher.ts'
 import { loadImageFile } from '../../media/loader.ts'
@@ -50,10 +55,7 @@ function cacheKeyForFile(file: LoadedFile, targetCols: number): string {
 }
 
 // check if an element is near the scrollbox viewport (within 1 viewport height buffer)
-function isNearViewport(
-	box: BoxRenderable | null,
-	scrollbox: ScrollBoxRenderable | null,
-): boolean {
+function isNearViewport(box: BoxRenderable | null, scrollbox: ScrollBoxRenderable | null): boolean {
 	if (box == null || scrollbox == null) return false
 
 	const vp = scrollbox.viewport
@@ -66,7 +68,7 @@ function isNearViewport(
 	const imgY = box.y
 	const imgH = box.height || 1
 
-	return (imgY + imgH >= vpTop - buffer) && (imgY <= vpBottom + buffer)
+	return imgY + imgH >= vpTop - buffer && imgY <= vpBottom + buffer
 }
 
 // polls element position vs viewport until the element enters the visible zone
@@ -101,7 +103,9 @@ export function useViewportVisibility(
 					clearInterval(interval)
 				}
 			}, 150)
-			cleanupRef.current = () => { clearInterval(interval) }
+			cleanupRef.current = () => {
+				clearInterval(interval)
+			}
 		}, 50)
 
 		return () => {
@@ -114,7 +118,11 @@ export function useViewportVisibility(
 }
 
 // route: remote fetch (coalesced + semaphore) vs local file load
-async function loadFile(url: string, basePath: string, signal: AbortSignal): Promise<ImageResult<LoadedFile>> {
+async function loadFile(
+	url: string,
+	basePath: string,
+	signal: AbortSignal,
+): Promise<ImageResult<LoadedFile>> {
 	if (isRemoteUrl(url)) return throttledFetch(url, signal)
 	return loadImageFile(url, basePath)
 }
@@ -123,11 +131,13 @@ async function loadFile(url: string, basePath: string, signal: AbortSignal): Pro
 function coalescedDecode(
 	file: LoadedFile,
 	targetCols: number,
+	maxRows: number | undefined,
 	ctx: ImageContextValue,
 	url: string,
 	signal: AbortSignal,
 ): Promise<LoadedImage | null> {
-	const cacheKey = cacheKeyForFile(file, targetCols)
+	const rowsSuffix = maxRows != null ? `@r${String(maxRows)}` : ''
+	const cacheKey = cacheKeyForFile(file, targetCols) + rowsSuffix
 
 	const cached = imageCache.get(cacheKey)
 	if (cached != null) return Promise.resolve(cached)
@@ -138,6 +148,7 @@ function coalescedDecode(
 		decodePromise = decodeImage({
 			bytes: file.bytes,
 			targetCols,
+			maxRows,
 			cellPixelWidth: ctx.capabilities.cellPixelWidth,
 			cellPixelHeight: ctx.capabilities.cellPixelHeight,
 			purpose,
@@ -190,7 +201,14 @@ export function useImageLoader(
 				return
 			}
 
-			const decoded = await coalescedDecode(fileResult.value, ctx.maxCols, ctx, url, controller.signal)
+			const decoded = await coalescedDecode(
+				fileResult.value,
+				ctx.maxCols,
+				ctx.maxRows,
+				ctx,
+				url,
+				controller.signal,
+			)
 			if (isStale()) return
 
 			if (decoded == null) {
@@ -202,8 +220,10 @@ export function useImageLoader(
 			setState('loaded')
 		})()
 
-		return () => { controller.abort() }
-	}, [url, ctx?.basePath, ctx?.capabilities.protocol, ctx?.maxCols, isVisible])
+		return () => {
+			controller.abort()
+		}
+	}, [url, ctx?.basePath, ctx?.capabilities.protocol, ctx?.maxCols, ctx?.maxRows, isVisible])
 
 	return { state, image, errorMsg }
 }

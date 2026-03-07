@@ -43,7 +43,7 @@ import { ImageContext, type ImageContextValue } from './image-context.tsx'
 import { clearImageCache } from './image.tsx'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-context.tsx'
-import { galleryDimensions, MediaGallery } from './media-gallery.tsx'
+import { MediaGallery } from './media-gallery.tsx'
 import { MediaModal } from './media-modal.tsx'
 import { StatusBar } from './status-bar.tsx'
 import {
@@ -145,10 +145,8 @@ export function App(props: Readonly<AppProps>) {
 	// -- directory watcher for browser live rescan --
 	const noWatch = props.noWatch
 	useEffect(() => {
-		if (browserDir == null || noWatch) return
-		if (state.mode !== 'browser') return
+		if (browserDir == null || noWatch || state.mode !== 'browser') return
 		if (state.browser.scanStatus !== 'complete') return
-
 		return startDirectoryWatcher(browserDir, previewCacheRef, setBrowserPreviewContent, dispatch)
 	}, [state.mode, state.browser.scanStatus])
 
@@ -304,9 +302,9 @@ export function App(props: Readonly<AppProps>) {
 
 	const showModal = isViewer && state.mediaModal.kind !== 'closed'
 	const modalMediaIndex = state.mediaModal.kind === 'image' ? state.mediaModal.mediaIndex : 0
+	const galleryHidden = state.mediaModal.kind === 'image' && state.mediaModal.galleryHidden
 	const galleryFocusIndex = showModal ? modalMediaIndex : state.mediaFocusIndex
-	const showGallery = isViewer && galleryFocusIndex != null
-	const galDims = showGallery ? galleryDimensions(mediaCount, state.dimensions.width) : null
+	const showGallery = isViewer && galleryFocusIndex != null && !galleryHidden
 
 	const modalElement = showModal ? (
 		<MediaModal
@@ -315,7 +313,6 @@ export function App(props: Readonly<AppProps>) {
 			theme={props.theme}
 			termWidth={state.dimensions.width}
 			termHeight={state.dimensions.height}
-			galleryHeight={galDims?.height}
 		/>
 	) : null
 

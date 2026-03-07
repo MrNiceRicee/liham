@@ -84,7 +84,7 @@ describe('media modal actions', () => {
 	test('OpenMediaModal opens modal at focused index', () => {
 		const s = stateWith({ mediaFocusIndex: 1 })
 		const next = appReducer(s, { type: 'OpenMediaModal' })
-		expect(next.mediaModal).toEqual({ kind: 'image', mediaIndex: 1 })
+		expect(next.mediaModal).toEqual({ kind: 'image', mediaIndex: 1, galleryHidden: false })
 	})
 
 	test('OpenMediaModal no-op when no focus', () => {
@@ -121,26 +121,26 @@ describe('media legend entries', () => {
 	test('modal open shows modal legend', () => {
 		const s = stateWith({
 			mediaFocusIndex: 0,
-			mediaModal: { kind: 'image', mediaIndex: 0 },
+			mediaModal: { kind: 'image', mediaIndex: 0, galleryHidden: false },
 		})
 		const entries = legendEntries(s)
-		expect(entries.some(e => e.key === 'esc' && e.label === 'close')).toBe(true)
-		expect(entries.some(e => e.key === 'n/N')).toBe(true)
-		expect(entries.some(e => e.key === 'space')).toBe(true)
+		expect(entries.some((e) => e.key === 'esc' && e.label === 'close')).toBe(true)
+		expect(entries.some((e) => e.key === 'n/N')).toBe(true)
+		expect(entries.some((e) => e.key === 'g' && e.label === 'gallery')).toBe(true)
 	})
 
 	test('media focused shows focus legend', () => {
 		const s = stateWith({ mediaFocusIndex: 0 })
 		const entries = legendEntries(s)
-		expect(entries.some(e => e.key === 'enter' && e.label === 'view')).toBe(true)
-		expect(entries.some(e => e.key === 'esc' && e.label === 'unfocus')).toBe(true)
-		expect(entries.some(e => e.key === 'n/N')).toBe(true)
+		expect(entries.some((e) => e.key === 'enter' && e.label === 'view')).toBe(true)
+		expect(entries.some((e) => e.key === 'esc' && e.label === 'unfocus')).toBe(true)
+		expect(entries.some((e) => e.key === 'n/N')).toBe(true)
 	})
 
 	test('no media focus shows normal legend', () => {
 		const s = stateWith({})
 		const entries = legendEntries(s)
-		expect(entries.some(e => e.key === 'q' && e.label === 'quit')).toBe(true)
-		expect(entries.some(e => e.key === 'n/N')).toBe(false)
+		expect(entries.some((e) => e.key === 'q' && e.label === 'quit')).toBe(true)
+		expect(entries.some((e) => e.key === 'n/N')).toBe(false)
 	})
 })

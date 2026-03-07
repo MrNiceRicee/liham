@@ -1,13 +1,13 @@
 // media modal overlay — full-screen media viewer with info bar.
 // absolute positioned sibling of scrollbox content (does not scroll with content).
 
-import { useContext, type ReactNode } from 'react'
+import { type ReactNode, useContext, useMemo } from 'react'
 
 import type { MediaIRNode } from '../../ir/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import type { MediaEntry } from './index.tsx'
 
-import { renderHalfBlockMerged, type MergedSpan } from '../../media/halfblock.ts'
+import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
 import { sanitizeForTerminal } from '../../pipeline/sanitize.ts'
 import { ImageContext } from './image-context.tsx'
 import { useImageLoader } from './use-image-loader.ts'
@@ -70,13 +70,22 @@ function ModalImageContent({
 	url,
 	alt,
 	theme,
+	maxCols,
+	maxRows,
 }: {
 	readonly url: string | undefined
 	readonly alt: string
 	readonly theme: ThemeTokens
+	readonly maxCols: number
+	readonly maxRows: number
 }): ReactNode {
 	const ctx = useContext(ImageContext)
-	const { state, image } = useImageLoader(url, ctx, true)
+	// override context with full-viewport dimensions for lightbox rendering
+	const modalCtx = useMemo(
+		() => (ctx != null ? { ...ctx, maxCols, maxRows } : null),
+		[ctx, maxCols, maxRows],
+	)
+	const { state, image } = useImageLoader(url, modalCtx, true)
 
 	if (ctx == null || url == null || ctx.capabilities.protocol === 'text') {
 		return (
@@ -115,7 +124,6 @@ export interface MediaModalProps {
 	readonly theme: ThemeTokens
 	readonly termWidth: number
 	readonly termHeight: number
-	readonly galleryHeight?: number
 }
 
 export function MediaModal({
@@ -124,7 +132,6 @@ export function MediaModal({
 	theme,
 	termWidth,
 	termHeight,
-	galleryHeight,
 }: MediaModalProps): ReactNode {
 	const entry = mediaNodes[mediaIndex]
 	if (entry == null) return null
@@ -135,8 +142,9 @@ export function MediaModal({
 	const typeLabel = mediaTypeLabel(node)
 	const position = `[${String(mediaIndex + 1)}/${String(mediaNodes.length)}]`
 
-	// reserve space at bottom for gallery overlay so image doesn't render behind it
-	const bottomPad = galleryHeight ?? 0
+	// content area = full height minus info bar (2 rows)
+	const infoBarHeight = 2
+	const contentRows = Math.max(1, termHeight - infoBarHeight)
 
 	return (
 		<box
@@ -153,14 +161,19 @@ export function MediaModal({
 		>
 			<box
 				style={{
-					flexGrow: 1,
+					height: contentRows,
 					justifyContent: 'center',
 					alignItems: 'center',
-					paddingBottom: bottomPad,
 				}}
 			>
 				{node.type === 'image' ? (
-					<ModalImageContent url={url} alt={node.alt} theme={theme} />
+					<ModalImageContent
+						url={url}
+						alt={node.alt}
+						theme={theme}
+						maxCols={termWidth}
+						maxRows={contentRows}
+					/>
 				) : node.type === 'video' ? (
 					<text>
 						<span fg={theme.image.fallbackColor}>[video: {sanitizeForTerminal(node.alt)}]</span>

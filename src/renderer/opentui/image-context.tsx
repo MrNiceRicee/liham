@@ -12,6 +12,7 @@ export interface ImageContextValue {
 	capabilities: ImageCapabilities
 	bgColor: string
 	maxCols: number
+	maxRows?: number
 	scrollRef: RefObject<ScrollBoxRenderable | null>
 }
 

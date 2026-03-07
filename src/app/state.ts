@@ -24,7 +24,7 @@ export interface BrowserState {
 
 export type MediaModalState =
 	| { kind: 'closed' }
-	| { kind: 'image'; mediaIndex: number }
+	| { kind: 'image'; mediaIndex: number; galleryHidden: boolean }
 
 export interface AppState {
 	mode: AppMode
@@ -80,6 +80,7 @@ export type AppAction =
 	| { type: 'FocusMedia'; index: number }
 	| { type: 'OpenMediaModal' }
 	| { type: 'CloseMediaModal' }
+	| { type: 'ToggleGallery' }
 
 // -- layout helpers --
 
@@ -274,7 +275,19 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
 		case 'OpenMediaModal': {
 			if (state.mediaFocusIndex == null) return state
-			return { ...state, mediaModal: { kind: 'image', mediaIndex: state.mediaFocusIndex } }
+			const prevHidden = state.mediaModal.kind === 'image' ? state.mediaModal.galleryHidden : false
+			return {
+				...state,
+				mediaModal: { kind: 'image', mediaIndex: state.mediaFocusIndex, galleryHidden: prevHidden },
+			}
+		}
+
+		case 'ToggleGallery': {
+			if (state.mediaModal.kind !== 'image') return state
+			return {
+				...state,
+				mediaModal: { ...state.mediaModal, galleryHidden: !state.mediaModal.galleryHidden },
+			}
 		}
 
 		case 'CloseMediaModal': {
@@ -443,7 +456,7 @@ export function legendEntries(state: AppState): LegendEntry[] {
 		return [
 			{ key: '?', label: 'more' },
 			{ key: 'n/N', label: 'next/prev' },
-			{ key: 'space', label: 'play/pause' },
+			{ key: 'g', label: 'gallery' },
 			{ key: 'esc', label: 'close' },
 		]
 	}

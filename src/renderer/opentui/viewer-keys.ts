@@ -74,6 +74,8 @@ export function handleModalKey(
 			queueMicrotask(() => dispatch({ type: 'OpenMediaModal' }))
 			return null
 		}
+		case 'g':
+			return { type: 'ToggleGallery' }
 		case ' ':
 			// play/pause — Phase 3 will wire this
 			return null
@@ -84,6 +86,9 @@ export function handleModalKey(
 			return null
 	}
 }
+
+// keys allowed when media is focused (n/N mode) — everything else is blocked
+const MEDIA_FOCUS_ALLOWED = new Set(['escape', 'q', '?', 'n', 'return'])
 
 // viewer key handler — processes escape chain, shift, and normal key maps
 // dispatches directly for escape-chain actions, returns action for caller to handle
@@ -101,6 +106,11 @@ export function handleViewerKey(
 		}
 		if (state.fromBrowser) return { type: 'ReturnToBrowser' }
 		return { type: 'Quit' }
+	}
+
+	// media focus mode — lock keys to media navigation only
+	if (state.mediaFocusIndex != null && !MEDIA_FOCUS_ALLOWED.has(key.name)) {
+		return null
 	}
 
 	if (key.shift) {
