@@ -38,6 +38,7 @@ import { clearImageCache } from './image.tsx'
 import { type MediaEntry, renderToOpenTUI, renderToOpenTUIWithMedia } from './index.tsx'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-context.tsx'
+import { MediaModal } from './media-modal.tsx'
 import { StatusBar } from './status-bar.tsx'
 import { VIEWER_KEY_MAP, VIEWER_SHIFT_KEY_MAP, applyScroll, handleModalKey, syncScroll } from './viewer-keys.ts'
 
@@ -507,8 +508,10 @@ export function App(props: Readonly<AppProps>) {
 		? <MediaFocusContext.Provider value={mediaFocusCtx}>{withImageCtx}</MediaFocusContext.Provider>
 		: null
 
+	const showModal = state.mode === 'viewer' && state.mediaModal.kind !== 'closed'
+
 	return (
-		<box style={{ flexDirection: 'column', width: '100%', height: '100%' }}>
+		<box style={{ position: 'relative', flexDirection: 'column', width: '100%', height: '100%' }}>
 			{state.mode === 'browser'
 				? renderBrowserLayout(
 						state,
@@ -527,6 +530,15 @@ export function App(props: Readonly<AppProps>) {
 				renderTimeMs={renderTimeMs}
 				fileDeleted={state.fileDeleted}
 			/>
+			{showModal && (
+				<MediaModal
+					mediaNodes={viewerState.mediaNodes}
+					mediaIndex={state.mediaModal.kind === 'image' ? state.mediaModal.mediaIndex : 0}
+					theme={props.theme}
+					termWidth={state.dimensions.width}
+					termHeight={state.dimensions.height}
+				/>
+			)}
 		</box>
 	)
 }
