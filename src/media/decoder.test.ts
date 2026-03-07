@@ -203,18 +203,17 @@ describe('decodeImage', () => {
 			expect(inline.value.frames!.length).toBe(1)
 		}
 
-		// modal: maxFrames 50 — should decode all available frames
+		// modal: no frame cap, byte budget only — should decode all available frames
 		const modal = await decode({
 			bytes: gif,
 			source: 'duck.gif',
 			targetCols: 40,
-			animationLimits: { maxFrames: 50, maxDecodedBytes: 30 * 1024 * 1024 },
+			animationLimits: { maxFrames: Infinity, maxDecodedBytes: 30 * 1024 * 1024 },
 		})
 		expect(modal.ok).toBe(true)
 		if (modal.ok) {
 			expect(modal.value.frames).toBeDefined()
 			expect(modal.value.frames!.length).toBeGreaterThan(1)
-			expect(modal.value.frames!.length).toBeLessThanOrEqual(50)
 		}
 	})
 

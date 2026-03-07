@@ -13,7 +13,8 @@ import type { MediaEntry } from './index.tsx'
 import { useImageLoader } from './use-image-loader.ts'
 
 // modal decodes up to 50 frames (vs 1 for inline) with a 30MB budget
-const MODAL_ANIMATION_LIMITS: AnimationLimits = { maxFrames: 50, maxDecodedBytes: 30 * 1024 * 1024 }
+// modal: no frame cap, 30MB byte budget is the only guard
+const MODAL_ANIMATION_LIMITS: AnimationLimits = { maxFrames: Infinity, maxDecodedBytes: 30 * 1024 * 1024 }
 
 // -- helpers --
 
@@ -101,10 +102,7 @@ function ModalImageContent({
 	// report frame info to parent for info bar
 	useEffect(() => {
 		if (image?.frames != null && image.frames.length > 1) {
-			onFrameInfo({
-				frameCount: image.frames.length,
-				capped: image.frames.length >= MODAL_ANIMATION_LIMITS.maxFrames,
-			})
+			onFrameInfo({ frameCount: image.frames.length, capped: false })
 		} else {
 			onFrameInfo(null)
 		}
