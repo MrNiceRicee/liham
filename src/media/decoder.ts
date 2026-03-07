@@ -20,6 +20,18 @@ const DEFAULT_ANIMATION_LIMITS: AnimationLimits = {
 	maxDecodedBytes: 10 * 1024 * 1024,
 }
 
+export interface DecodeOptions {
+	bytes: Uint8Array
+	targetCols: number
+	cellPixelWidth: number
+	cellPixelHeight: number
+	purpose: 'kitty' | 'halfblock'
+	source: string
+	animationLimits?: AnimationLimits
+	shouldContinue?: () => boolean
+	signal?: AbortSignal
+}
+
 // lazy sharp reference — initialized on first decode
 // using `any` for the module type since sharp's TS exports vary across versions
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- sharp module type varies
@@ -65,23 +77,24 @@ export async function getImageDimensions(
 	}
 }
 
-export async function decodeImage(
-	bytes: Uint8Array,
-	targetCols: number,
-	cellPixelWidth: number,
-	cellPixelHeight: number,
-	purpose: 'kitty' | 'halfblock',
-	source: string,
-	animationLimits: AnimationLimits = DEFAULT_ANIMATION_LIMITS,
-	signal?: AbortSignal,
-): Promise<ImageResult<LoadedImage>> {
+export async function decodeImage(options: DecodeOptions): Promise<ImageResult<LoadedImage>> {
 	if (!(await initSharp()) || sharpModule == null) {
 		return { ok: false, error: 'sharp not available' }
 	}
 
-	await decodeSemaphore.acquire(signal)
+	await decodeSemaphore.acquire(options.signal)
 	try {
-		return await decodeInternal(sharpModule, bytes, targetCols, cellPixelWidth, cellPixelHeight, purpose, source, animationLimits)
+		return await decodeInternal(
+			sharpModule,
+			options.bytes,
+			options.targetCols,
+			options.cellPixelWidth,
+			options.cellPixelHeight,
+			options.purpose,
+			options.source,
+			options.animationLimits ?? DEFAULT_ANIMATION_LIMITS,
+			options.shouldContinue,
+		)
 	} finally {
 		decodeSemaphore.release()
 	}
@@ -152,6 +165,7 @@ async function decodeInternal(
 	purpose: 'kitty' | 'halfblock',
 	source: string,
 	limits: AnimationLimits,
+	shouldContinue?: () => boolean,
 ): Promise<ImageResult<LoadedImage>> {
 	try {
 		const meta = await sharp(bytes).metadata()
@@ -167,7 +181,7 @@ async function decodeInternal(
 		const pageCount = typeof meta.pages === 'number' ? meta.pages : 1
 
 		if (pageCount > 1) {
-			return decodeAnimated(sharp, bytes, targetWidth, purpose, cellPixelWidth, cellPixelHeight, meta, source, limits)
+			return decodeAnimated(sharp, bytes, targetWidth, purpose, cellPixelWidth, cellPixelHeight, meta, source, limits, shouldContinue)
 		}
 
 		return decodeSingleFrame(sharp, bytes, targetWidth, purpose, cellPixelWidth, cellPixelHeight, source)
@@ -207,6 +221,7 @@ async function decodeAnimated(
 	meta: any,
 	source: string,
 	limits: AnimationLimits,
+	shouldContinue?: () => boolean,
 ): Promise<ImageResult<LoadedImage>> {
 	const frameCount = Math.min(typeof meta.pages === 'number' ? meta.pages : 1, limits.maxFrames)
 	const rawDelays: number[] = Array.isArray(meta.delay) ? meta.delay : []
@@ -221,6 +236,7 @@ async function decodeAnimated(
 
 		totalDecoded += rgba.byteLength
 		if (totalDecoded > limits.maxDecodedBytes) break
+		if (shouldContinue != null && !shouldContinue()) break
 
 		frames.push(rgba)
 		finalWidth = width

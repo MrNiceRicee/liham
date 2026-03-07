@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 
-import type { CoreIRNode, ImageNode, IRNode, RootNode } from '../ir/types.ts'
+import type { AudioNode, CoreIRNode, ImageNode, IRNode, RootNode, VideoNode } from '../ir/types.ts'
 import type { PipelineSuccess } from '../types/pipeline.ts'
 
 import { isBlockNode } from '../ir/types.ts'
@@ -428,6 +428,69 @@ describe('IR compiler — URL sanitization', () => {
 	})
 })
 
+describe('IR compiler — media nodes', () => {
+	it('auto-detects video from .mp4 in markdown image syntax', async () => {
+		const ir = await compileToIR('![clip](video.mp4)')
+		const videos = findNodes(ir, 'video')
+		expect(videos.length).toBe(1)
+		const v = videos[0] as N & VideoNode
+		expect(v.alt).toBe('clip')
+		expect(v.src).toBe('video.mp4')
+		expect(v.autoplay).toBe(false)
+		expect(v.loop).toBe(false)
+	})
+
+	it('auto-detects audio from .mp3 in markdown image syntax', async () => {
+		const ir = await compileToIR('![song](track.mp3)')
+		const audios = findNodes(ir, 'audio')
+		expect(audios.length).toBe(1)
+		const a = audios[0] as N & AudioNode
+		expect(a.alt).toBe('song')
+		expect(a.src).toBe('track.mp3')
+		expect(a.autoplay).toBe(false)
+		expect(a.loop).toBe(false)
+	})
+
+	it('keeps unknown extensions as image', async () => {
+		const ir = await compileToIR('![photo](pic.png)')
+		const images = findNodes(ir, 'image')
+		expect(images.length).toBe(1)
+		expect(findNodes(ir, 'video').length).toBe(0)
+		expect(findNodes(ir, 'audio').length).toBe(0)
+	})
+
+	it('auto-detects .webm as video', async () => {
+		const ir = await compileToIR('![demo](demo.webm)')
+		expect(findNodes(ir, 'video').length).toBe(1)
+	})
+
+	it('auto-detects .ogg as audio', async () => {
+		const ir = await compileToIR('![music](song.ogg)')
+		expect(findNodes(ir, 'audio').length).toBe(1)
+	})
+
+	it('handles extension with query string', async () => {
+		const ir = await compileToIR('![clip](https://example.com/video.mp4?t=10)')
+		expect(findNodes(ir, 'video').length).toBe(1)
+	})
+
+	it('promotes standalone video out of paragraph', async () => {
+		const ir = await compileToIR('![clip](video.mp4)')
+		if (ir.type !== 'root') throw new Error('expected root')
+		const root = ir as N & RootNode
+		const videoChild = root.children.find(c => c.type === 'video')
+		expect(videoChild).toBeDefined()
+	})
+
+	it('promotes standalone audio out of paragraph', async () => {
+		const ir = await compileToIR('![song](track.mp3)')
+		if (ir.type !== 'root') throw new Error('expected root')
+		const root = ir as N & RootNode
+		const audioChild = root.children.find(c => c.type === 'audio')
+		expect(audioChild).toBeDefined()
+	})
+})
+
 describe('isBlockNode helper', () => {
 	it('returns true for block types', () => {
 		expect(isBlockNode({ type: 'root', children: [] })).toBe(true)
@@ -439,6 +502,8 @@ describe('isBlockNode helper', () => {
 		expect(isBlockNode({ type: 'listItem', bullet: '•', style: {}, children: [] })).toBe(true)
 		expect(isBlockNode({ type: 'thematicBreak', style: { color: '', char: '' } })).toBe(true)
 		expect(isBlockNode({ type: 'unknown', tagName: 'div', style: {}, children: [] })).toBe(true)
+		expect(isBlockNode({ type: 'video', alt: '', autoplay: false, loop: false, style: {} })).toBe(true)
+		expect(isBlockNode({ type: 'audio', alt: '', autoplay: false, loop: false, style: {} })).toBe(true)
 	})
 
 	it('returns false for inline types', () => {

@@ -150,6 +150,26 @@ export interface ImageNode {
 	style: InlineStyle
 }
 
+export interface VideoNode {
+	type: 'video'
+	alt: string
+	src?: string
+	href?: string
+	poster?: string
+	autoplay: boolean
+	loop: boolean
+	style: InlineStyle
+}
+
+export interface AudioNode {
+	type: 'audio'
+	alt: string
+	src?: string
+	autoplay: boolean
+	loop: boolean
+	style: InlineStyle
+}
+
 export interface BreakNode {
 	type: 'break'
 }
@@ -172,6 +192,7 @@ export interface CustomNode<T extends string = string> {
 
 // core node types — strictly discriminated union for type narrowing
 export type CoreIRNode =
+	| AudioNode
 	| BlockquoteNode
 	| BreakNode
 	| CheckboxNode
@@ -193,6 +214,7 @@ export type CoreIRNode =
 	| TextNode
 	| ThematicBreakNode
 	| UnknownBlockNode
+	| VideoNode
 
 // full union including custom extension nodes
 export type IRNode = CoreIRNode | CustomNode<string>
@@ -208,6 +230,8 @@ const BLOCK_TYPES = new Set([
 	'list',
 	'listItem',
 	'image',
+	'video',
+	'audio',
 	'table',
 	'tableRow',
 	'tableCell',

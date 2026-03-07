@@ -8,8 +8,8 @@ import type { VFile } from 'vfile'
 import type { IRNode, TableCellNode, TableRowNode } from '../ir/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 
+import { compileAudio, compileImg, compileVideo } from './compile-media.ts'
 import { getHighlightColor } from './hljs-colors.ts'
-import { sanitizeImageSrc } from './sanitize-image-src.ts'
 import { sanitizeUrl } from './sanitize-url.ts'
 import { sanitizeForTerminal } from './sanitize.ts'
 
@@ -79,6 +79,8 @@ const HAST_BLOCK_TAGS = new Set([
 	'thead',
 	'tr',
 	'ul',
+	'video',
+	'audio',
 ])
 
 const KNOWN_INLINE_TAGS = new Set([
@@ -229,9 +231,10 @@ function compileHeading(state: CompilerState, node: Element): IRNode {
 
 function compileParagraph(state: CompilerState, node: Element): IRNode {
 	const children = withAncestors(state, node)
-	// standalone image: <p><img></p> → promote to block so ImageBlock component renders
-	if (children.length === 1 && children[0]?.type === 'image') {
-		return children[0]
+	// standalone media: <p><img></p>, <p><video></p>, <p><audio></p> → promote to block
+	const first = children[0]
+	if (children.length === 1 && (first?.type === 'image' || first?.type === 'video' || first?.type === 'audio')) {
+		return first
 	}
 	return {
 		type: 'paragraph',
@@ -393,6 +396,8 @@ const BLOCK_COMPILERS: Record<string, BlockCompiler> = {
 	th: compileTableCell,
 	tr: (state, node) => compileTableRow(state, node, false),
 	ul: compileList,
+	video: (state, node) => compileVideo(state.theme, node),
+	audio: (state, node) => compileAudio(state.theme, node),
 }
 
 function compileElement(state: CompilerState, node: Element): IRNode | undefined {
@@ -518,17 +523,7 @@ const INLINE_COMPILERS: Record<string, InlineCompiler> = {
 		style: { italic: true },
 		children: withAncestors(state, node),
 	}),
-	img: (state, node) => {
-		const alt = typeof node.properties?.['alt'] === 'string' ? node.properties['alt'] : 'image'
-		const src = typeof node.properties?.['src'] === 'string' ? node.properties['src'] : ''
-		const url = sanitizeImageSrc(src)
-		return {
-			type: 'image',
-			alt: sanitizeForTerminal(alt),
-			...(url.length > 0 ? { url } : {}),
-			style: { fg: state.theme.image.fallbackColor },
-		}
-	},
+	img: (state, node) => compileImg(state.theme, node),
 	input: (_state, node) => ({ type: 'checkbox', checked: node.properties?.['checked'] === true }),
 	s: (state, node) => ({
 		type: 'strikethrough',

@@ -52,6 +52,12 @@ function renderNode(node: IRNode, key: string, maxWidth?: number): ReactNode {
 		case 'image':
 			return renderImageBlock(node, key)
 
+		case 'video':
+			return <text key={key}><span style={{ fg: node.style.fg, dim: true }}>[video: {node.alt}]</span></text>
+
+		case 'audio':
+			return <text key={key}><span style={{ fg: node.style.fg, dim: true }}>[audio: {node.alt}]</span></text>
+
 		case 'table':
 			return renderTable(node, key, maxWidth)
 

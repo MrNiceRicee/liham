@@ -5,7 +5,7 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 
 import { createContext, type RefObject } from 'react'
 
-import type { ImageCapabilities } from '../../image/types.ts'
+import type { ImageCapabilities } from '../../media/types.ts'
 
 export interface ImageContextValue {
 	basePath: string

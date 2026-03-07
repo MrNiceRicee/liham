@@ -5,14 +5,14 @@ import type { BoxRenderable, ScrollBoxRenderable } from '@opentui/core'
 
 import { useEffect, useRef, useState, type RefObject } from 'react'
 
-import type { ImageResult, LoadedFile, LoadedImage, RemoteFile } from '../../image/types.ts'
+import type { ImageResult, LoadedFile, LoadedImage, RemoteFile } from '../../media/types.ts'
 import type { ImageContextValue } from './image-context.tsx'
 
-import { createImageCache, localCacheKey, remoteCacheKey, type ImageCache } from '../../image/cache.ts'
-import { decodeImage } from '../../image/decoder.ts'
-import { fetchRemoteImage } from '../../image/fetcher.ts'
-import { loadImageFile } from '../../image/loader.ts'
-import { createSemaphore, type Semaphore } from '../../image/semaphore.ts'
+import { createImageCache, localCacheKey, remoteCacheKey, type ImageCache } from '../../media/cache.ts'
+import { decodeImage } from '../../media/decoder.ts'
+import { fetchRemoteImage } from '../../media/fetcher.ts'
+import { loadImageFile } from '../../media/loader.ts'
+import { createSemaphore, type Semaphore } from '../../media/semaphore.ts'
 
 export type ImageState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -135,16 +135,16 @@ function coalescedDecode(
 	let decodePromise = inflightDecodes.get(cacheKey)
 	if (decodePromise == null) {
 		const purpose = ctx.capabilities.protocol === 'kitty-virtual' ? 'kitty' : 'halfblock'
-		decodePromise = decodeImage(
-			file.bytes,
+		decodePromise = decodeImage({
+			bytes: file.bytes,
 			targetCols,
-			ctx.capabilities.cellPixelWidth,
-			ctx.capabilities.cellPixelHeight,
+			cellPixelWidth: ctx.capabilities.cellPixelWidth,
+			cellPixelHeight: ctx.capabilities.cellPixelHeight,
 			purpose,
-			url,
-			{ maxFrames: 1, maxDecodedBytes: 10 * 1024 * 1024 },
+			source: url,
+			animationLimits: { maxFrames: 1, maxDecodedBytes: 10 * 1024 * 1024 },
 			signal,
-		).then((r) => {
+		}).then((r) => {
 			inflightDecodes.delete(cacheKey)
 			if (r.ok) {
 				imageCache.set(cacheKey, r.value)

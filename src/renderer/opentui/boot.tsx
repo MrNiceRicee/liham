@@ -4,8 +4,8 @@
 import { createCliRenderer } from '@opentui/core'
 import { createRoot } from '@opentui/react'
 
-import type { ImageCapabilities } from '../../image/types.ts'
 import type { IRNode } from '../../ir/types.ts'
+import type { ImageCapabilities } from '../../media/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 
 import { type LayoutMode, paneDimensions } from '../../app/state.ts'

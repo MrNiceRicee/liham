@@ -1,4 +1,4 @@
-// image types — shared across all renderers, no framework imports.
+// media types — shared across all renderers, no framework imports.
 
 // result type following PipelineResult pattern in src/types/pipeline.ts
 export type ImageResult<T> = { ok: true; value: T } | { ok: false; error: string; cause?: unknown }
@@ -48,4 +48,12 @@ export interface ImageCapabilities {
 	protocol: ImageProtocol
 	cellPixelWidth: number
 	cellPixelHeight: number
+}
+
+// extends image capabilities with animation and audio support.
+// canAnimate: false for OpenTUI (React reconciler tearing), true for Rezi.
+// canPlayAudio: true when ffmpeg/ffplay detected (future).
+export interface MediaCapabilities extends ImageCapabilities {
+	canAnimate: boolean
+	canPlayAudio: boolean
 }
