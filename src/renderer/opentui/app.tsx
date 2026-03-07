@@ -14,7 +14,7 @@ import {
 	type ReactNode,
 } from 'react'
 
-import type { ImageCapabilities } from '../../image/types.ts'
+import type { ImageCapabilities } from '../../media/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 
 import {

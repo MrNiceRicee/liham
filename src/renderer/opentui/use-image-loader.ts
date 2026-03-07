@@ -5,14 +5,14 @@ import type { BoxRenderable, ScrollBoxRenderable } from '@opentui/core'
 
 import { useEffect, useRef, useState, type RefObject } from 'react'
 
-import type { ImageResult, LoadedFile, LoadedImage, RemoteFile } from '../../image/types.ts'
+import type { ImageResult, LoadedFile, LoadedImage, RemoteFile } from '../../media/types.ts'
 import type { ImageContextValue } from './image-context.tsx'
 
-import { createImageCache, localCacheKey, remoteCacheKey, type ImageCache } from '../../image/cache.ts'
-import { decodeImage } from '../../image/decoder.ts'
-import { fetchRemoteImage } from '../../image/fetcher.ts'
-import { loadImageFile } from '../../image/loader.ts'
-import { createSemaphore, type Semaphore } from '../../image/semaphore.ts'
+import { createImageCache, localCacheKey, remoteCacheKey, type ImageCache } from '../../media/cache.ts'
+import { decodeImage } from '../../media/decoder.ts'
+import { fetchRemoteImage } from '../../media/fetcher.ts'
+import { loadImageFile } from '../../media/loader.ts'
+import { createSemaphore, type Semaphore } from '../../media/semaphore.ts'
 
 export type ImageState = 'idle' | 'loading' | 'loaded' | 'error'
 
