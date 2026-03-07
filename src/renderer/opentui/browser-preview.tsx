@@ -4,15 +4,38 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 import type { ReactNode, RefObject } from 'react'
 
 import type { AppAction, AppState } from '../../app/state.ts'
+import type { FuzzyMatch } from '../../browser/fuzzy.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 
 import { paneDimensions } from '../../app/state.ts'
+import { scanDirectory } from '../../browser/scanner.ts'
 import { processMarkdown } from '../../pipeline/processor.ts'
+import { createDirectoryWatcher, createFileWatcher } from '../../watcher/watcher.ts'
 import { type MediaEntry, renderToOpenTUI, renderToOpenTUIWithMedia } from './index.tsx'
 
 export interface PreviewCacheEntry {
 	content: ReactNode
 	renderTimeMs: number
+}
+
+// directory scan effect — returns cleanup function for useEffect
+export function scanDirectoryEffect(dir: string, dispatch: React.Dispatch<AppAction>): () => void {
+	let cancelled = false
+
+	scanDirectory(dir).then(
+		(files) => {
+			if (!cancelled) dispatch({ type: 'ScanComplete', files })
+		},
+		(err: unknown) => {
+			if (cancelled) return
+			const message = err instanceof Error ? err.message : 'scan failed'
+			dispatch({ type: 'ScanError', error: message })
+		},
+	)
+
+	return () => {
+		cancelled = true
+	}
 }
 
 export function renderBrowserPreview(
@@ -58,6 +81,97 @@ export function renderBrowserPreview(
 			setContent(<text color={theme.fallback.textColor}>cannot read file</text>)
 		}
 	})()
+}
+
+// cache-first browser preview — resolves match, checks cache, triggers background render on miss
+export function updateBrowserPreview(
+	filteredMatches: FuzzyMatch[],
+	state: AppState,
+	theme: ThemeTokens,
+	cursorRef: React.RefObject<number>,
+	cache: Map<string, PreviewCacheEntry>,
+	setContent: (content: ReactNode) => void,
+	setRenderTime: (ms: number) => void,
+): void {
+	if (filteredMatches.length === 0) {
+		setContent(null)
+		return
+	}
+
+	const match = filteredMatches[state.browser.cursorIndex]
+	if (match == null) return
+
+	const filePath = match.entry.absolutePath
+	const cached = cache.get(filePath)
+	if (cached != null) {
+		setContent(cached.content)
+		setRenderTime(cached.renderTimeMs)
+		return
+	}
+
+	const cursorSnapshot = state.browser.cursorIndex
+	cursorRef.current = cursorSnapshot
+	renderBrowserPreview(
+		filePath,
+		cursorSnapshot,
+		cursorRef,
+		cache,
+		state,
+		theme,
+		setContent,
+		setRenderTime,
+	)
+}
+
+// start directory watcher, returns cleanup function for useEffect
+export function startDirectoryWatcher(
+	browserDir: string,
+	previewCacheRef: React.RefObject<Map<string, PreviewCacheEntry>>,
+	setContent: (content: ReactNode) => void,
+	dispatch: React.Dispatch<AppAction>,
+): (() => void) | undefined {
+	const scanId = { current: 0 }
+
+	try {
+		const watcher = createDirectoryWatcher(browserDir, {
+			onEvent: () => {
+				const id = ++scanId.current
+				scanDirectory(browserDir)
+					.then((files) => {
+						if (scanId.current !== id) return
+						previewCacheRef.current.clear()
+						setContent(null)
+						dispatch({ type: 'RescanComplete', files })
+					})
+					.catch(() => {})
+			},
+		})
+
+		return () => {
+			watcher.close()
+		}
+	} catch {
+		return undefined
+	}
+}
+
+// start file watcher for live reload, returns cleanup function for useEffect
+export function startFileWatcher(
+	watchedFile: string,
+	reloadFile: (path: string) => void,
+	dispatch: React.Dispatch<AppAction>,
+): (() => void) | undefined {
+	try {
+		const watcher = createFileWatcher(watchedFile, {
+			onEvent: (event) => {
+				if (event.type === 'change') reloadFile(watchedFile)
+				else if (event.type === 'delete') dispatch({ type: 'FileDeleted' })
+			},
+		})
+		return () => watcher.close()
+	} catch {
+		return undefined
+	}
 }
 
 export function openFileFromBrowser(

@@ -58,36 +58,59 @@ export const VIEWER_SHIFT_KEY_MAP: Record<
 // modal key handler — called when modal is open, swallows all non-modal keys
 export function handleModalKey(
 	key: KeyEvent,
-	state: AppState,
+	_state: AppState,
 	dispatch: React.Dispatch<AppAction>,
 	mediaCount: number,
-): void {
+): AppAction | null {
 	switch (key.name) {
 		case 'escape':
 			dispatch({ type: 'CloseMediaModal' })
-			return
-		case 'n':
-			if (key.shift) {
-				dispatch({ type: 'FocusPrevMedia', mediaCount })
-				if (state.mediaModal.kind !== 'closed') {
-					// update modal to show new focused media
-					queueMicrotask(() => dispatch({ type: 'OpenMediaModal' }))
-				}
-			} else {
-				dispatch({ type: 'FocusNextMedia', mediaCount })
-				if (state.mediaModal.kind !== 'closed') {
-					queueMicrotask(() => dispatch({ type: 'OpenMediaModal' }))
-				}
-			}
-			return
+			return null
+		case 'n': {
+			const focusAction: AppAction = key.shift
+				? { type: 'FocusPrevMedia', mediaCount }
+				: { type: 'FocusNextMedia', mediaCount }
+			dispatch(focusAction)
+			queueMicrotask(() => dispatch({ type: 'OpenMediaModal' }))
+			return null
+		}
 		case ' ':
 			// play/pause — Phase 3 will wire this
-			return
+			return null
 		case 'q':
-			dispatch({ type: 'Quit' })
-			return
+			return { type: 'Quit' }
+		default:
+			// swallow all other keys when modal is open
+			return null
 	}
-	// swallow all other keys when modal is open
+}
+
+// viewer key handler — processes escape chain, shift, and normal key maps
+// dispatches directly for escape-chain actions, returns action for caller to handle
+export function handleViewerKey(
+	key: KeyEvent,
+	state: AppState,
+	dispatch: React.Dispatch<AppAction>,
+	mediaCount: number,
+): AppAction | null {
+	// escape chain: (1) modal/focus, (2) browser, (3) quit
+	if (key.name === 'escape') {
+		if (state.mediaModal.kind !== 'closed' || state.mediaFocusIndex != null) {
+			dispatch({ type: 'CloseMediaModal' })
+			return null
+		}
+		if (state.fromBrowser) return { type: 'ReturnToBrowser' }
+		return { type: 'Quit' }
+	}
+
+	if (key.shift) {
+		const shiftMapper = VIEWER_SHIFT_KEY_MAP[key.name]
+		if (shiftMapper != null) return shiftMapper(state, mediaCount)
+	}
+
+	const mapper = VIEWER_KEY_MAP[key.name]
+	if (mapper == null) return null
+	return mapper(key, state, mediaCount)
 }
 
 // -- scroll helpers --

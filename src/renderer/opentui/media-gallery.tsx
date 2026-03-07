@@ -1,5 +1,5 @@
 // media gallery — floating picker panel showing all media nodes with focus highlight.
-// appears when a media node is focused (n/N), hidden when modal is open.
+// appears when a media node is focused (n/N) and persists in modal mode.
 
 import type { ReactNode } from 'react'
 
@@ -33,6 +33,19 @@ function typeIcon(node: MediaIRNode): string {
 function truncate(text: string, maxLen: number): string {
 	if (text.length <= maxLen) return text
 	return `${text.slice(0, maxLen - 1)}…`
+}
+
+// compute gallery dimensions — used by modal to reserve space
+export function galleryDimensions(
+	mediaCount: number,
+	termWidth: number,
+): { width: number; height: number } {
+	if (mediaCount === 0) return { width: 0, height: 0 }
+	const maxVisible = Math.min(mediaCount, 8)
+	return {
+		width: Math.min(40, Math.floor(termWidth * 0.4)),
+		height: maxVisible + 3,
+	}
 }
 
 // -- gallery component --
@@ -76,7 +89,7 @@ export function MediaGallery({
 			style={{
 				position: 'absolute',
 				bottom: 2,
-				right: 1,
+				left: 1,
 				width: galleryWidth,
 				height: galleryHeight,
 				zIndex: 150,

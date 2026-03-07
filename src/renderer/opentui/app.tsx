@@ -29,29 +29,29 @@ import {
 	type ScrollDirection,
 } from '../../app/state.ts'
 import { fuzzyFilter } from '../../browser/fuzzy.ts'
-import { scanDirectory } from '../../browser/scanner.ts'
-import { createDirectoryWatcher, createFileWatcher } from '../../watcher/watcher.ts'
 import { browserKeyHandler } from './browser-keys.ts'
 import {
 	openFileFromBrowser,
 	type PreviewCacheEntry,
 	reloadViewerFile,
-	renderBrowserPreview,
+	scanDirectoryEffect,
+	startDirectoryWatcher,
+	startFileWatcher,
+	updateBrowserPreview,
 } from './browser-preview.tsx'
 import { ImageContext, type ImageContextValue } from './image-context.tsx'
 import { clearImageCache } from './image.tsx'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-context.tsx'
-import { MediaGallery } from './media-gallery.tsx'
+import { galleryDimensions, MediaGallery } from './media-gallery.tsx'
 import { MediaModal } from './media-modal.tsx'
 import { StatusBar } from './status-bar.tsx'
 import {
 	applyScroll,
 	createMouseHandlers,
 	handleModalKey,
+	handleViewerKey,
 	syncScroll,
-	VIEWER_KEY_MAP,
-	VIEWER_SHIFT_KEY_MAP,
 } from './viewer-keys.ts'
 
 type AppProps =
@@ -111,6 +111,10 @@ export function App(props: Readonly<AppProps>) {
 		return { content: null, raw: '', mediaNodes: [] }
 	})
 
+	// derived state
+	const isViewer = state.mode === 'viewer'
+	const currentFile = isViewer ? state.currentFile : undefined
+
 	// computed filtered list for browser
 	const filteredMatches = useMemo(
 		() => fuzzyFilter(state.browser.filter, state.browser.files),
@@ -118,102 +122,41 @@ export function App(props: Readonly<AppProps>) {
 	)
 
 	// -- directory scan on mount (browser mode) --
+	const browserDir = props.mode === 'browser' ? props.dir : null
 	useEffect(() => {
-		if (props.mode !== 'browser') return
-		let cancelled = false
-
-		scanDirectory(props.dir).then(
-			(files) => {
-				if (!cancelled) dispatch({ type: 'ScanComplete', files })
-			},
-			(err: unknown) => {
-				if (!cancelled) {
-					const message = err instanceof Error ? err.message : 'scan failed'
-					dispatch({ type: 'ScanError', error: message })
-				}
-			},
-		)
-
-		return () => {
-			cancelled = true
-		}
-	}, [props.mode === 'browser' ? props.dir : null])
+		if (browserDir == null) return
+		return scanDirectoryEffect(browserDir, dispatch)
+	}, [browserDir])
 
 	// -- browser live preview: cache-first, background load on miss --
 	useEffect(() => {
 		if (state.mode !== 'browser') return
-		if (filteredMatches.length === 0) {
-			setBrowserPreviewContent(null)
-			return
-		}
-
-		const match = filteredMatches[state.browser.cursorIndex]
-		if (match == null) return
-
-		const filePath = match.entry.absolutePath
-		const cached = previewCacheRef.current.get(filePath)
-		if (cached != null) {
-			setBrowserPreviewContent(cached.content)
-			setRenderTimeMs(cached.renderTimeMs)
-			return
-		}
-
-		const cursorSnapshot = state.browser.cursorIndex
-		previewCursorRef.current = cursorSnapshot
-
-		renderBrowserPreview(
-			filePath,
-			cursorSnapshot,
-			previewCursorRef,
-			previewCacheRef.current,
+		updateBrowserPreview(
+			filteredMatches,
 			state,
 			props.theme,
+			previewCursorRef,
+			previewCacheRef.current,
 			setBrowserPreviewContent,
 			setRenderTimeMs,
 		)
 	}, [state.mode, state.browser.cursorIndex, filteredMatches.length, state.browser.scanVersion])
 
 	// -- directory watcher for browser live rescan --
+	const noWatch = props.noWatch
 	useEffect(() => {
+		if (browserDir == null || noWatch) return
 		if (state.mode !== 'browser') return
-		if (props.mode === 'browser' && props.noWatch) return
 		if (state.browser.scanStatus !== 'complete') return
 
-		const browserDir = props.mode === 'browser' ? props.dir : undefined
-		if (browserDir == null) return
-
-		const scanId = { current: 0 }
-
-		try {
-			const watcher = createDirectoryWatcher(browserDir, {
-				onEvent: () => {
-					const id = ++scanId.current
-					scanDirectory(browserDir)
-						.then((files) => {
-							if (scanId.current !== id) return
-							previewCacheRef.current.clear()
-							setBrowserPreviewContent(null)
-							dispatch({ type: 'RescanComplete', files })
-						})
-						.catch(() => {})
-				},
-			})
-
-			return () => {
-				watcher.close()
-			}
-		} catch {
-			return
-		}
+		return startDirectoryWatcher(browserDir, previewCacheRef, setBrowserPreviewContent, dispatch)
 	}, [state.mode, state.browser.scanStatus])
 
 	// -- debounced resize --
 	const resizeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 	useOnResize((width, height) => {
-		if (resizeTimer.current != null) clearTimeout(resizeTimer.current)
-		resizeTimer.current = setTimeout(() => {
-			dispatch({ type: 'Resize', width, height })
-		}, 100)
+		clearTimeout(resizeTimer.current ?? undefined)
+		resizeTimer.current = setTimeout(() => dispatch({ type: 'Resize', width, height }), 100)
 	})
 
 	// -- file watcher for live reload --
@@ -236,29 +179,9 @@ export function App(props: Readonly<AppProps>) {
 	)
 
 	useEffect(() => {
-		const watchedFile = state.currentFile
-		if (watchedFile == null) return
-		if (state.mode !== 'viewer') return
-		if (props.noWatch) return
-
-		try {
-			const watcher = createFileWatcher(watchedFile, {
-				onEvent: (event) => {
-					if (event.type === 'change') {
-						reloadFile(watchedFile)
-					} else if (event.type === 'delete') {
-						dispatch({ type: 'FileDeleted' })
-					}
-				},
-			})
-
-			return () => {
-				watcher.close()
-			}
-		} catch {
-			return
-		}
-	}, [state.currentFile, state.mode])
+		if (currentFile == null || !isViewer || noWatch) return
+		return startFileWatcher(currentFile, reloadFile, dispatch)
+	}, [currentFile, state.mode])
 
 	// -- viewer scroll handling --
 	const focusedRef = state.focus === 'source' ? sourceRef : previewRef
@@ -310,43 +233,13 @@ export function App(props: Readonly<AppProps>) {
 			return
 		}
 
-		// modal open — intercept keys before viewer dispatch
-		if (state.mediaModal.kind !== 'closed') {
-			if (key.name === 'q') {
-				renderer?.destroy()
-				return
-			}
-			handleModalKey(key, state, dispatch, mediaCount)
-			return
-		}
-
-		// viewer mode — 3-level Esc chain: (1) modal/focus, (2) browser, (3) quit
-		if (key.name === 'escape') {
-			if (state.mediaModal.kind !== 'closed' || state.mediaFocusIndex != null) {
-				dispatch({ type: 'CloseMediaModal' })
-				return
-			}
-			if (state.fromBrowser) {
-				clearImageCache()
-				dispatch({ type: 'ReturnToBrowser' })
-				return
-			}
-			renderer?.destroy()
-			return
-		}
-
-		if (key.shift) {
-			const shiftMapper = VIEWER_SHIFT_KEY_MAP[key.name]
-			if (shiftMapper != null) {
-				handleAction(shiftMapper(state, mediaCount))
-				return
-			}
-		}
-
-		const mapper = VIEWER_KEY_MAP[key.name]
-		if (mapper == null) return
-		const action = mapper(key, state, mediaCount)
-		if (action != null) handleAction(action)
+		const action =
+			state.mediaModal.kind !== 'closed'
+				? handleModalKey(key, state, dispatch, mediaCount)
+				: handleViewerKey(key, state, dispatch, mediaCount)
+		if (action == null) return
+		if (action.type === 'ReturnToBrowser') clearImageCache()
+		handleAction(action)
 	})
 
 	const panes = paneDimensions(
@@ -359,20 +252,19 @@ export function App(props: Readonly<AppProps>) {
 
 	// image context for viewer mode — provides basePath for relative image resolution
 	const imageCtx: ImageContextValue | undefined = useMemo(() => {
-		if (state.mode !== 'viewer' || state.currentFile == null) return undefined
+		if (currentFile == null) return undefined
 		const previewWidth = panes.preview?.width ?? state.dimensions.width
 		// subtract padding/borders (scrollbox border + internal padding)
 		const maxCols = Math.max(1, previewWidth - 4)
 		return {
-			basePath: dirname(state.currentFile),
+			basePath: dirname(currentFile),
 			capabilities: props.imageCapabilities,
 			bgColor: props.theme.image.placeholderBg,
 			maxCols,
 			scrollRef: previewRef,
 		}
 	}, [
-		state.mode,
-		state.currentFile,
+		currentFile,
 		props.imageCapabilities,
 		props.theme.image.placeholderBg,
 		panes.preview?.width,
@@ -397,40 +289,40 @@ export function App(props: Readonly<AppProps>) {
 
 	const mouseHandlers = createMouseHandlers(state, dispatch, sourceRef, previewRef)
 
-	const viewerLayout =
-		state.mode !== 'browser'
-			? renderViewerLayout(
-					state,
-					panes,
-					viewerState.content,
-					viewerState.raw,
-					props.theme,
-					sourceRef,
-					previewRef,
-					mouseHandlers,
-				)
-			: null
+	const viewerLayout = isViewer
+		? renderViewerLayout(
+				state,
+				panes,
+				viewerState.content,
+				viewerState.raw,
+				props.theme,
+				sourceRef,
+				previewRef,
+				mouseHandlers,
+			)
+		: null
 
-	const showModal = state.mode === 'viewer' && state.mediaModal.kind !== 'closed'
-	const galleryFocusIndex = showModal
-		? (state.mediaModal.kind === 'image' ? state.mediaModal.mediaIndex : 0)
-		: state.mediaFocusIndex
-	const showGallery = state.mode === 'viewer' && galleryFocusIndex != null && mediaCount > 0
+	const showModal = isViewer && state.mediaModal.kind !== 'closed'
+	const modalMediaIndex = state.mediaModal.kind === 'image' ? state.mediaModal.mediaIndex : 0
+	const galleryFocusIndex = showModal ? modalMediaIndex : state.mediaFocusIndex
+	const showGallery = isViewer && galleryFocusIndex != null
+	const galDims = showGallery ? galleryDimensions(mediaCount, state.dimensions.width) : null
 
 	const modalElement = showModal ? (
 		<MediaModal
 			mediaNodes={viewerState.mediaNodes}
-			mediaIndex={state.mediaModal.kind === 'image' ? state.mediaModal.mediaIndex : 0}
+			mediaIndex={modalMediaIndex}
 			theme={props.theme}
 			termWidth={state.dimensions.width}
 			termHeight={state.dimensions.height}
+			galleryHeight={galDims?.height}
 		/>
 	) : null
 
 	const galleryElement = showGallery ? (
 		<MediaGallery
 			mediaNodes={viewerState.mediaNodes}
-			focusedIndex={galleryFocusIndex!}
+			focusedIndex={galleryFocusIndex}
 			theme={props.theme}
 			termWidth={state.dimensions.width}
 			termHeight={state.dimensions.height}
@@ -446,21 +338,17 @@ export function App(props: Readonly<AppProps>) {
 		</>
 	)
 
-	const withImageCtx =
-		imageCtx != null ? (
-			<ImageContext.Provider value={imageCtx}>{viewerContent}</ImageContext.Provider>
-		) : (
-			viewerContent
-		)
-
 	const wrappedViewerLayout = (
-		<MediaFocusContext.Provider value={mediaFocusCtx}>{withImageCtx}</MediaFocusContext.Provider>
+		<MediaFocusContext.Provider value={mediaFocusCtx}>
+			<ImageContext.Provider value={imageCtx}>{viewerContent}</ImageContext.Provider>
+		</MediaFocusContext.Provider>
 	)
 
 	return (
 		<box style={{ position: 'relative', flexDirection: 'column', width: '100%', height: '100%' }}>
-			{state.mode === 'browser'
-				? renderBrowserLayout(
+			{isViewer
+				? wrappedViewerLayout
+				: renderBrowserLayout(
 						state,
 						panes,
 						filteredMatches,
@@ -468,11 +356,10 @@ export function App(props: Readonly<AppProps>) {
 						props.theme,
 						browserRef,
 						previewRef,
-					)
-				: wrappedViewerLayout}
+					)}
 			<StatusBar
 				entries={entries}
-				layout={state.mode === 'browser' ? 'browser' : state.layout}
+				layout={isViewer ? state.layout : 'browser'}
 				theme={props.theme}
 				renderTimeMs={renderTimeMs}
 				fileDeleted={state.fileDeleted}
