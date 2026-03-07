@@ -1,7 +1,7 @@
 ---
 title: "feat: Rewrite liham to TypeScript/OpenTUI with unified.js pipeline"
 type: feat
-status: active
+status: completed
 date: 2026-03-04
 deepened: 2026-03-04
 origin: docs/brainstorms/2026-03-04-ts-rewrite-remark-pipeline-brainstorm.md

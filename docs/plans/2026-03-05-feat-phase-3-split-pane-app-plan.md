@@ -1,7 +1,7 @@
 ---
 title: "feat: Phase 3 — Split Pane App"
 type: feat
-status: active
+status: completed
 date: 2026-03-05
 deepened: 2026-03-05
 origin: docs/brainstorms/2026-03-05-phase-3-split-pane-app-brainstorm.md
