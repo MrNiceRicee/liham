@@ -30,6 +30,8 @@ export const lightTheme: ThemeTokens = {
 	},
 	image: {
 		fallbackColor: '#8c8fa1',
+		loadingColor: '#34548a',
+		placeholderBg: '#d5d6db',
 	},
 	inlineCode: {
 		backgroundColor: '#c4c5cc',

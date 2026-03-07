@@ -4,6 +4,7 @@
 import { createCliRenderer } from '@opentui/core'
 import { createRoot } from '@opentui/react'
 
+import type { ImageCapabilities } from '../../image/types.ts'
 import type { IRNode } from '../../ir/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 
@@ -16,13 +17,14 @@ export type BootContext =
 			mode: 'viewer'
 			ir: IRNode
 			theme: ThemeTokens
+			imageCapabilities: ImageCapabilities
 			layout: LayoutMode
 			raw: string
 			renderTimeMs: number
 			filePath: string
 			noWatch: boolean
 	  }
-	| { mode: 'browser'; dir: string; theme: ThemeTokens; layout: LayoutMode; noWatch: boolean }
+	| { mode: 'browser'; dir: string; theme: ThemeTokens; imageCapabilities: ImageCapabilities; layout: LayoutMode; noWatch: boolean }
 
 export async function boot(ctx: BootContext): Promise<void> {
 	const renderer = await createCliRenderer({
@@ -34,7 +36,7 @@ export async function boot(ctx: BootContext): Promise<void> {
 	try {
 		if (ctx.mode === 'browser') {
 			createRoot(renderer).render(
-				<App mode="browser" dir={ctx.dir} layout={ctx.layout} theme={ctx.theme} noWatch={ctx.noWatch} />,
+				<App mode="browser" dir={ctx.dir} layout={ctx.layout} theme={ctx.theme} imageCapabilities={ctx.imageCapabilities} noWatch={ctx.noWatch} />,
 			)
 		} else {
 			// compute preview pane width for table layout at render time
@@ -52,6 +54,7 @@ export async function boot(ctx: BootContext): Promise<void> {
 					raw={ctx.raw}
 					layout={ctx.layout}
 					theme={ctx.theme}
+					imageCapabilities={ctx.imageCapabilities}
 					renderTimeMs={ctx.renderTimeMs}
 					filePath={ctx.filePath}
 					noWatch={ctx.noWatch}

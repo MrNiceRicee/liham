@@ -196,6 +196,8 @@ export type CoreIRNode =
 // full union including custom extension nodes
 export type IRNode = CoreIRNode | CustomNode<string>
 
+// image uses InlineStyle but renders as a block — the component ignores most
+// style props and uses theme tokens + ImageContext directly.
 const BLOCK_TYPES = new Set([
 	'root',
 	'heading',
@@ -204,6 +206,7 @@ const BLOCK_TYPES = new Set([
 	'blockquote',
 	'list',
 	'listItem',
+	'image',
 	'table',
 	'tableRow',
 	'tableCell',

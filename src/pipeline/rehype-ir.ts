@@ -9,6 +9,7 @@ import type { IRNode, TableCellNode, TableRowNode } from '../ir/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 
 import { getHighlightColor } from './hljs-colors.ts'
+import { sanitizeImageSrc } from './sanitize-image-src.ts'
 import { sanitizeUrl } from './sanitize-url.ts'
 import { sanitizeForTerminal } from './sanitize.ts'
 
@@ -227,10 +228,15 @@ function compileHeading(state: CompilerState, node: Element): IRNode {
 }
 
 function compileParagraph(state: CompilerState, node: Element): IRNode {
+	const children = withAncestors(state, node)
+	// standalone image: <p><img></p> → promote to block so ImageBlock component renders
+	if (children.length === 1 && children[0]?.type === 'image') {
+		return children[0]
+	}
 	return {
 		type: 'paragraph',
 		style: { fg: state.theme.paragraph.textColor },
-		children: withAncestors(state, node),
+		children,
 	}
 }
 
@@ -504,7 +510,7 @@ const INLINE_COMPILERS: Record<string, InlineCompiler> = {
 	img: (state, node) => {
 		const alt = typeof node.properties?.['alt'] === 'string' ? node.properties['alt'] : 'image'
 		const src = typeof node.properties?.['src'] === 'string' ? node.properties['src'] : ''
-		const url = sanitizeUrl(src)
+		const url = sanitizeImageSrc(src)
 		return {
 			type: 'image',
 			alt: sanitizeForTerminal(alt),
