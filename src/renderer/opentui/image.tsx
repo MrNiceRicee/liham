@@ -75,7 +75,7 @@ function KittyPlaceholder({ rows, cols }: { readonly rows: number; readonly cols
 
 // -- main image block component --
 
-function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly nodeKey: string }): ReactNode {
+function ImageBlock({ node, nodeKey, mediaIndex: _mediaIndex }: { readonly node: ImageNode; readonly nodeKey: string; readonly mediaIndex?: number }): ReactNode {
 	const ctx = useContext(ImageContext)
 	const renderer = useRenderer()
 	const boxRef = useRef<BoxRenderable | null>(null)
@@ -218,6 +218,6 @@ function renderTextFallback(node: ImageNode, key: string): ReactNode {
 }
 
 // public dispatch wrapper for consistency with other renderers
-export function renderImageBlock(node: ImageNode, key: string): ReactNode {
-	return <ImageBlock node={node} nodeKey={key} key={key} />
+export function renderImageBlock(node: ImageNode, key: string, mediaIndex?: number): ReactNode {
+	return <ImageBlock node={node} nodeKey={key} key={key} mediaIndex={mediaIndex} />
 }

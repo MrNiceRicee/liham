@@ -10,7 +10,7 @@ import type { ThemeTokens } from '../../theme/types.ts'
 
 import { type LayoutMode, paneDimensions } from '../../app/state.ts'
 import { App } from './app.tsx'
-import { renderToOpenTUI } from './index.tsx'
+import { renderToOpenTUIWithMedia } from './index.tsx'
 
 export type BootContext =
 	| {
@@ -45,13 +45,14 @@ export async function boot(ctx: BootContext): Promise<void> {
 			const panes = paneDimensions(ctx.layout, termWidth, termHeight)
 			const paneChrome = 4
 			const previewWidth = (panes.preview?.width ?? termWidth) - paneChrome
-			const content = renderToOpenTUI(ctx.ir, previewWidth)
+			const { jsx: content, mediaNodes } = renderToOpenTUIWithMedia(ctx.ir, previewWidth)
 
 			createRoot(renderer).render(
 				<App
 					mode="viewer"
 					content={content}
 					raw={ctx.raw}
+					mediaNodes={mediaNodes}
 					layout={ctx.layout}
 					theme={ctx.theme}
 					imageCapabilities={ctx.imageCapabilities}

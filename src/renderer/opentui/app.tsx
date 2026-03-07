@@ -35,7 +35,7 @@ import { createDirectoryWatcher, createFileWatcher } from '../../watcher/watcher
 import { browserKeyHandler } from './browser-keys.ts'
 import { ImageContext, type ImageContextValue } from './image-context.tsx'
 import { clearImageCache } from './image.tsx'
-import { renderToOpenTUI } from './index.tsx'
+import { type MediaEntry, renderToOpenTUI, renderToOpenTUIWithMedia } from './index.tsx'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { StatusBar } from './status-bar.tsx'
 import { VIEWER_KEY_MAP, VIEWER_SHIFT_KEY_MAP, applyScroll, syncScroll } from './viewer-keys.ts'
@@ -97,6 +97,7 @@ type AppProps =
 			mode: 'viewer'
 			content: ReactNode
 			raw: string
+			mediaNodes: MediaEntry[]
 			layout: LayoutMode
 			theme: ThemeTokens
 			imageCapabilities: ImageCapabilities
@@ -131,9 +132,9 @@ export function App(props: Readonly<AppProps>) {
 	)
 
 	// unified viewer content — mutable state for live reload
-	const [viewerState, setViewerState] = useState<{ content: ReactNode; raw: string }>(() => {
-		if (props.mode === 'viewer') return { content: props.content, raw: props.raw }
-		return { content: null, raw: '' }
+	const [viewerState, setViewerState] = useState<{ content: ReactNode; raw: string; mediaNodes: MediaEntry[] }>(() => {
+		if (props.mode === 'viewer') return { content: props.content, raw: props.raw, mediaNodes: props.mediaNodes }
+		return { content: null, raw: '', mediaNodes: [] }
 	})
 
 	// computed filtered list for browser
@@ -269,14 +270,14 @@ export function App(props: Readonly<AppProps>) {
 						'viewer',
 					)
 					const width = (panes.preview?.width ?? state.dimensions.width) - 4
-					const rendered = renderToOpenTUI(result.value, width)
+					const { jsx: rendered, mediaNodes } = renderToOpenTUIWithMedia(result.value, width)
 					const elapsed = performance.now() - t0
 
 					if (fileChangeIdRef.current !== changeId) return
 
 					// preserve scroll position
 					const scrollBefore = previewRef.current?.scrollTop ?? 0
-					setViewerState({ content: rendered, raw: markdown })
+					setViewerState({ content: rendered, raw: markdown, mediaNodes })
 					setRenderTimeMs(elapsed)
 					queueMicrotask(() => {
 						previewRef.current?.scrollTo(scrollBefore)
@@ -363,9 +364,9 @@ export function App(props: Readonly<AppProps>) {
 				const panes = paneDimensions(state.layout, termWidth, state.dimensions.height, 'viewer')
 				const paneChrome = 4
 				const width = (panes.preview?.width ?? termWidth) - paneChrome
-				const rendered = renderToOpenTUI(result.value, width)
+				const { jsx: rendered, mediaNodes } = renderToOpenTUIWithMedia(result.value, width)
 
-				setViewerState({ content: rendered, raw: markdown })
+				setViewerState({ content: rendered, raw: markdown, mediaNodes })
 			} catch {
 				setBrowserPreviewContent(
 					<text color={props.theme.fallback.textColor}>cannot read file</text>,

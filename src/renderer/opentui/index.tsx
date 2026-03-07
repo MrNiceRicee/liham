@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react'
 
-import { isBlockNode, type CoreIRNode, type IRNode } from '../../ir/types.ts'
+import { isBlockNode, type CoreIRNode, type IRNode, type MediaIRNode } from '../../ir/types.ts'
 import { renderBlockquote } from './blockquote.tsx'
 import { renderCodeBlock } from './code-block.tsx'
 import { renderCustom, renderUnknown } from './fallback.tsx'
@@ -15,19 +15,36 @@ import { renderParagraph } from './paragraph.tsx'
 import { renderTable, renderTableCell, renderTableRow } from './table.tsx'
 import { renderThematicBreak } from './thematic-break.tsx'
 
+// media collection accumulated during IR-to-JSX traversal
+export interface MediaEntry {
+	node: MediaIRNode
+	index: number
+}
+
+export interface RenderResult {
+	jsx: ReactNode
+	mediaNodes: MediaEntry[]
+}
+
+// mutable accumulator threaded through render calls
+interface RenderContext {
+	maxWidth?: number
+	media: MediaEntry[]
+}
+
 function isCoreNode(node: IRNode): node is CoreIRNode {
 	return 'type' in node && typeof node.type === 'string'
 }
 
 // renders a single IR node to OpenTUI JSX
-function renderNode(node: IRNode, key: string, maxWidth?: number): ReactNode {
+function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 	if (!isCoreNode(node)) return renderCustom(node, key)
 
 	switch (node.type) {
 		case 'root':
 			return (
 				<box key={key} style={{ flexDirection: 'column', width: '100%' }}>
-					{renderChildren(node.children, key, maxWidth)}
+					{renderChildrenInternal(node.children, key, ctx)}
 				</box>
 			)
 
@@ -49,17 +66,26 @@ function renderNode(node: IRNode, key: string, maxWidth?: number): ReactNode {
 		case 'listItem':
 			return renderListItem(node, key)
 
-		case 'image':
-			return renderImageBlock(node, key)
+		case 'image': {
+			const mediaIndex = ctx.media.length
+			ctx.media.push({ node, index: mediaIndex })
+			return renderImageBlock(node, key, mediaIndex)
+		}
 
-		case 'video':
+		case 'video': {
+			const mediaIndex = ctx.media.length
+			ctx.media.push({ node, index: mediaIndex })
 			return <text key={key}><span style={{ fg: node.style.fg, dim: true }}>[video: {node.alt}]</span></text>
+		}
 
-		case 'audio':
+		case 'audio': {
+			const mediaIndex = ctx.media.length
+			ctx.media.push({ node, index: mediaIndex })
 			return <text key={key}><span style={{ fg: node.style.fg, dim: true }}>[audio: {node.alt}]</span></text>
+		}
 
 		case 'table':
-			return renderTable(node, key, maxWidth)
+			return renderTable(node, key, ctx.maxWidth)
 
 		case 'tableRow':
 			return renderTableRow(node, key, { colWidths: [] })
@@ -79,10 +105,8 @@ function renderNode(node: IRNode, key: string, maxWidth?: number): ReactNode {
 	}
 }
 
-// renders children with block-context awareness:
-// groups consecutive inline nodes into <text> wrappers,
-// renders block nodes directly.
-export function renderChildren(children: IRNode[], parentKey: string, maxWidth?: number): ReactNode[] {
+// internal renderChildren that threads RenderContext
+function renderChildrenInternal(children: IRNode[], parentKey: string, ctx: RenderContext): ReactNode[] {
 	const results: ReactNode[] = []
 	let inlineGroup: { node: IRNode; index: number }[] = []
 	let wrapCount = 0
@@ -105,7 +129,7 @@ export function renderChildren(children: IRNode[], parentKey: string, maxWidth?:
 		const child = children[i]!
 		if (isBlockNode(child)) {
 			flushInline()
-			const result = renderNode(child, `${parentKey}-${String(i)}`, maxWidth)
+			const result = renderNode(child, `${parentKey}-${String(i)}`, ctx)
 			if (result != null) results.push(result)
 		} else {
 			inlineGroup.push({ node: child, index: i })
@@ -116,7 +140,22 @@ export function renderChildren(children: IRNode[], parentKey: string, maxWidth?:
 	return results
 }
 
-// public API: renders an IR tree to a React node tree
+// renders children with block-context awareness:
+// groups consecutive inline nodes into <text> wrappers,
+// renders block nodes directly.
+export function renderChildren(children: IRNode[], parentKey: string, maxWidth?: number): ReactNode[] {
+	return renderChildrenInternal(children, parentKey, { maxWidth, media: [] })
+}
+
+// public API: renders an IR tree to a React node tree (legacy, no media collection)
 export function renderToOpenTUI(ir: IRNode, maxWidth?: number): ReactNode {
-	return renderNode(ir, 'root', maxWidth)
+	const ctx: RenderContext = { maxWidth, media: [] }
+	return renderNode(ir, 'root', ctx)
+}
+
+// public API: renders an IR tree and collects media nodes
+export function renderToOpenTUIWithMedia(ir: IRNode, maxWidth?: number): RenderResult {
+	const ctx: RenderContext = { maxWidth, media: [] }
+	const jsx = renderNode(ir, 'root', ctx)
+	return { jsx, mediaNodes: ctx.media }
 }
