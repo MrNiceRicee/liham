@@ -77,7 +77,12 @@ export async function decodeImage(
 
 // pad RGBA buffer to even height for halfblock rendering
 function padToEvenHeight(data: Uint8Array, width: number, height: number): { rgba: Uint8Array; height: number } {
-	if (height % 2 === 0) return { rgba: new Uint8Array(data.buffer, data.byteOffset, data.byteLength), height }
+	if (height % 2 === 0) {
+		// copy — sharp's Buffer pool can recycle the underlying memory
+		const copy = new Uint8Array(data.byteLength)
+		copy.set(data)
+		return { rgba: copy, height }
+	}
 	const paddedHeight = height + 1
 	const padded = new Uint8Array(width * paddedHeight * 4)
 	padded.set(data)
@@ -139,7 +144,7 @@ async function decodeSingleFrame(
 		.toBuffer({ resolveWithObject: true })
 
 	const { width } = info
-	const padded = purpose === 'halfblock' ? padToEvenHeight(data, width, info.height) : { rgba: new Uint8Array(data.buffer, data.byteOffset, data.byteLength), height: info.height as number }
+	const padded = purpose === 'halfblock' ? padToEvenHeight(data, width, info.height) : { rgba: Uint8Array.from(data), height: info.height as number }
 
 	const terminalCols = purpose === 'halfblock' ? width : Math.ceil(width / cellPixelWidth)
 	const terminalRows = purpose === 'halfblock' ? padded.height / 2 : Math.ceil(padded.height / cellPixelHeight)
@@ -182,7 +187,7 @@ async function decodeAnimated(
 
 		const padded = purpose === 'halfblock'
 			? padToEvenHeight(data, info.width, info.height)
-			: { rgba: new Uint8Array(data.buffer, data.byteOffset, data.byteLength), height: info.height as number }
+			: { rgba: Uint8Array.from(data), height: info.height as number }
 
 		totalDecoded += padded.rgba.byteLength
 		if (totalDecoded > MAX_GIF_DECODED_BYTES) break
