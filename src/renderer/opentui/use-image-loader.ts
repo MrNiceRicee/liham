@@ -1,6 +1,9 @@
 // extracted image loading hook — state machine, cache, inflight coalescing, decode orchestration.
+// viewport-aware lazy loading: images only load when near the visible scroll region.
 
-import { useEffect, useRef, useState } from 'react'
+import type { BoxRenderable, ScrollBoxRenderable } from '@opentui/core'
+
+import { useEffect, useRef, useState, type RefObject } from 'react'
 
 import type { ImageResult, LoadedFile, LoadedImage, RemoteFile } from '../../image/types.ts'
 import type { ImageContextValue } from './image-context.tsx'
@@ -9,6 +12,7 @@ import { createImageCache, localCacheKey, remoteCacheKey, type ImageCache } from
 import { decodeImage } from '../../image/decoder.ts'
 import { fetchRemoteImage } from '../../image/fetcher.ts'
 import { loadImageFile } from '../../image/loader.ts'
+import { createSemaphore, type Semaphore } from '../../image/semaphore.ts'
 
 export type ImageState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -19,6 +23,9 @@ const inflightFetches = new Map<string, Promise<ImageResult<RemoteFile>>>()
 // 50MB per-document LRU cache
 const IMAGE_BUDGET = 50 * 1024 * 1024
 let imageCache: ImageCache = createImageCache(IMAGE_BUDGET)
+
+// max 3 concurrent remote fetches to prevent thundering herd
+const fetchSemaphore: Semaphore = createSemaphore(3)
 
 export function clearImageCache(): void {
 	imageCache.clear()
@@ -42,9 +49,72 @@ function cacheKeyForFile(file: LoadedFile, targetCols: number): string {
 	return remoteCacheKey(file.url, targetCols)
 }
 
-// route: remote fetch (coalesced) vs local file load
+// check if an element is near the scrollbox viewport (within 1 viewport height buffer)
+function isNearViewport(
+	box: BoxRenderable | null,
+	scrollbox: ScrollBoxRenderable | null,
+): boolean {
+	if (box == null || scrollbox == null) return false
+
+	const vp = scrollbox.viewport
+	if (vp.height <= 0) return false
+
+	const vpTop = vp.y
+	const vpBottom = vpTop + vp.height
+	const buffer = vp.height // 1 viewport height lookahead
+
+	const imgY = box.y
+	const imgH = box.height || 1
+
+	return (imgY + imgH >= vpTop - buffer) && (imgY <= vpBottom + buffer)
+}
+
+// polls element position vs viewport until the element enters the visible zone
+export function useViewportVisibility(
+	boxRef: RefObject<BoxRenderable | null>,
+	scrollRef: RefObject<ScrollBoxRenderable | null> | undefined,
+): boolean {
+	const [visible, setVisible] = useState(false)
+
+	useEffect(() => {
+		if (visible) return
+		if (scrollRef == null) {
+			// no scrollbox → always visible (browser preview, standalone)
+			setVisible(true)
+			return
+		}
+
+		const check = () => isNearViewport(boxRef.current, scrollRef.current)
+
+		// check after a short delay to let yoga layout settle
+		const initialTimer = setTimeout(() => {
+			if (check()) {
+				setVisible(true)
+				return
+			}
+			// poll every 150ms while not yet visible
+			const interval = setInterval(() => {
+				if (check()) {
+					setVisible(true)
+					clearInterval(interval)
+				}
+			}, 150)
+			cleanupRef.current = () => { clearInterval(interval) }
+		}, 50)
+
+		const cleanupRef = { current: () => {} }
+		return () => {
+			clearTimeout(initialTimer)
+			cleanupRef.current()
+		}
+	}, [visible, scrollRef])
+
+	return visible
+}
+
+// route: remote fetch (coalesced + semaphore) vs local file load
 async function loadFile(url: string, basePath: string, signal: AbortSignal): Promise<ImageResult<LoadedFile>> {
-	if (isRemoteUrl(url)) return coalescedFetch(url, signal)
+	if (isRemoteUrl(url)) return throttledFetch(url, signal)
 	return loadImageFile(url, basePath)
 }
 
@@ -87,6 +157,7 @@ function coalescedDecode(
 export function useImageLoader(
 	url: string | undefined,
 	ctx: ImageContextValue | null,
+	isVisible: boolean,
 ): ImageLoaderResult {
 	const [state, setState] = useState<ImageState>('idle')
 	const [image, setImage] = useState<LoadedImage | null>(null)
@@ -96,6 +167,7 @@ export function useImageLoader(
 	useEffect(() => {
 		if (ctx == null || url == null) return
 		if (ctx.capabilities.protocol === 'text') return
+		if (!isVisible) return
 
 		const thisLoadId = ++loadIdRef.current
 		const isStale = () => loadIdRef.current !== thisLoadId
@@ -127,9 +199,19 @@ export function useImageLoader(
 		})()
 
 		return () => { controller.abort() }
-	}, [url, ctx?.basePath, ctx?.capabilities.protocol, ctx?.maxCols])
+	}, [url, ctx?.basePath, ctx?.capabilities.protocol, ctx?.maxCols, isVisible])
 
 	return { state, image, errorMsg }
+}
+
+// acquire semaphore slot, then coalesce the actual fetch
+async function throttledFetch(url: string, signal: AbortSignal): Promise<ImageResult<RemoteFile>> {
+	await fetchSemaphore.acquire(signal)
+	try {
+		return await coalescedFetch(url, signal)
+	} finally {
+		fetchSemaphore.release()
+	}
 }
 
 // coalesce duplicate remote URLs into a single fetch

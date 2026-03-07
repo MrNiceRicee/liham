@@ -1,7 +1,7 @@
 // image renderer component — Kitty virtual placements, half-block fallback, text fallback.
 // thin rendering shell — loading logic lives in use-image-loader.ts.
 
-import { resolveRenderLib } from '@opentui/core'
+import { resolveRenderLib, type BoxRenderable } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
 import { writeSync } from 'node:fs'
 import { memo, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
@@ -12,7 +12,7 @@ import type { ImageNode } from '../../ir/types.ts'
 import { renderHalfBlockMerged, type MergedSpan } from '../../image/halfblock.ts'
 import { buildCleanupCommand, buildTransmitChunks, buildVirtualPlacement, generateImageId } from '../../image/kitty.ts'
 import { ImageContext } from './image-context.tsx'
-import { useImageLoader } from './use-image-loader.ts'
+import { useImageLoader, useViewportVisibility } from './use-image-loader.ts'
 
 // re-export for consumers that import from here
 export { clearImageCache } from './use-image-loader.ts'
@@ -78,7 +78,9 @@ function KittyPlaceholder({ rows, cols }: { readonly rows: number; readonly cols
 function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly nodeKey: string }): ReactNode {
 	const ctx = useContext(ImageContext)
 	const renderer = useRenderer()
-	const { state, image, errorMsg } = useImageLoader(node.url, ctx)
+	const boxRef = useRef<BoxRenderable | null>(null)
+	const isVisible = useViewportVisibility(boxRef, ctx?.scrollRef)
+	const { state, image, errorMsg } = useImageLoader(node.url, ctx, isVisible)
 	const kittyIdRef = useRef<number | null>(null)
 
 	// pre-rendered half-block frames for animation
@@ -133,25 +135,34 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	const fgProps: Record<string, unknown> = {}
 	if (node.style.fg != null) fgProps['fg'] = node.style.fg
 
-	if (state === 'loading') {
+	// wrap all states in a ref'd box for viewport position tracking
+	if (state === 'idle' || state === 'loading') {
 		return (
-			<text key={nodeKey}>
-				<span {...fgProps}>{`[loading: ${node.alt}]`}</span>
-			</text>
+			<box ref={boxRef} key={nodeKey}>
+				<text>
+					<span {...fgProps}>{`[loading: ${node.alt}]`}</span>
+				</text>
+			</box>
 		)
 	}
 
 	if (state === 'error') {
 		const suffix = errorMsg.length > 0 ? ` (${errorMsg})` : ''
 		return (
-			<text key={nodeKey}>
-				<span {...fgProps}>{`[image: ${node.alt}${suffix}]`}</span>
-			</text>
+			<box ref={boxRef} key={nodeKey}>
+				<text>
+					<span {...fgProps}>{`[image: ${node.alt}${suffix}]`}</span>
+				</text>
+			</box>
 		)
 	}
 
 	if (state === 'loaded' && image != null) {
-		return renderLoadedImage(image, node, nodeKey, ctx, frameIndex, renderedFramesRef.current)
+		return (
+			<box ref={boxRef} key={nodeKey}>
+				{renderLoadedImage(image, node, nodeKey, ctx, frameIndex, renderedFramesRef.current)}
+			</box>
+		)
 	}
 
 	return renderTextFallback(node, nodeKey)
