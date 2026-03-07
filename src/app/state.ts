@@ -22,6 +22,10 @@ export interface BrowserState {
 	scanVersion: number
 }
 
+export type MediaModalState =
+	| { kind: 'closed' }
+	| { kind: 'image'; mediaIndex: number }
+
 export interface AppState {
 	mode: AppMode
 	layout: LayoutMode
@@ -34,6 +38,8 @@ export interface AppState {
 	currentFile?: string
 	fromBrowser: boolean
 	fileDeleted: boolean
+	mediaFocusIndex: number | null
+	mediaModal: MediaModalState
 }
 
 // -- actions --
@@ -68,6 +74,12 @@ export type AppAction =
 	| { type: 'ReturnToBrowser' }
 	// watcher actions
 	| { type: 'FileDeleted' }
+	// media actions
+	| { type: 'FocusNextMedia'; mediaCount: number }
+	| { type: 'FocusPrevMedia'; mediaCount: number }
+	| { type: 'FocusMedia'; index: number }
+	| { type: 'OpenMediaModal' }
+	| { type: 'CloseMediaModal' }
 
 // -- layout helpers --
 
@@ -139,7 +151,14 @@ function rescanCursor(browser: BrowserState, newFiles: FileEntry[]): number {
 
 function returnToBrowser(state: AppState): AppState {
 	if (!state.fromBrowser) return state
-	return { ...omitCurrentFile(state), mode: 'browser', focus: 'preview', fileDeleted: false }
+	return {
+		...omitCurrentFile(state),
+		mode: 'browser',
+		focus: 'preview',
+		fileDeleted: false,
+		mediaFocusIndex: null,
+		mediaModal: { kind: 'closed' },
+	}
 }
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -235,6 +254,38 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
 		case 'FileDeleted':
 			return { ...state, fileDeleted: true }
+
+		// -- media actions --
+
+		case 'FocusNextMedia': {
+			if (action.mediaCount === 0) return state
+			const next = ((state.mediaFocusIndex ?? -1) + 1) % action.mediaCount
+			return { ...state, mediaFocusIndex: next }
+		}
+
+		case 'FocusPrevMedia': {
+			if (action.mediaCount === 0) return state
+			const prev = ((state.mediaFocusIndex ?? 0) - 1 + action.mediaCount) % action.mediaCount
+			return { ...state, mediaFocusIndex: prev }
+		}
+
+		case 'FocusMedia':
+			return { ...state, mediaFocusIndex: action.index }
+
+		case 'OpenMediaModal': {
+			if (state.mediaFocusIndex == null) return state
+			return { ...state, mediaModal: { kind: 'image', mediaIndex: state.mediaFocusIndex } }
+		}
+
+		case 'CloseMediaModal': {
+			if (state.mediaModal.kind !== 'closed') {
+				return { ...state, mediaModal: { kind: 'closed' } }
+			}
+			if (state.mediaFocusIndex != null) {
+				return { ...state, mediaFocusIndex: null }
+			}
+			return state
+		}
 	}
 }
 
@@ -266,6 +317,8 @@ export function initialState(
 		browser: initialBrowserState(),
 		fromBrowser: false,
 		fileDeleted: false,
+		mediaFocusIndex: null,
+		mediaModal: { kind: 'closed' },
 	}
 }
 
@@ -384,7 +437,29 @@ export function legendEntries(state: AppState): LegendEntry[] {
 		]
 	}
 
-	// viewer mode
+	// viewer mode — modal open legend
+	if (state.mediaModal.kind !== 'closed') {
+		if (state.legendPage === 'off') return [{ key: '?', label: 'help' }]
+		return [
+			{ key: '?', label: 'more' },
+			{ key: 'n/N', label: 'next/prev' },
+			{ key: 'space', label: 'play/pause' },
+			{ key: 'esc', label: 'close' },
+		]
+	}
+
+	// viewer mode — media focused legend
+	if (state.mediaFocusIndex != null) {
+		if (state.legendPage === 'off') return [{ key: '?', label: 'help' }]
+		return [
+			{ key: '?', label: 'more' },
+			{ key: 'n/N', label: 'next/prev media' },
+			{ key: 'enter', label: 'view' },
+			{ key: 'esc', label: 'unfocus' },
+		]
+	}
+
+	// viewer mode — normal
 	if (state.legendPage === 'off') {
 		return [{ key: '?', label: 'help' }]
 	}
