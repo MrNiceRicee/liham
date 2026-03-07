@@ -21,6 +21,22 @@ export interface HalfBlockCell {
 
 export type HalfBlockGrid = HalfBlockCell[][]
 
+// loaded file — discriminated union for local vs remote sources
+export interface LocalFile {
+	kind: 'local'
+	bytes: Uint8Array
+	absolutePath: string
+	mtime: number
+}
+
+export interface RemoteFile {
+	kind: 'remote'
+	bytes: Uint8Array
+	url: string
+}
+
+export type LoadedFile = LocalFile | RemoteFile
+
 // kitty-virtual = Kitty/Ghostty with U+10EEEE support
 // halfblock = 24-bit color terminals without virtual placements (WezTerm, etc.)
 // text = minimal terminals, fallback

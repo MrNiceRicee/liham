@@ -2,17 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import type { LoadedImage } from '../../image/types.ts'
+import type { ImageResult, LoadedFile, LoadedImage, RemoteFile } from '../../image/types.ts'
 import type { ImageContextValue } from './image-context.tsx'
 
-import { createImageCache, imageCacheKey, type ImageCache } from '../../image/cache.ts'
+import { createImageCache, localCacheKey, remoteCacheKey, type ImageCache } from '../../image/cache.ts'
 import { decodeImage } from '../../image/decoder.ts'
+import { fetchRemoteImage } from '../../image/fetcher.ts'
 import { loadImageFile } from '../../image/loader.ts'
 
 export type ImageState = 'idle' | 'loading' | 'loaded' | 'error'
 
-// inflight promise map for request coalescing
+// inflight promise maps for request coalescing
 const inflightDecodes = new Map<string, Promise<LoadedImage | null>>()
+const inflightFetches = new Map<string, Promise<ImageResult<RemoteFile>>>()
 
 // 50MB per-document LRU cache
 const IMAGE_BUDGET = 50 * 1024 * 1024
@@ -22,12 +24,64 @@ export function clearImageCache(): void {
 	imageCache.clear()
 	imageCache = createImageCache(IMAGE_BUDGET)
 	inflightDecodes.clear()
+	inflightFetches.clear()
 }
 
 export interface ImageLoaderResult {
 	state: ImageState
 	image: LoadedImage | null
 	errorMsg: string
+}
+
+function isRemoteUrl(url: string): boolean {
+	return url.startsWith('http://') || url.startsWith('https://')
+}
+
+function cacheKeyForFile(file: LoadedFile, targetCols: number): string {
+	if (file.kind === 'local') return localCacheKey(file.absolutePath, file.mtime, targetCols)
+	return remoteCacheKey(file.url, targetCols)
+}
+
+// route: remote fetch (coalesced) vs local file load
+async function loadFile(url: string, basePath: string, signal: AbortSignal): Promise<ImageResult<LoadedFile>> {
+	if (isRemoteUrl(url)) return coalescedFetch(url, signal)
+	return loadImageFile(url, basePath)
+}
+
+// decode with cache lookup and inflight coalescing
+function coalescedDecode(
+	file: LoadedFile,
+	targetCols: number,
+	ctx: ImageContextValue,
+	url: string,
+): Promise<LoadedImage | null> {
+	const cacheKey = cacheKeyForFile(file, targetCols)
+
+	const cached = imageCache.get(cacheKey)
+	if (cached != null) return Promise.resolve(cached)
+
+	let decodePromise = inflightDecodes.get(cacheKey)
+	if (decodePromise == null) {
+		const purpose = ctx.capabilities.protocol === 'kitty-virtual' ? 'kitty' : 'halfblock'
+		decodePromise = decodeImage(
+			file.bytes,
+			targetCols,
+			ctx.capabilities.cellPixelWidth,
+			ctx.capabilities.cellPixelHeight,
+			purpose,
+			url,
+		).then((r) => {
+			inflightDecodes.delete(cacheKey)
+			if (r.ok) {
+				imageCache.set(cacheKey, r.value)
+				return r.value
+			}
+			return null
+		})
+		inflightDecodes.set(cacheKey, decodePromise)
+	}
+
+	return decodePromise
 }
 
 export function useImageLoader(
@@ -40,61 +94,27 @@ export function useImageLoader(
 	const loadIdRef = useRef(0)
 
 	useEffect(() => {
-		// skip loading when no context, no URL, or text-only protocol
 		if (ctx == null || url == null) return
 		if (ctx.capabilities.protocol === 'text') return
 
 		const thisLoadId = ++loadIdRef.current
 		const isStale = () => loadIdRef.current !== thisLoadId
+		const controller = new AbortController()
 
 		setState('loading')
 		setImage(null)
 		setErrorMsg('')
 
 		void (async () => {
-			const loadResult = await loadImageFile(url, ctx.basePath)
+			const fileResult = await loadFile(url, ctx.basePath, controller.signal)
 			if (isStale()) return
-			if (!loadResult.ok) {
+			if (!fileResult.ok) {
 				setState('error')
-				setErrorMsg(loadResult.error === 'file not found' ? 'not found' : loadResult.error)
+				setErrorMsg(fileResult.error === 'file not found' ? 'not found' : fileResult.error)
 				return
 			}
 
-			const { bytes, absolutePath, mtime } = loadResult.value
-			const purpose = ctx.capabilities.protocol === 'kitty-virtual' ? 'kitty' : 'halfblock'
-			const targetCols = ctx.maxCols
-			const cacheKey = imageCacheKey(absolutePath, mtime, targetCols)
-
-			// check LRU cache first
-			const cached = imageCache.get(cacheKey)
-			if (cached != null) {
-				setImage(cached)
-				setState('loaded')
-				return
-			}
-
-			// check inflight map for request coalescing
-			let decodePromise = inflightDecodes.get(cacheKey)
-			if (decodePromise == null) {
-				decodePromise = decodeImage(
-					bytes,
-					targetCols,
-					ctx.capabilities.cellPixelWidth,
-					ctx.capabilities.cellPixelHeight,
-					purpose,
-					url,
-				).then((r) => {
-					inflightDecodes.delete(cacheKey)
-					if (r.ok) {
-						imageCache.set(cacheKey, r.value)
-						return r.value
-					}
-					return null
-				})
-				inflightDecodes.set(cacheKey, decodePromise)
-			}
-
-			const decoded = await decodePromise
+			const decoded = await coalescedDecode(fileResult.value, ctx.maxCols, ctx, url)
 			if (isStale()) return
 
 			if (decoded == null) {
@@ -105,7 +125,21 @@ export function useImageLoader(
 			setImage(decoded)
 			setState('loaded')
 		})()
+
+		return () => { controller.abort() }
 	}, [url, ctx?.basePath, ctx?.capabilities.protocol, ctx?.maxCols])
 
 	return { state, image, errorMsg }
+}
+
+// coalesce duplicate remote URLs into a single fetch
+function coalescedFetch(url: string, signal: AbortSignal): Promise<ImageResult<RemoteFile>> {
+	let inflight = inflightFetches.get(url)
+	if (inflight != null) return inflight
+
+	inflight = fetchRemoteImage(url, signal).finally(() => {
+		inflightFetches.delete(url)
+	})
+	inflightFetches.set(url, inflight)
+	return inflight
 }

@@ -66,7 +66,11 @@ export function createImageCache(
 	}
 }
 
-// cache key includes path, mtime, and target width
-export function imageCacheKey(absolutePath: string, mtime: number, targetWidth: number): string {
-	return `${absolutePath}:${String(mtime)}:${String(targetWidth)}`
+// cache key includes source identity and target width
+export function localCacheKey(absolutePath: string, mtime: number, targetWidth: number): string {
+	return `local:${absolutePath}:${String(mtime)}:${String(targetWidth)}`
+}
+
+export function remoteCacheKey(url: string, targetWidth: number): string {
+	return `remote:${url}:${String(targetWidth)}`
 }

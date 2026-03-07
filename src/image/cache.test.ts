@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { LoadedImage } from './types.ts'
 
-import { createImageCache, imageCacheKey } from './cache.ts'
+import { createImageCache, localCacheKey, remoteCacheKey } from './cache.ts'
 
 function makeImage(source: string, byteSize: number): LoadedImage {
 	return {
@@ -88,10 +88,22 @@ describe('createImageCache', () => {
 		expect(cache.totalBytes()).toBe(100)
 	})
 
-	test('different widths produce different keys', () => {
-		const key1 = imageCacheKey('/img.png', 1000, 80)
-		const key2 = imageCacheKey('/img.png', 1000, 120)
+	test('different widths produce different local keys', () => {
+		const key1 = localCacheKey('/img.png', 1000, 80)
+		const key2 = localCacheKey('/img.png', 1000, 120)
 		expect(key1).not.toBe(key2)
+	})
+
+	test('remote cache key includes url and width', () => {
+		const key1 = remoteCacheKey('https://example.com/img.png', 80)
+		const key2 = remoteCacheKey('https://example.com/img.png', 120)
+		expect(key1).not.toBe(key2)
+	})
+
+	test('local and remote keys never collide', () => {
+		const local = localCacheKey('https://example.com/img.png', 0, 80)
+		const remote = remoteCacheKey('https://example.com/img.png', 80)
+		expect(local).not.toBe(remote)
 	})
 
 	test('clear calls onEvict for each entry', () => {
