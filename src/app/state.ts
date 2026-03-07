@@ -19,6 +19,7 @@ export interface BrowserState {
 	scrollPosition: number
 	scanStatus: ScanStatus
 	scanError?: string
+	scanVersion: number
 }
 
 export interface AppState {
@@ -191,6 +192,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 					files: action.files,
 					scanStatus: 'complete',
 					cursorIndex: rescanCursor(state.browser, action.files),
+					scanVersion: state.browser.scanVersion + 1,
 				},
 			}
 
@@ -245,6 +247,7 @@ function initialBrowserState(): BrowserState {
 		cursorIndex: 0,
 		scrollPosition: 0,
 		scanStatus: 'scanning',
+		scanVersion: 0,
 	}
 }
 
