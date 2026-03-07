@@ -4,7 +4,7 @@
 import { resolveRenderLib } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
 import { writeSync } from 'node:fs'
-import { memo, useContext, useEffect, useRef, type ReactNode } from 'react'
+import { memo, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import type { LoadedImage } from '../../image/types.ts'
 import type { ImageNode } from '../../ir/types.ts'
@@ -74,10 +74,43 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	const { state, image, errorMsg } = useImageLoader(node.url, ctx)
 	const kittyIdRef = useRef<number | null>(null)
 
+	// pre-rendered half-block frames for animation
+	const renderedFramesRef = useRef<MergedSpan[][][] | null>(null)
+	const [frameIndex, setFrameIndex] = useState(0)
+	const frameStartRef = useRef(performance.now())
+
+	// pre-render all frames when animated image loads
+	useEffect(() => {
+		if (ctx == null || image?.frames == null) {
+			renderedFramesRef.current = null
+			return
+		}
+		renderedFramesRef.current = image.frames.map(rgba => {
+			const frameImg: LoadedImage = { ...image, rgba }
+			return renderHalfBlockMerged(frameImg, ctx.bgColor)
+		})
+		setFrameIndex(0)
+	}, [image, ctx?.bgColor])
+
+	// frame cycling timer
+	useEffect(() => {
+		if (image?.frames == null || image.delays == null) return
+		const delay = image.delays[frameIndex] ?? 100
+		const elapsed = performance.now() - frameStartRef.current
+		const adjusted = Math.max(0, delay - elapsed)
+
+		const timer = setTimeout(() => {
+			frameStartRef.current = performance.now()
+			setFrameIndex(i => (i + 1) % image.frames!.length)
+		}, adjusted)
+		return () => { clearTimeout(timer) }
+	}, [image, frameIndex])
+
 	// kitty transmit + cleanup lifecycle
 	useEffect(() => {
 		if (ctx == null || image == null) return
 		if (ctx.capabilities.protocol !== 'kitty-virtual') return
+		if (image.frames != null) return // animated → halfblock only
 		if (renderer == null) return
 
 		transmitKittyImage(image, renderer)
@@ -111,6 +144,14 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	}
 
 	if (state === 'loaded' && image != null) {
+		// animated GIFs always use halfblock
+		if (image.frames != null) {
+			const safeIndex = Math.min(frameIndex, image.frames.length - 1)
+			const rows = renderedFramesRef.current?.[safeIndex]
+				?? renderHalfBlockMerged(image, ctx.bgColor)
+			return <HalfBlockRows key={nodeKey} rows={rows} width={image.terminalCols} />
+		}
+
 		if (ctx.capabilities.protocol === 'kitty-virtual') {
 			return <KittyPlaceholder key={nodeKey} rows={image.terminalRows} cols={image.terminalCols} />
 		}

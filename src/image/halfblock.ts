@@ -11,9 +11,11 @@ function parseHex(hex: string): [number, number, number] {
 	return [r, g, b]
 }
 
-// format RGB as #rrggbb
+// pre-computed hex lookup table — eliminates 7 string allocations per call
+const HEX = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'))
+
 function toHex(r: number, g: number, b: number): string {
-	return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+	return `#${HEX[r]}${HEX[g]}${HEX[b]}`
 }
 
 // alpha blend a single pixel against background (integer arithmetic)
