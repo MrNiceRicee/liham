@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 
-import type { CoreIRNode, IRNode } from '../ir/types.ts'
+import type { CoreIRNode, ImageNode, IRNode, RootNode } from '../ir/types.ts'
 import type { PipelineSuccess } from '../types/pipeline.ts'
 
 import { isBlockNode } from '../ir/types.ts'
@@ -397,6 +397,34 @@ describe('IR compiler — URL sanitization', () => {
 		const link = links[0]!
 		if (link.type !== 'link') throw new Error('expected link')
 		expect(link.url).not.toContain('\x07')
+	})
+
+	it('compiles image link to ImageNode with href', async () => {
+		const ir = await compileToIR('[![alt text](./img.png)](https://example.com)')
+		const images = findNodes(ir, 'image')
+		expect(images.length).toBe(1)
+		const img = images[0] as N & ImageNode
+		expect(img.alt).toBe('alt text')
+		expect(img.url).toBe('./img.png')
+		expect(img.href).toBe('https://example.com')
+	})
+
+	it('image link is promoted out of paragraph', async () => {
+		const ir = await compileToIR('[![alt](./img.png)](https://example.com)')
+		if (ir.type !== 'root') throw new Error('expected root')
+		const root = ir as N & RootNode
+		const imgChild = root.children.find(c => c.type === 'image')
+		expect(imgChild).toBeDefined()
+	})
+
+	it('mixed-content link is not image link', async () => {
+		const ir = await compileToIR('[text ![img](./img.png)](https://example.com)')
+		const links = findNodes(ir, 'link')
+		expect(links.length).toBe(1)
+		const images = findNodes(ir, 'image')
+		expect(images.length).toBe(1)
+		const img = images[0] as N & ImageNode
+		expect(img.href).toBeUndefined()
 	})
 })
 

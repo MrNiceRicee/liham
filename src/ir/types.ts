@@ -146,6 +146,7 @@ export interface ImageNode {
 	type: 'image'
 	alt: string
 	url?: string
+	href?: string
 	style: InlineStyle
 }
 

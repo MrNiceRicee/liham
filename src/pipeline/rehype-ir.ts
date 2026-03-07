@@ -460,9 +460,20 @@ function compileCode(state: CompilerState, node: Element): IRNode | undefined {
 
 function compileAnchor(state: CompilerState, node: Element): IRNode {
 	const href = typeof node.properties?.['href'] === 'string' ? node.properties['href'] : ''
+	const sanitizedHref = sanitizeUrl(href)
+
+	// image link: [![alt](img.png)](href) → ImageNode with href
+	const elements = node.children.filter((c): c is Element => c.type === 'element')
+	if (elements.length === 1 && elements[0]!.tagName === 'img' && node.children.length === 1) {
+		const imgNode = compileInline(state, elements[0]!)
+		if (imgNode?.type === 'image') {
+			return { ...imgNode, ...(sanitizedHref.length > 0 ? { href: sanitizedHref } : {}) }
+		}
+	}
+
 	return {
 		type: 'link',
-		url: sanitizeUrl(href),
+		url: sanitizedHref,
 		style: { fg: state.theme.link.color, underline: state.theme.link.underline },
 		children: withAncestors(state, node),
 	}

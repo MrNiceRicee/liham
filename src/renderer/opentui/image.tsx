@@ -37,28 +37,35 @@ function registerExitHandler(): void {
 interface HalfBlockRowsProps {
 	readonly rows: MergedSpan[][]
 	readonly width: number
+	readonly href?: string
 }
 
-const HalfBlockRows = memo(function HalfBlockRows({ rows, width }: HalfBlockRowsProps) {
+function renderSpans(spans: MergedSpan[], rowIdx: number): ReactNode[] {
+	return spans.map((s, sIdx) => {
+		const props: Record<string, unknown> = {}
+		if (s.bg.length > 0) props['bg'] = s.bg
+		if (s.fg.length > 0) props['fg'] = s.fg
+		return (
+			<span key={`s-${String(rowIdx)}-${String(sIdx)}`} {...props}>
+				{s.text}
+			</span>
+		)
+	})
+}
+
+const HalfBlockRows = memo(function HalfBlockRows({ rows, width, href }: HalfBlockRowsProps) {
 	return (
 		<box style={{ height: rows.length, width }}>
 			{rows.map((spans, rowIdx) => (
 				<text key={`hb-${String(rowIdx)}`}>
-					{spans.map((s, sIdx) => {
-						const props: Record<string, unknown> = {}
-						if (s.bg.length > 0) props['bg'] = s.bg
-						if (s.fg.length > 0) props['fg'] = s.fg
-						return (
-							<span key={`s-${String(rowIdx)}-${String(sIdx)}`} {...props}>
-								{s.text}
-							</span>
-						)
-					})}
+					{href != null
+						? <a href={href}>{renderSpans(spans, rowIdx)}</a>
+						: renderSpans(spans, rowIdx)}
 				</text>
 			))}
 		</box>
 	)
-}, (prev, next) => prev.rows === next.rows)
+}, (prev, next) => prev.rows === next.rows && prev.href === next.href)
 
 // -- kitty text fallback for placeholder rendering --
 
@@ -144,22 +151,7 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	}
 
 	if (state === 'loaded' && image != null) {
-		// animated GIFs always use halfblock
-		if (image.frames != null) {
-			const safeIndex = Math.min(frameIndex, image.frames.length - 1)
-			const rows = renderedFramesRef.current?.[safeIndex]
-				?? renderHalfBlockMerged(image, ctx.bgColor)
-			return <HalfBlockRows key={nodeKey} rows={rows} width={image.terminalCols} />
-		}
-
-		if (ctx.capabilities.protocol === 'kitty-virtual') {
-			return <KittyPlaceholder key={nodeKey} rows={image.terminalRows} cols={image.terminalCols} />
-		}
-
-		if (ctx.capabilities.protocol === 'halfblock') {
-			const rows = renderHalfBlockMerged(image, ctx.bgColor)
-			return <HalfBlockRows key={nodeKey} rows={rows} width={image.terminalCols} />
-		}
+		return renderLoadedImage(image, node, nodeKey, ctx, frameIndex, renderedFramesRef.current)
 	}
 
 	return renderTextFallback(node, nodeKey)
@@ -212,12 +204,45 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	}
 }
 
+function renderLoadedImage(
+	image: LoadedImage,
+	node: ImageNode,
+	key: string,
+	ctx: NonNullable<ReturnType<typeof useContext<typeof ImageContext>>>,
+	frameIndex: number,
+	preRenderedFrames: MergedSpan[][][] | null,
+): ReactNode {
+	// degrade to halfblock for animated GIFs and linked images
+	let protocol = ctx.capabilities.protocol
+	if (image.frames != null) protocol = 'halfblock'
+	if (node.href != null && protocol === 'kitty-virtual') protocol = 'halfblock'
+
+	if (protocol === 'halfblock') {
+		if (image.frames != null) {
+			const safeIndex = Math.min(frameIndex, image.frames.length - 1)
+			const rows = preRenderedFrames?.[safeIndex] ?? renderHalfBlockMerged(image, ctx.bgColor)
+			return <HalfBlockRows key={key} rows={rows} width={image.terminalCols} href={node.href} />
+		}
+		const rows = renderHalfBlockMerged(image, ctx.bgColor)
+		return <HalfBlockRows key={key} rows={rows} width={image.terminalCols} href={node.href} />
+	}
+
+	if (protocol === 'kitty-virtual') {
+		return <KittyPlaceholder key={key} rows={image.terminalRows} cols={image.terminalCols} />
+	}
+
+	return renderTextFallback(node, key)
+}
+
 function renderTextFallback(node: ImageNode, key: string): ReactNode {
 	const props: Record<string, unknown> = {}
 	if (node.style.fg != null) props['fg'] = node.style.fg
+	const label = `[image: ${node.alt}]`
 	return (
 		<text key={key}>
-			<span {...props}>{`[image: ${node.alt}]`}</span>
+			{node.href != null
+				? <a href={node.href}><span {...props}>{label}</span></a>
+				: <span {...props}>{label}</span>}
 		</text>
 	)
 }
