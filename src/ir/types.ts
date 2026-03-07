@@ -219,6 +219,9 @@ export type CoreIRNode =
 // full union including custom extension nodes
 export type IRNode = CoreIRNode | CustomNode<string>
 
+// media-specific union for components that handle image/video/audio uniformly
+export type MediaIRNode = ImageNode | VideoNode | AudioNode
+
 // image uses InlineStyle but renders as a block — the component ignores most
 // style props and uses theme tokens + ImageContext directly.
 const BLOCK_TYPES = new Set([

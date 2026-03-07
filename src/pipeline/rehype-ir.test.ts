@@ -489,6 +489,26 @@ describe('IR compiler — media nodes', () => {
 		const audioChild = root.children.find(c => c.type === 'audio')
 		expect(audioChild).toBeDefined()
 	})
+
+	it('sanitizes video alt text with control characters', async () => {
+		const ir = await compileToIR('![evil\x07video](clip.mp4)')
+		const videos = findNodes(ir, 'video')
+		expect(videos.length).toBe(1)
+		const v = videos[0] as N & VideoNode
+		expect(v.alt).not.toContain('\x07')
+		expect(v.alt).toContain('evil')
+		expect(v.alt).toContain('video')
+	})
+
+	it('sanitizes audio alt text with control characters', async () => {
+		const ir = await compileToIR('![evil\x07audio](track.mp3)')
+		const audios = findNodes(ir, 'audio')
+		expect(audios.length).toBe(1)
+		const a = audios[0] as N & AudioNode
+		expect(a.alt).not.toContain('\x07')
+		expect(a.alt).toContain('evil')
+		expect(a.alt).toContain('audio')
+	})
 })
 
 describe('isBlockNode helper', () => {

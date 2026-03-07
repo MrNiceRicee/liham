@@ -132,4 +132,53 @@ describe('fetchRemoteImage', () => {
 		expect(result.ok).toBe(false)
 		if (!result.ok) expect(result.error).toBe('remote image failed')
 	})
+
+	test('blocks 10.x.x.x (RFC 1918)', async () => {
+		const result = await fetchRemoteImage('http://10.0.0.1/secret')
+		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.error).toBe('remote image blocked')
+	})
+
+	test('blocks 192.168.x.x (RFC 1918)', async () => {
+		const result = await fetchRemoteImage('http://192.168.1.1/secret')
+		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.error).toBe('remote image blocked')
+	})
+
+	test('blocks 172.16-31.x.x (RFC 1918)', async () => {
+		const result = await fetchRemoteImage('http://172.16.0.1/secret')
+		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.error).toBe('remote image blocked')
+
+		const result2 = await fetchRemoteImage('http://172.31.255.1/secret')
+		expect(result2.ok).toBe(false)
+	})
+
+	test('allows 172.32.x.x (outside RFC 1918 range)', async () => {
+		stubFetch(PNG_MAGIC)
+		const result = await fetchRemoteImage('http://172.32.0.1/img.png')
+		expect(result.ok).toBe(true)
+	})
+
+	test('blocks 100.64-127.x.x (CGNAT)', async () => {
+		const result = await fetchRemoteImage('http://100.64.0.1/secret')
+		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.error).toBe('remote image blocked')
+
+		const result2 = await fetchRemoteImage('http://100.127.255.1/secret')
+		expect(result2.ok).toBe(false)
+	})
+
+	test('blocks IPv6 ULA (fc00::/7)', async () => {
+		const result = await fetchRemoteImage('http://[fd12:3456::1]/secret')
+		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.error).toBe('remote image blocked')
+	})
+
+	test('blocks redirect to private IP', async () => {
+		stubFetchRedirect('http://10.0.0.1/secret', PNG_MAGIC)
+		const result = await fetchRemoteImage('https://example.com/redirect')
+		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.error).toBe('remote image blocked')
+	})
 })

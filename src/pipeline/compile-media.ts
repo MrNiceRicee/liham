@@ -26,7 +26,7 @@ export function compileVideo(theme: ThemeTokens, node: Element): VideoNode {
 	const rawSrc = node.properties?.['src']
 	const src = typeof rawSrc === 'string' ? sanitizeImageSrc(rawSrc) : undefined
 	const rawAlt = node.properties?.['alt']
-	const alt = typeof rawAlt === 'string' ? rawAlt : ''
+	const alt = typeof rawAlt === 'string' ? sanitizeForTerminal(rawAlt) : ''
 	const autoplay = node.properties?.['autoPlay'] != null
 	const loop = node.properties?.['loop'] != null
 	const rawPoster = node.properties?.['poster']
@@ -47,7 +47,7 @@ export function compileAudio(theme: ThemeTokens, node: Element): AudioNode {
 	const rawSrc = node.properties?.['src']
 	const src = typeof rawSrc === 'string' ? sanitizeImageSrc(rawSrc) : undefined
 	const rawAlt = node.properties?.['alt']
-	const alt = typeof rawAlt === 'string' ? rawAlt : ''
+	const alt = typeof rawAlt === 'string' ? sanitizeForTerminal(rawAlt) : ''
 	const autoplay = node.properties?.['autoPlay'] != null
 	const loop = node.properties?.['loop'] != null
 

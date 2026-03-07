@@ -8,19 +8,46 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const FETCH_TIMEOUT_MS = 10_000
 const MAX_REDIRECTS = 5
 
+function isPrivateIPv4(ip: string): boolean {
+	if (ip.startsWith('127.') || ip.startsWith('169.254.')) return true
+	if (ip.startsWith('10.')) return true
+	if (ip.startsWith('192.168.')) return true
+	// 172.16.0.0 - 172.31.255.255
+	if (ip.startsWith('172.')) {
+		const second = Number.parseInt(ip.split('.')[1]!, 10)
+		if (second >= 16 && second <= 31) return true
+	}
+	// CGNAT: 100.64.0.0 - 100.127.255.255
+	if (ip.startsWith('100.')) {
+		const second = Number.parseInt(ip.split('.')[1]!, 10)
+		if (second >= 64 && second <= 127) return true
+	}
+	return false
+}
+
 function isBlockedHost(hostname: string): boolean {
 	const bare = hostname.replace(/^\[|\]$/g, '') // strip IPv6 brackets
 	if (bare === 'localhost' || bare === '::1' || bare === '0.0.0.0' || bare === '[::]') return true
-	if (bare.startsWith('127.') || bare.startsWith('169.254.')) return true
+	if (isPrivateIPv4(bare)) return true
+	// IPv6 ULA: fc00::/7 (fc00:: - fdff::)
+	if (/^f[cd][0-9a-f]{2}:/i.test(bare)) return true
 	// IPv6-mapped IPv4 bypass prevention
 	// URL parser may normalize ::ffff:127.0.0.1 to ::ffff:7f00:1 (hex form)
 	if (/^::ffff:/i.test(bare)) {
 		const mapped = bare.replace(/^::ffff:/i, '')
-		if (mapped.startsWith('127.') || mapped.startsWith('169.254.')) return true
+		if (isPrivateIPv4(mapped)) return true
 		// hex form: 7f00:0 through 7f00:ffff = 127.0.x.x
 		if (/^7f[0-9a-f]{2}:/i.test(mapped)) return true
 		// hex form: a9fe:0 through a9fe:ffff = 169.254.x.x
 		if (/^a9fe:/i.test(mapped)) return true
+		// hex form: 0a = 10.x.x.x
+		if (/^0a[0-9a-f]{2}:/i.test(mapped)) return true
+		// hex form: c0a8 = 192.168.x.x
+		if (/^c0a8:/i.test(mapped)) return true
+		// hex form: ac1x = 172.16-31.x.x
+		if (/^ac1[0-9a-f]:/i.test(mapped)) return true
+		// hex form: 6440-647f = 100.64-127.x.x
+		if (/^64[4-7][0-9a-f]:/i.test(mapped)) return true
 	}
 	return false
 }
