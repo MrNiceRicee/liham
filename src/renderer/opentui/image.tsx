@@ -9,6 +9,7 @@ import { memo, useContext, useEffect, useRef, useState, type ReactNode } from 'r
 import type { LoadedImage } from '../../image/types.ts'
 import type { ImageNode } from '../../ir/types.ts'
 
+import { createImageCache, imageCacheKey, type ImageCache } from '../../image/cache.ts'
 import { decodeImage } from '../../image/decoder.ts'
 import { renderHalfBlock } from '../../image/halfblock.ts'
 import { buildCleanupCommand, buildTransmitChunks, buildVirtualPlacement, generateImageId } from '../../image/kitty.ts'
@@ -35,8 +36,13 @@ function registerExitHandler(): void {
 // inflight promise map for request coalescing
 const inflightDecodes = new Map<string, Promise<LoadedImage | null>>()
 
-function getCacheKey(absolutePath: string, mtime: number, targetWidth: number): string {
-	return `${absolutePath}:${String(mtime)}:${String(targetWidth)}`
+// 50MB per-document LRU cache
+const IMAGE_BUDGET = 50 * 1024 * 1024
+let imageCache: ImageCache = createImageCache(IMAGE_BUDGET)
+
+export function clearImageCache(): void {
+	imageCache.clear()
+	imageCache = createImageCache(IMAGE_BUDGET)
 }
 
 // -- half-block memoized output --
@@ -118,9 +124,20 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 			const { bytes, absolutePath, mtime } = loadResult.value
 			const purpose = protocol === 'kitty-virtual' ? 'kitty' : 'halfblock'
 			const targetCols = Math.max(1, terminalWidth - 2) // leave margin
-			const cacheKey = getCacheKey(absolutePath, mtime, targetCols)
+			const cacheKey = imageCacheKey(absolutePath, mtime, targetCols)
 
-			// check inflight map
+			// check LRU cache first
+			const cached = imageCache.get(cacheKey)
+			if (cached != null) {
+				setImage(cached)
+				setState('loaded')
+				if (protocol === 'kitty-virtual' && renderer != null) {
+					transmitKittyImage(cached, renderer)
+				}
+				return
+			}
+
+			// check inflight map for request coalescing
 			let decodePromise = inflightDecodes.get(cacheKey)
 			if (decodePromise == null) {
 				decodePromise = decodeImage(
@@ -132,7 +149,11 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 					node.url!,
 				).then((r) => {
 					inflightDecodes.delete(cacheKey)
-					return r.ok ? r.value : null
+					if (r.ok) {
+						imageCache.set(cacheKey, r.value)
+						return r.value
+					}
+					return null
 				})
 				inflightDecodes.set(cacheKey, decodePromise)
 			}

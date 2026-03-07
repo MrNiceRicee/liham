@@ -34,6 +34,7 @@ import { processMarkdown } from '../../pipeline/processor.ts'
 import { createDirectoryWatcher, createFileWatcher } from '../../watcher/watcher.ts'
 import { browserKeyHandler } from './browser-keys.ts'
 import { ImageContext, type ImageContextValue } from './image-context.tsx'
+import { clearImageCache } from './image.tsx'
 import { renderToOpenTUI } from './index.tsx'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { StatusBar } from './status-bar.tsx'
@@ -454,6 +455,7 @@ export function App(props: Readonly<AppProps>) {
 		// viewer mode — check escape for back-to-browser
 		if (key.name === 'escape') {
 			if (state.fromBrowser) {
+				clearImageCache()
 				dispatch({ type: 'ReturnToBrowser' })
 				return
 			}
