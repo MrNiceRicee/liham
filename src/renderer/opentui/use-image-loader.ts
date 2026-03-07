@@ -14,7 +14,7 @@ import {
 	localCacheKey,
 	remoteCacheKey,
 } from '../../media/cache.ts'
-import { decodeImage } from '../../media/decoder.ts'
+import { type AnimationLimits, decodeImage } from '../../media/decoder.ts'
 import { fetchRemoteImage } from '../../media/fetcher.ts'
 import { loadImageFile } from '../../media/loader.ts'
 import { createSemaphore, type Semaphore } from '../../media/semaphore.ts'
@@ -127,6 +127,9 @@ async function loadFile(
 	return loadImageFile(url, basePath)
 }
 
+// inline images: 1 frame only (animation in modal only)
+const INLINE_ANIMATION_LIMITS: AnimationLimits = { maxFrames: 1, maxDecodedBytes: 10 * 1024 * 1024 }
+
 // decode with cache lookup and inflight coalescing
 function coalescedDecode(
 	file: LoadedFile,
@@ -136,8 +139,10 @@ function coalescedDecode(
 	url: string,
 	signal: AbortSignal,
 ): Promise<LoadedImage | null> {
+	const limits = ctx.animationLimits ?? INLINE_ANIMATION_LIMITS
 	const rowsSuffix = maxRows != null ? `@r${String(maxRows)}` : ''
-	const cacheKey = cacheKeyForFile(file, targetCols) + rowsSuffix
+	const limitsSuffix = limits.maxFrames > 1 ? `@f${String(limits.maxFrames)}` : ''
+	const cacheKey = cacheKeyForFile(file, targetCols) + rowsSuffix + limitsSuffix
 
 	const cached = imageCache.get(cacheKey)
 	if (cached != null) return Promise.resolve(cached)
@@ -153,7 +158,7 @@ function coalescedDecode(
 			cellPixelHeight: ctx.capabilities.cellPixelHeight,
 			purpose,
 			source: url,
-			animationLimits: { maxFrames: 1, maxDecodedBytes: 10 * 1024 * 1024 },
+			animationLimits: limits,
 			signal,
 		}).then((r) => {
 			inflightDecodes.delete(cacheKey)

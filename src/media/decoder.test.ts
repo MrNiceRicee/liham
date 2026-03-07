@@ -184,4 +184,53 @@ describe('decodeImage', () => {
 			expect(result.value.delays).toBeUndefined()
 		}
 	})
+
+	test('custom animation limits raise frame cap', async () => {
+		const { readFile } = await import('node:fs/promises')
+		const gif = new Uint8Array(await readFile('test/assets/duck-simple.gif'))
+
+		// inline default: maxFrames 1 — should decode only 1 frame
+		const inline = await decode({
+			bytes: gif,
+			source: 'duck.gif',
+			targetCols: 40,
+			animationLimits: { maxFrames: 1, maxDecodedBytes: 10 * 1024 * 1024 },
+		})
+		expect(inline.ok).toBe(true)
+		if (inline.ok) {
+			// animated GIF with maxFrames: 1 still goes through decodeAnimated, gets 1 frame
+			expect(inline.value.frames).toBeDefined()
+			expect(inline.value.frames!.length).toBe(1)
+		}
+
+		// modal: maxFrames 50 — should decode all available frames
+		const modal = await decode({
+			bytes: gif,
+			source: 'duck.gif',
+			targetCols: 40,
+			animationLimits: { maxFrames: 50, maxDecodedBytes: 30 * 1024 * 1024 },
+		})
+		expect(modal.ok).toBe(true)
+		if (modal.ok) {
+			expect(modal.value.frames).toBeDefined()
+			expect(modal.value.frames!.length).toBeGreaterThan(1)
+			expect(modal.value.frames!.length).toBeLessThanOrEqual(50)
+		}
+	})
+
+	test('frame cap at maxFrames is respected', async () => {
+		const { readFile } = await import('node:fs/promises')
+		const gif = new Uint8Array(await readFile('test/assets/duck-simple.gif'))
+
+		const result = await decode({
+			bytes: gif,
+			source: 'duck.gif',
+			targetCols: 40,
+			animationLimits: { maxFrames: 3, maxDecodedBytes: 30 * 1024 * 1024 },
+		})
+		expect(result.ok).toBe(true)
+		if (result.ok && result.value.frames != null) {
+			expect(result.value.frames.length).toBeLessThanOrEqual(3)
+		}
+	})
 })

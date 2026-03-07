@@ -5,6 +5,7 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 
 import { createContext, type RefObject } from 'react'
 
+import type { AnimationLimits } from '../../media/decoder.ts'
 import type { ImageCapabilities } from '../../media/types.ts'
 
 export interface ImageContextValue {
@@ -13,6 +14,7 @@ export interface ImageContextValue {
 	bgColor: string
 	maxCols: number
 	maxRows?: number
+	animationLimits?: AnimationLimits
 	scrollRef: RefObject<ScrollBoxRenderable | null>
 }
 

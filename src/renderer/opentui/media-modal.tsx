@@ -1,16 +1,19 @@
 // media modal overlay — full-screen media viewer with info bar.
 // absolute positioned sibling of scrollbox content (does not scroll with content).
 
-import { type ReactNode, useContext, useMemo } from 'react'
+import { type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 
 import type { MediaIRNode } from '../../ir/types.ts'
-import type { ThemeTokens } from '../../theme/types.ts'
-import type { MediaEntry } from './index.tsx'
-
+import type { AnimationLimits } from '../../media/decoder.ts'
 import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
 import { sanitizeForTerminal } from '../../pipeline/sanitize.ts'
+import type { ThemeTokens } from '../../theme/types.ts'
 import { ImageContext } from './image-context.tsx'
+import type { MediaEntry } from './index.tsx'
 import { useImageLoader } from './use-image-loader.ts'
+
+// modal decodes up to 50 frames (vs 1 for inline) with a 30MB budget
+const MODAL_ANIMATION_LIMITS: AnimationLimits = { maxFrames: 50, maxDecodedBytes: 30 * 1024 * 1024 }
 
 // -- helpers --
 
@@ -66,26 +69,46 @@ function ModalHalfBlockRows({
 
 // -- modal image content --
 
+export interface FrameInfo {
+	frameCount: number
+	capped: boolean
+}
+
 function ModalImageContent({
 	url,
 	alt,
 	theme,
 	maxCols,
 	maxRows,
+	onFrameInfo,
 }: {
 	readonly url: string | undefined
 	readonly alt: string
 	readonly theme: ThemeTokens
 	readonly maxCols: number
 	readonly maxRows: number
+	readonly onFrameInfo: (info: FrameInfo | null) => void
 }): ReactNode {
 	const ctx = useContext(ImageContext)
-	// override context with full-viewport dimensions for lightbox rendering
+	// override context with full-viewport dimensions + raised animation limits for lightbox
 	const modalCtx = useMemo(
-		() => (ctx != null ? { ...ctx, maxCols, maxRows } : null),
+		() =>
+			ctx != null ? { ...ctx, maxCols, maxRows, animationLimits: MODAL_ANIMATION_LIMITS } : null,
 		[ctx, maxCols, maxRows],
 	)
 	const { state, image } = useImageLoader(url, modalCtx, true)
+
+	// report frame info to parent for info bar
+	useEffect(() => {
+		if (image?.frames != null && image.frames.length > 1) {
+			onFrameInfo({
+				frameCount: image.frames.length,
+				capped: image.frames.length >= MODAL_ANIMATION_LIMITS.maxFrames,
+			})
+		} else {
+			onFrameInfo(null)
+		}
+	}, [image])
 
 	if (ctx == null || url == null || ctx.capabilities.protocol === 'text') {
 		return (
@@ -126,6 +149,12 @@ export interface MediaModalProps {
 	readonly termHeight: number
 }
 
+function frameInfoLabel(info: FrameInfo | null): string {
+	if (info == null) return ''
+	const suffix = info.capped ? ' (capped)' : ''
+	return ` | ${String(info.frameCount)} frames${suffix}`
+}
+
 export function MediaModal({
 	mediaNodes,
 	mediaIndex,
@@ -134,6 +163,8 @@ export function MediaModal({
 	termHeight,
 }: MediaModalProps): ReactNode {
 	const entry = mediaNodes[mediaIndex]
+	const [frameInfo, setFrameInfo] = useState<FrameInfo | null>(null)
+
 	if (entry == null) return null
 
 	const node = entry.node
@@ -173,6 +204,7 @@ export function MediaModal({
 						theme={theme}
 						maxCols={termWidth}
 						maxRows={contentRows}
+						onFrameInfo={setFrameInfo}
 					/>
 				) : node.type === 'video' ? (
 					<text>
@@ -187,7 +219,8 @@ export function MediaModal({
 			<box border={['top']} style={{ height: 2 }}>
 				<text>
 					<span fg={theme.paragraph.textColor}>
-						{sanitizeForTerminal(filename)} | {typeLabel} | {position}
+						{sanitizeForTerminal(filename)} | {typeLabel}
+						{frameInfoLabel(frameInfo)} | {position}
 					</span>
 				</text>
 			</box>
