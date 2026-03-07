@@ -1,6 +1,16 @@
 import { describe, expect, test } from 'bun:test'
 
-import { decodeImage, getImageDimensions, initSharp } from './decoder.ts'
+import { decodeImage, getImageDimensions, initSharp, type DecodeOptions } from './decoder.ts'
+
+function decode(overrides: Partial<DecodeOptions> & Pick<DecodeOptions, 'bytes' | 'source'>): ReturnType<typeof decodeImage> {
+	return decodeImage({
+		targetCols: 80,
+		cellPixelWidth: 8,
+		cellPixelHeight: 16,
+		purpose: 'halfblock',
+		...overrides,
+	})
+}
 
 // 4x4 red PNG generated via sharp
 const PNG_4x4 = Buffer.from(
@@ -33,7 +43,7 @@ describe('getImageDimensions', () => {
 
 describe('decodeImage', () => {
 	test('decodes PNG to RGBA for halfblock', async () => {
-		const result = await decodeImage(new Uint8Array(PNG_4x4), 80, 8, 16, 'halfblock', 'test.png')
+		const result = await decode({ bytes: new Uint8Array(PNG_4x4), source: 'test.png' })
 		expect(result.ok).toBe(true)
 		if (result.ok) {
 			expect(result.value.width).toBe(4)
@@ -47,7 +57,7 @@ describe('decodeImage', () => {
 	})
 
 	test('decodes for kitty purpose', async () => {
-		const result = await decodeImage(new Uint8Array(PNG_4x4), 80, 8, 16, 'kitty', 'test.png')
+		const result = await decode({ bytes: new Uint8Array(PNG_4x4), source: 'test.png', purpose: 'kitty' })
 		expect(result.ok).toBe(true)
 		if (result.ok) {
 			expect(result.value.width).toBe(4)
@@ -64,7 +74,7 @@ describe('decodeImage', () => {
 			.png()
 			.toBuffer()
 
-		const result = await decodeImage(new Uint8Array(buf), 80, 8, 16, 'halfblock', 'test.png')
+		const result = await decode({ bytes: new Uint8Array(buf), source: 'test.png' })
 		expect(result.ok).toBe(true)
 		if (result.ok) {
 			expect(result.value.height % 2).toBe(0) // even
@@ -73,7 +83,7 @@ describe('decodeImage', () => {
 	})
 
 	test('small image not enlarged', async () => {
-		const result = await decodeImage(new Uint8Array(PNG_4x4), 80, 8, 16, 'kitty', 'test.png')
+		const result = await decode({ bytes: new Uint8Array(PNG_4x4), source: 'test.png', purpose: 'kitty' })
 		expect(result.ok).toBe(true)
 		if (result.ok) {
 			// 4px wide image, target would be 80*8=640px — but withoutEnlargement prevents upscale
@@ -83,14 +93,14 @@ describe('decodeImage', () => {
 	})
 
 	test('rejects corrupt data', async () => {
-		const result = await decodeImage(new Uint8Array([0, 0, 0, 0]), 80, 8, 16, 'halfblock', 'bad')
+		const result = await decode({ bytes: new Uint8Array([0, 0, 0, 0]), source: 'bad' })
 		expect(result.ok).toBe(false)
 	})
 
 	test('animated GIF decodes all frames', async () => {
 		const { readFile } = await import('node:fs/promises')
 		const gif = new Uint8Array(await readFile('test/assets/duck-simple.gif'))
-		const result = await decodeImage(gif, 40, 8, 16, 'halfblock', 'duck.gif')
+		const result = await decode({ bytes: gif, source: 'duck.gif', targetCols: 40 })
 		expect(result.ok).toBe(true)
 		if (result.ok) {
 			expect(result.value.frames).toBeDefined()
@@ -110,7 +120,7 @@ describe('decodeImage', () => {
 			.gif({ delay: [0, 5] })
 			.toBuffer()
 
-		const result = await decodeImage(new Uint8Array(gif), 40, 8, 16, 'halfblock', 'test.gif')
+		const result = await decode({ bytes: new Uint8Array(gif), source: 'test.gif', targetCols: 40 })
 		if (result.ok && result.value.delays != null) {
 			for (const d of result.value.delays) {
 				expect(d).toBeGreaterThanOrEqual(100)
@@ -118,10 +128,27 @@ describe('decodeImage', () => {
 		}
 	})
 
+	test('shouldContinue callback stops decode early', async () => {
+		const { readFile } = await import('node:fs/promises')
+		const gif = new Uint8Array(await readFile('test/assets/duck-simple.gif'))
+		let callCount = 0
+		const result = await decode({
+			bytes: gif,
+			source: 'duck.gif',
+			targetCols: 40,
+			shouldContinue: () => { callCount++; return callCount < 3 },
+		})
+		expect(result.ok).toBe(true)
+		if (result.ok && result.value.frames != null) {
+			// shouldContinue returns false after 3 calls, so max 3 frames decoded
+			expect(result.value.frames.length).toBeLessThanOrEqual(3)
+		}
+	})
+
 	test('static GIF has no frames/delays', async () => {
 		const sharp = (await import('sharp')).default
 		const gif = await sharp({ create: { width: 4, height: 4, channels: 4, background: { r: 0, g: 0, b: 255, alpha: 1 } } }).gif().toBuffer()
-		const result = await decodeImage(new Uint8Array(gif), 40, 8, 16, 'halfblock', 'static.gif')
+		const result = await decode({ bytes: new Uint8Array(gif), source: 'static.gif', targetCols: 40 })
 		expect(result.ok).toBe(true)
 		if (result.ok) {
 			expect(result.value.frames).toBeUndefined()

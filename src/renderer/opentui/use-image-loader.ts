@@ -135,16 +135,16 @@ function coalescedDecode(
 	let decodePromise = inflightDecodes.get(cacheKey)
 	if (decodePromise == null) {
 		const purpose = ctx.capabilities.protocol === 'kitty-virtual' ? 'kitty' : 'halfblock'
-		decodePromise = decodeImage(
-			file.bytes,
+		decodePromise = decodeImage({
+			bytes: file.bytes,
 			targetCols,
-			ctx.capabilities.cellPixelWidth,
-			ctx.capabilities.cellPixelHeight,
+			cellPixelWidth: ctx.capabilities.cellPixelWidth,
+			cellPixelHeight: ctx.capabilities.cellPixelHeight,
 			purpose,
-			url,
-			{ maxFrames: 1, maxDecodedBytes: 10 * 1024 * 1024 },
+			source: url,
+			animationLimits: { maxFrames: 1, maxDecodedBytes: 10 * 1024 * 1024 },
 			signal,
-		).then((r) => {
+		}).then((r) => {
 			inflightDecodes.delete(cacheKey)
 			if (r.ok) {
 				imageCache.set(cacheKey, r.value)
