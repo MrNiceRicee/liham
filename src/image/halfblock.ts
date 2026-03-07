@@ -1,8 +1,6 @@
 // half-block renderer — converts RGBA pixels to styled character grid.
 // uses U+2584 (lower half block): fg = bottom pixel, bg = top pixel.
 
-import { type OptimizedBuffer, RGBA } from '@opentui/core'
-
 import type { HalfBlockGrid, LoadedImage } from './types.ts'
 
 // parse hex color string (#RRGGBB) to RGB components
@@ -128,24 +126,3 @@ export function renderHalfBlockMerged(image: LoadedImage, bgColor: string): Merg
 
 	return rows
 }
-
-const TRANSPARENT = RGBA.fromValues(0, 0, 0, 0)
-
-// write pre-computed merged span rows directly to a native buffer
-export function drawMergedSpansToBuffer(
-	buffer: OptimizedBuffer,
-	rows: MergedSpan[][],
-	bgRGBA: RGBA,
-): void {
-	buffer.clear(bgRGBA)
-	for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
-		let x = 0
-		for (const span of rows[rowIdx]!) {
-			const fg = span.fg.length > 0 ? RGBA.fromHex(span.fg) : TRANSPARENT
-			const bg = span.bg.length > 0 ? RGBA.fromHex(span.bg) : bgRGBA
-			buffer.drawText(span.text, x, rowIdx, fg, bg)
-			x += span.text.length
-		}
-	}
-}
-

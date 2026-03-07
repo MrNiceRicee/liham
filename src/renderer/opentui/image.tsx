@@ -1,7 +1,7 @@
 // image renderer component — Kitty virtual placements, half-block fallback, text fallback.
 // thin rendering shell — loading logic lives in use-image-loader.ts.
 
-import { resolveRenderLib, RGBA, type BoxRenderable, type FrameBufferRenderable } from '@opentui/core'
+import { resolveRenderLib, type BoxRenderable } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
 import { writeSync } from 'node:fs'
 import { memo, useContext, useEffect, useRef, type ReactNode } from 'react'
@@ -9,7 +9,7 @@ import { memo, useContext, useEffect, useRef, type ReactNode } from 'react'
 import type { LoadedImage } from '../../image/types.ts'
 import type { ImageNode } from '../../ir/types.ts'
 
-import { drawMergedSpansToBuffer, renderHalfBlockMerged, type MergedSpan } from '../../image/halfblock.ts'
+import { renderHalfBlockMerged, type MergedSpan } from '../../image/halfblock.ts'
 import { buildCleanupCommand, buildTransmitChunks, buildVirtualPlacement, generateImageId } from '../../image/kitty.ts'
 import { ImageContext } from './image-context.tsx'
 import { useImageLoader, useViewportVisibility } from './use-image-loader.ts'
@@ -66,45 +66,6 @@ const HalfBlockRows = memo(function HalfBlockRows({ rows, width, href }: HalfBlo
 		</box>
 	)
 }, (prev, next) => prev.rows === next.rows && prev.href === next.href)
-
-// -- animated GIF via FrameBuffer (bypasses React reconciliation for frame updates) --
-
-function AnimatedGifBlock({ image, bgColor }: {
-	readonly image: LoadedImage
-	readonly bgColor: string
-}): ReactNode {
-	const fbRef = useRef<FrameBufferRenderable | null>(null)
-
-	useEffect(() => {
-		const fb = fbRef.current
-		if (!fb || !image.frames || !image.delays) return
-
-		// pre-compute all frames as merged span rows
-		const frames = image.frames.map(rgba =>
-			renderHalfBlockMerged({ ...image, rgba }, bgColor),
-		)
-		const bgRGBA = RGBA.fromHex(bgColor)
-
-		// draw first frame
-		let frameIdx = 0
-		drawMergedSpansToBuffer(fb.frameBuffer, frames[0]!, bgRGBA)
-		fb.requestRender()
-
-		// animation timer — writes directly to native buffer
-		const advance = (): void => {
-			frameIdx = (frameIdx + 1) % frames.length
-			drawMergedSpansToBuffer(fb.frameBuffer, frames[frameIdx]!, bgRGBA)
-			fb.requestRender()
-			timer = setTimeout(advance, image.delays![frameIdx] ?? 100)
-		}
-		let timer = setTimeout(advance, image.delays[0] ?? 100)
-
-		return () => { clearTimeout(timer) }
-	}, [image, bgColor])
-
-	const rows = Math.ceil(image.height / 2)
-	return <frame-buffer ref={fbRef} width={image.terminalCols} height={rows} />
-}
 
 // -- kitty text fallback for placeholder rendering --
 
@@ -234,9 +195,6 @@ function renderLoadedImage(
 	if (node.href != null && protocol === 'kitty-virtual') protocol = 'halfblock'
 
 	if (protocol === 'halfblock') {
-		if (image.frames != null && image.delays != null) {
-			return <AnimatedGifBlock key={key} image={image} bgColor={ctx.bgColor} />
-		}
 		const rows = renderHalfBlockMerged(image, ctx.bgColor)
 		return <HalfBlockRows key={key} rows={rows} width={image.terminalCols} href={node.href} />
 	}
