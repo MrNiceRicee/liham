@@ -11,28 +11,41 @@ import {
 } from './kitty.ts'
 
 describe('generateImageId', () => {
-	test('returns number in range 1-255', () => {
-		const id = generateImageId('test.png', 12345)
-		expect(id).toBeGreaterThanOrEqual(1)
-		expect(id).toBeLessThanOrEqual(255)
+	test('returns numbers in range 1-255', () => {
+		for (let i = 0; i < 300; i++) {
+			const id = generateImageId()
+			expect(id).toBeGreaterThanOrEqual(1)
+			expect(id).toBeLessThanOrEqual(255)
+		}
 	})
 
-	test('different sources produce different IDs', () => {
-		const id1 = generateImageId('a.png', 1)
-		const id2 = generateImageId('b.png', 1)
-		expect(id1).not.toBe(id2)
+	test('monotonically increases', () => {
+		const a = generateImageId()
+		const b = generateImageId()
+		// b should be a+1, unless a was 255 (then b wraps to 1)
+		if (a < 255) {
+			expect(b).toBe(a + 1)
+		} else {
+			expect(b).toBe(1)
+		}
 	})
 
-	test('different PIDs produce different IDs', () => {
-		const id1 = generateImageId('test.png', 100)
-		const id2 = generateImageId('test.png', 200)
-		expect(id1).not.toBe(id2)
+	test('wraps from 255 back to 1', () => {
+		// generate enough to guarantee a wrap
+		let sawWrap = false
+		let prev = generateImageId()
+		for (let i = 0; i < 256; i++) {
+			const cur = generateImageId()
+			if (prev === 255 && cur === 1) sawWrap = true
+			prev = cur
+		}
+		expect(sawWrap).toBe(true)
 	})
 
-	test('deterministic for same input', () => {
-		const id1 = generateImageId('test.png', 42)
-		const id2 = generateImageId('test.png', 42)
-		expect(id1).toBe(id2)
+	test('never returns 0', () => {
+		for (let i = 0; i < 512; i++) {
+			expect(generateImageId()).not.toBe(0)
+		}
 	})
 })
 

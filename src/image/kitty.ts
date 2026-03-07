@@ -47,14 +47,12 @@ const DIACRITICS: number[] = [
 const PLACEHOLDER = String.fromCodePoint(0x10eeee)
 const CHUNK_SIZE = 4096
 
-// image ID: hash of source + PID, range 1-255 (8-bit foreground color)
-export function generateImageId(source: string, pid: number): number {
-	let hash = 0
-	const input = `${source}:${String(pid)}`
-	for (let i = 0; i < input.length; i++) {
-		hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0
-	}
-	return (((hash % 255) + 255) % 255) + 1
+// monotonic image ID counter — wraps at 255 (8-bit foreground color range)
+let nextImageId = 0
+
+export function generateImageId(): number {
+	nextImageId = (nextImageId % 255) + 1
+	return nextImageId
 }
 
 // build all transmit chunks as a single concatenated string

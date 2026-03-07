@@ -3,6 +3,8 @@
 
 import type { ImageResult, LoadedImage } from './types.ts'
 
+import { createSemaphore } from './semaphore.ts'
+
 const MAX_DECODED_PIXELS = 25_000_000
 
 // lazy sharp reference — initialized on first decode
@@ -29,29 +31,7 @@ export function isSharpAvailable(): boolean {
 	return sharpAvailable === true
 }
 
-// simple promise-based semaphore for limiting concurrent decodes
-const MAX_CONCURRENT_DECODES = 2
-let activeDecodes = 0
-const waitQueue: (() => void)[] = []
-
-async function acquireSemaphore(): Promise<void> {
-	if (activeDecodes < MAX_CONCURRENT_DECODES) {
-		activeDecodes++
-		return
-	}
-	return new Promise<void>((resolve) => {
-		waitQueue.push(resolve)
-	})
-}
-
-function releaseSemaphore(): void {
-	const next = waitQueue.shift()
-	if (next != null) {
-		next()
-	} else {
-		activeDecodes--
-	}
-}
+const decodeSemaphore = createSemaphore(2)
 
 export async function getImageDimensions(
 	bytes: Uint8Array,
@@ -84,7 +64,7 @@ export async function decodeImage(
 		return { ok: false, error: 'sharp not available' }
 	}
 
-	await acquireSemaphore()
+	await decodeSemaphore.acquire()
 	try {
 		return await decodeInternal(
 			sharpModule,
@@ -96,7 +76,7 @@ export async function decodeImage(
 			source,
 		)
 	} finally {
-		releaseSemaphore()
+		decodeSemaphore.release()
 	}
 }
 

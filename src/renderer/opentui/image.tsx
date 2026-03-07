@@ -1,22 +1,21 @@
 // image renderer component — Kitty virtual placements, half-block fallback, text fallback.
-// first stateful renderer component in the codebase (uses hooks).
+// thin rendering shell — loading logic lives in use-image-loader.ts.
 
 import { resolveRenderLib } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
 import { writeSync } from 'node:fs'
-import { memo, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { memo, useContext, useEffect, useRef, type ReactNode } from 'react'
 
 import type { LoadedImage } from '../../image/types.ts'
 import type { ImageNode } from '../../ir/types.ts'
 
-import { createImageCache, imageCacheKey, type ImageCache } from '../../image/cache.ts'
-import { decodeImage } from '../../image/decoder.ts'
-import { renderHalfBlockMerged } from '../../image/halfblock.ts'
+import { renderHalfBlockMerged, type MergedSpan } from '../../image/halfblock.ts'
 import { buildCleanupCommand, buildTransmitChunks, buildVirtualPlacement, generateImageId } from '../../image/kitty.ts'
-import { loadImageFile } from '../../image/loader.ts'
 import { ImageContext } from './image-context.tsx'
+import { useImageLoader } from './use-image-loader.ts'
 
-type ImageState = 'idle' | 'loading' | 'loaded' | 'error'
+// re-export for consumers that import from here
+export { clearImageCache } from './use-image-loader.ts'
 
 // track active image IDs for process exit cleanup
 const activeImageIds = new Set<number>()
@@ -33,31 +32,16 @@ function registerExitHandler(): void {
 	})
 }
 
-// inflight promise map for request coalescing
-const inflightDecodes = new Map<string, Promise<LoadedImage | null>>()
-
-// 50MB per-document LRU cache
-const IMAGE_BUDGET = 50 * 1024 * 1024
-let imageCache: ImageCache = createImageCache(IMAGE_BUDGET)
-
-export function clearImageCache(): void {
-	imageCache.clear()
-	imageCache = createImageCache(IMAGE_BUDGET)
-}
-
 // -- half-block memoized output --
 
 interface HalfBlockRowsProps {
-	readonly image: LoadedImage
-	readonly bgColor: string
+	readonly rows: MergedSpan[][]
+	readonly width: number
 }
 
-const HalfBlockRows = memo(function HalfBlockRows({ image, bgColor }: HalfBlockRowsProps) {
-	const rows = renderHalfBlockMerged(image, bgColor)
-	// per-row <text> elements inside height-constrained box for proper viewport culling.
-	// merged spans dramatically reduce React element count (consecutive same-colored cells combined).
+const HalfBlockRows = memo(function HalfBlockRows({ rows, width }: HalfBlockRowsProps) {
 	return (
-		<box style={{ height: rows.length, width: image.terminalCols }}>
+		<box style={{ height: rows.length, width }}>
 			{rows.map((spans, rowIdx) => (
 				<text key={`hb-${String(rowIdx)}`}>
 					{spans.map((s, sIdx) => {
@@ -74,13 +58,11 @@ const HalfBlockRows = memo(function HalfBlockRows({ image, bgColor }: HalfBlockR
 			))}
 		</box>
 	)
-})
+}, (prev, next) => prev.rows === next.rows)
 
 // -- kitty text fallback for placeholder rendering --
 
 function KittyPlaceholder({ rows, cols }: { readonly rows: number; readonly cols: number }): ReactNode {
-	// render invisible placeholder — the actual text is the U+10EEEE characters
-	// but we use a box for layout sizing; Kitty replaces the cell content
 	return <box style={{ height: rows, width: cols }} />
 }
 
@@ -89,97 +71,24 @@ function KittyPlaceholder({ rows, cols }: { readonly rows: number; readonly cols
 function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly nodeKey: string }): ReactNode {
 	const ctx = useContext(ImageContext)
 	const renderer = useRenderer()
-	const [state, setState] = useState<ImageState>('idle')
-	const [image, setImage] = useState<LoadedImage | null>(null)
-	const [errorMsg, setErrorMsg] = useState('')
-	const loadIdRef = useRef(0)
+	const { state, image, errorMsg } = useImageLoader(node.url, ctx)
 	const kittyIdRef = useRef<number | null>(null)
 
-	// no context = browser preview or missing provider -> text fallback
-	if (ctx == null || node.url == null) {
+	// kitty transmit + cleanup lifecycle
+	useEffect(() => {
+		if (ctx == null || image == null) return
+		if (ctx.capabilities.protocol !== 'kitty-virtual') return
+		if (renderer == null) return
+
+		transmitKittyImage(image, renderer)
+
+		return () => { cleanupKittyImage(renderer) }
+	}, [image, ctx?.capabilities.protocol])
+
+	// conditional rendering AFTER all hooks
+	if (ctx == null || node.url == null || ctx.capabilities.protocol === 'text') {
 		return renderTextFallback(node, nodeKey)
 	}
-
-	const { basePath, capabilities, bgColor, maxCols } = ctx
-	const protocol = capabilities.protocol
-
-	useEffect(() => {
-		const thisLoadId = ++loadIdRef.current
-		const isStale = () => loadIdRef.current !== thisLoadId
-
-		setState('loading')
-		setImage(null)
-		setErrorMsg('')
-
-		void (async () => {
-			// load from disk
-			const loadResult = await loadImageFile(node.url!, basePath)
-			if (isStale()) return
-			if (!loadResult.ok) {
-				setState('error')
-				setErrorMsg(loadResult.error === 'file not found' ? 'not found' : loadResult.error)
-				return
-			}
-
-			const { bytes, absolutePath, mtime } = loadResult.value
-			const purpose = protocol === 'kitty-virtual' ? 'kitty' : 'halfblock'
-			const targetCols = maxCols
-			const cacheKey = imageCacheKey(absolutePath, mtime, targetCols)
-
-			// check LRU cache first
-			const cached = imageCache.get(cacheKey)
-			if (cached != null) {
-				setImage(cached)
-				setState('loaded')
-				if (protocol === 'kitty-virtual' && renderer != null) {
-					transmitKittyImage(cached, renderer)
-				}
-				return
-			}
-
-			// check inflight map for request coalescing
-			let decodePromise = inflightDecodes.get(cacheKey)
-			if (decodePromise == null) {
-				decodePromise = decodeImage(
-					bytes,
-					targetCols,
-					capabilities.cellPixelWidth,
-					capabilities.cellPixelHeight,
-					purpose,
-					node.url!,
-				).then((r) => {
-					inflightDecodes.delete(cacheKey)
-					if (r.ok) {
-						imageCache.set(cacheKey, r.value)
-						return r.value
-					}
-					return null
-				})
-				inflightDecodes.set(cacheKey, decodePromise)
-			}
-
-			const decoded = await decodePromise
-			if (isStale()) return
-
-			if (decoded == null) {
-				setState('error')
-				return
-			}
-
-			setImage(decoded)
-			setState('loaded')
-
-			// kitty: transmit + place
-			if (protocol === 'kitty-virtual' && renderer != null) {
-				transmitKittyImage(decoded, renderer)
-			}
-		})()
-
-		return () => {
-			// cleanup kitty image on unmount/URL change
-			cleanupKittyImage(renderer)
-		}
-	}, [node.url, basePath, maxCols, protocol])
 
 	const fgProps: Record<string, unknown> = {}
 	if (node.style.fg != null) fgProps['fg'] = node.style.fg
@@ -202,12 +111,13 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	}
 
 	if (state === 'loaded' && image != null) {
-		if (protocol === 'kitty-virtual') {
+		if (ctx.capabilities.protocol === 'kitty-virtual') {
 			return <KittyPlaceholder key={nodeKey} rows={image.terminalRows} cols={image.terminalCols} />
 		}
 
-		if (protocol === 'halfblock') {
-			return <HalfBlockRows key={nodeKey} image={image} bgColor={bgColor} />
+		if (ctx.capabilities.protocol === 'halfblock') {
+			const rows = renderHalfBlockMerged(image, ctx.bgColor)
+			return <HalfBlockRows key={nodeKey} rows={rows} width={image.terminalCols} />
 		}
 	}
 
@@ -216,12 +126,11 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	// -- helpers scoped to component for access to refs --
 
 	function transmitKittyImage(img: LoadedImage, rend: NonNullable<typeof renderer>): void {
-		const id = generateImageId(img.source, process.pid)
+		const id = generateImageId()
 		kittyIdRef.current = id
 		activeImageIds.add(id)
 		registerExitHandler()
 
-		// encode image as PNG for transmission via sharp
 		void (async () => {
 			try {
 				const sharp = (await import('sharp')).default
@@ -231,13 +140,16 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 					.png()
 					.toBuffer()
 
+				// stale: cleanup ran or a new transmit started while encoding
+				if (kittyIdRef.current !== id) return
+
 				const transmitCmd = buildTransmitChunks(id, new Uint8Array(pngBuf))
 				const placeCmd = buildVirtualPlacement(id, img.terminalCols, img.terminalRows)
 
 				const lib = resolveRenderLib()
 				lib.writeOut(rend.rendererPtr, transmitCmd + placeCmd)
 			} catch {
-				// transmission failed — image stays as layout box
+				// transmit failed — image just won't display
 			}
 		})()
 	}

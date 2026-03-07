@@ -66,6 +66,8 @@ options:
 
   -i, --info               Show detected theme and terminal info, then exit
 
+  --no-images              Disable image rendering (text fallback only)
+
   --no-watch               Disable file watching (no live reload)
 
   --completions <shell>    Output shell completion script (zsh, bash)
@@ -85,14 +87,15 @@ const options = {
 	help: { type: 'boolean' as const, short: 'h' },
 	info: { type: 'boolean' as const, short: 'i' },
 	layout: { type: 'string' as const, short: 'l', default: 'side' },
+	'no-images': { type: 'boolean' as const, default: false },
 	'no-watch': { type: 'boolean' as const, default: false },
 	renderer: { type: 'string' as const, short: 'r', default: 'opentui' },
 	theme: { type: 'string' as const, short: 't', default: 'auto' },
 } as const
 
 type CliMode =
-	| { mode: 'info'; layout: LayoutMode; renderer: RendererName; theme: ThemeName }
-	| { mode: 'browser'; dir: string; layout: LayoutMode; renderer: RendererName; theme: ThemeName; noWatch: boolean }
+	| { mode: 'info'; layout: LayoutMode; renderer: RendererName; theme: ThemeName; noImages: boolean }
+	| { mode: 'browser'; dir: string; layout: LayoutMode; renderer: RendererName; theme: ThemeName; noWatch: boolean; noImages: boolean }
 	| {
 			mode: 'viewer'
 			filePath: string
@@ -100,6 +103,7 @@ type CliMode =
 			renderer: RendererName
 			theme: ThemeName
 			noWatch: boolean
+			noImages: boolean
 	  }
 
 function parseCliArgs(): CliMode {
@@ -164,8 +168,10 @@ function parseCliArgs(): CliMode {
 		process.exit(1)
 	}
 
+	const noImages = values['no-images'] ?? false
+
 	if (values.info) {
-		return { mode: 'info', layout, renderer, theme }
+		return { mode: 'info', layout, renderer, theme, noImages }
 	}
 
 	const positional = positionals[0]
@@ -174,11 +180,11 @@ function parseCliArgs(): CliMode {
 
 	// no positional → browser mode (cwd)
 	if (positional == null) {
-		return { mode: 'browser', dir: process.cwd(), layout, renderer, theme, noWatch }
+		return { mode: 'browser', dir: process.cwd(), layout, renderer, theme, noWatch, noImages }
 	}
 
 	// positional present — will be resolved to file or directory in main()
-	return { mode: 'viewer', filePath: positional, layout, renderer, theme, noWatch }
+	return { mode: 'viewer', filePath: positional, layout, renderer, theme, noWatch, noImages }
 }
 
 // resolve positional arg: file → viewer, directory → browser, missing → error
@@ -188,6 +194,7 @@ async function resolvePositional(
 	renderer: RendererName,
 	theme: ThemeName,
 	noWatch: boolean,
+	noImages: boolean,
 ): Promise<CliMode> {
 	const resolved = resolve(positional)
 
@@ -195,10 +202,10 @@ async function resolvePositional(
 		const { stat } = await import('node:fs/promises')
 		const s = await stat(resolved)
 		if (s.isDirectory()) {
-			return { mode: 'browser', dir: resolved, layout, renderer, theme, noWatch }
+			return { mode: 'browser', dir: resolved, layout, renderer, theme, noWatch, noImages }
 		}
 		if (s.isFile()) {
-			return { mode: 'viewer', filePath: resolved, layout, renderer, theme, noWatch }
+			return { mode: 'viewer', filePath: resolved, layout, renderer, theme, noWatch, noImages }
 		}
 	} catch {
 		// fall through
@@ -261,16 +268,23 @@ async function main() {
 			args.renderer,
 			args.theme,
 			args.noWatch,
+			args.noImages,
 		)
 	}
 
 	if (args.mode === 'info') {
 		const detection = await resolveDetection(args.theme)
+		if (args.noImages) {
+			detection.imageCapabilities = { protocol: 'text', cellPixelWidth: 0, cellPixelHeight: 0 }
+		}
 		const { initSharp } = await import('../image/decoder.ts')
 		await initSharp()
 		console.log(`theme: ${detection.themeName}`)
 		console.log(`renderer: ${args.renderer}`)
-		console.log(`image protocol: ${detection.imageCapabilities.protocol}`)
+		const protocolLabel = args.noImages
+			? `${detection.imageCapabilities.protocol} (--no-images)`
+			: detection.imageCapabilities.protocol
+		console.log(`image protocol: ${protocolLabel}`)
 		console.log(`cell pixels: ${String(detection.imageCapabilities.cellPixelWidth)}x${String(detection.imageCapabilities.cellPixelHeight)}`)
 		console.log(`sharp: ${String(isSharpAvailable())}`)
 		console.log(`TERM: ${process.env['TERM'] ?? '(unset)'}`)
@@ -282,6 +296,9 @@ async function main() {
 	}
 
 	const detection = await resolveDetection(args.theme)
+	if (args.noImages) {
+		detection.imageCapabilities = { protocol: 'text', cellPixelWidth: 0, cellPixelHeight: 0 }
+	}
 
 	if (args.mode === 'browser') {
 		await boot({ mode: 'browser', dir: args.dir, theme: detection.tokens, imageCapabilities: detection.imageCapabilities, layout: args.layout, noWatch: args.noWatch })

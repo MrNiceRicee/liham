@@ -35,12 +35,15 @@ function envDetectProtocol(): ImageProtocol | null {
 	const term = process.env['TERM']
 	if (term != null && term.startsWith('screen') && process.env['TMUX'] == null) return 'text'
 
-	// kitty/ghostty → virtual placements
-	if (term === 'xterm-kitty' || process.env['KITTY_WINDOW_ID'] != null) return 'kitty-virtual'
-	if (process.env['GHOSTTY_RESOURCES_DIR'] != null) return 'kitty-virtual'
-
-	// wezterm → halfblock only (no virtual placement support)
+	// kitty/ghostty/wezterm — all use halfblock
+	// (kitty virtual placements need U+10EEEE in cells which OpenTUI can't render yet)
+	if (term === 'xterm-kitty' || process.env['KITTY_WINDOW_ID'] != null) return 'halfblock'
+	if (process.env['GHOSTTY_RESOURCES_DIR'] != null) return 'halfblock'
 	if (process.env['TERM_PROGRAM'] === 'WezTerm') return 'halfblock'
+
+	// terminals advertising 24-bit color support
+	const colorterm = process.env['COLORTERM']
+	if (colorterm === 'truecolor' || colorterm === '24bit') return 'halfblock'
 
 	return null
 }
