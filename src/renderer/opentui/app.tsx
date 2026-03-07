@@ -39,7 +39,7 @@ import { type MediaEntry, renderToOpenTUI, renderToOpenTUIWithMedia } from './in
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-context.tsx'
 import { StatusBar } from './status-bar.tsx'
-import { VIEWER_KEY_MAP, VIEWER_SHIFT_KEY_MAP, applyScroll, syncScroll } from './viewer-keys.ts'
+import { VIEWER_KEY_MAP, VIEWER_SHIFT_KEY_MAP, applyScroll, handleModalKey, syncScroll } from './viewer-keys.ts'
 
 // -- browser preview cache helper --
 
@@ -378,14 +378,30 @@ export function App(props: Readonly<AppProps>) {
 	)
 
 	// -- keyboard handler --
+	const mediaCount = viewerState.mediaNodes.length
+
 	useKeyboard((key: KeyEvent) => {
 		if (state.mode === 'browser') {
 			browserKeyHandler(key, state, dispatch, filteredMatches.length, handleOpenFile, renderer)
 			return
 		}
 
-		// viewer mode — check escape for back-to-browser
+		// modal open — intercept keys before viewer dispatch
+		if (state.mediaModal.kind !== 'closed') {
+			if (key.name === 'q') {
+				renderer?.destroy()
+				return
+			}
+			handleModalKey(key, state, dispatch, mediaCount)
+			return
+		}
+
+		// viewer mode — 3-level Esc chain: (1) modal/focus, (2) browser, (3) quit
 		if (key.name === 'escape') {
+			if (state.mediaModal.kind !== 'closed' || state.mediaFocusIndex != null) {
+				dispatch({ type: 'CloseMediaModal' })
+				return
+			}
 			if (state.fromBrowser) {
 				clearImageCache()
 				dispatch({ type: 'ReturnToBrowser' })
@@ -396,16 +412,16 @@ export function App(props: Readonly<AppProps>) {
 		}
 
 		if (key.shift) {
-			const shiftAction = VIEWER_SHIFT_KEY_MAP[key.name]
-			if (shiftAction != null) {
-				handleAction(shiftAction())
+			const shiftMapper = VIEWER_SHIFT_KEY_MAP[key.name]
+			if (shiftMapper != null) {
+				handleAction(shiftMapper(state, mediaCount))
 				return
 			}
 		}
 
 		const mapper = VIEWER_KEY_MAP[key.name]
 		if (mapper == null) return
-		const action = mapper(key, state)
+		const action = mapper(key, state, mediaCount)
 		if (action != null) handleAction(action)
 	})
 

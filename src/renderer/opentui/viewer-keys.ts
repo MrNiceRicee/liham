@@ -8,7 +8,7 @@ import type { AppAction, AppState, ScrollDirection } from '../../app/state.ts'
 
 export const VIEWER_KEY_MAP: Record<
 	string,
-	(key: Pick<KeyEvent, 'ctrl'>, state: AppState) => AppAction | null
+	(key: Pick<KeyEvent, 'ctrl'>, state: AppState, mediaCount: number) => AppAction | null
 > = {
 	q: () => ({ type: 'Quit' }),
 	'?': () => ({ type: 'CycleLegend' }),
@@ -29,10 +29,62 @@ export const VIEWER_KEY_MAP: Record<
 	end: () => ({ type: 'Scroll', direction: 'bottom' }),
 	d: (key) => (key.ctrl ? { type: 'Scroll', direction: 'halfDown' } : null),
 	u: (key) => (key.ctrl ? { type: 'Scroll', direction: 'halfUp' } : null),
+	// media navigation — no-op in source-only (no preview pane)
+	n: (_, state, mediaCount) => {
+		if (state.layout === 'source-only' || mediaCount === 0) return null
+		return { type: 'FocusNextMedia', mediaCount }
+	},
+	return: (_, state) => {
+		if (state.layout === 'source-only') return null
+		if (state.mediaFocusIndex == null) return null
+		return { type: 'OpenMediaModal' }
+	},
 }
 
-export const VIEWER_SHIFT_KEY_MAP: Record<string, () => AppAction> = {
+export const VIEWER_SHIFT_KEY_MAP: Record<
+	string,
+	(state: AppState, mediaCount: number) => AppAction
+> = {
 	g: () => ({ type: 'Scroll', direction: 'bottom' }),
+	n: (state, mediaCount) => {
+		if (state.layout === 'source-only' || mediaCount === 0) return { type: 'Scroll', direction: 'down' } // no-op fallback
+		return { type: 'FocusPrevMedia', mediaCount }
+	},
+}
+
+// modal key handler — called when modal is open, swallows all non-modal keys
+export function handleModalKey(
+	key: KeyEvent,
+	state: AppState,
+	dispatch: React.Dispatch<AppAction>,
+	mediaCount: number,
+): void {
+	switch (key.name) {
+		case 'escape':
+			dispatch({ type: 'CloseMediaModal' })
+			return
+		case 'n':
+			if (key.shift) {
+				dispatch({ type: 'FocusPrevMedia', mediaCount })
+				if (state.mediaModal.kind !== 'closed') {
+					// update modal to show new focused media
+					queueMicrotask(() => dispatch({ type: 'OpenMediaModal' }))
+				}
+			} else {
+				dispatch({ type: 'FocusNextMedia', mediaCount })
+				if (state.mediaModal.kind !== 'closed') {
+					queueMicrotask(() => dispatch({ type: 'OpenMediaModal' }))
+				}
+			}
+			return
+		case ' ':
+			// play/pause — Phase 3 will wire this
+			return
+		case 'q':
+			dispatch({ type: 'Quit' })
+			return
+	}
+	// swallow all other keys when modal is open
 }
 
 // -- scroll helpers --
