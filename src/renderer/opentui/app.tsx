@@ -282,6 +282,7 @@ export function App(props: Readonly<AppProps>) {
 						.then((files) => {
 							if (scanId.current !== id) return
 							previewCacheRef.current.clear()
+							setBrowserPreviewContent(null)
 							dispatch({ type: 'RescanComplete', files })
 						})
 						.catch(() => {})
