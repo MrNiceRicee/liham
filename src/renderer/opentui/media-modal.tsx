@@ -5,18 +5,23 @@ import { type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 
 import type { MediaIRNode } from '../../ir/types.ts'
 import type { AnimationLimits } from '../../media/decoder.ts'
+import type { ThemeTokens } from '../../theme/types.ts'
+import type { MediaEntry } from './index.tsx'
+
 import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
 import { sanitizeForTerminal } from '../../pipeline/sanitize.ts'
-import type { ThemeTokens } from '../../theme/types.ts'
 import { ImageContext } from './image-context.tsx'
-import type { MediaEntry } from './index.tsx'
 import { useImageLoader } from './use-image-loader.ts'
 
-// modal decodes up to 50 frames (vs 1 for inline) with a 30MB budget
 // modal: no frame cap, 30MB byte budget is the only guard
 const MODAL_ANIMATION_LIMITS: AnimationLimits = { maxFrames: Infinity, maxDecodedBytes: 30 * 1024 * 1024 }
 
 // -- helpers --
+
+function truncate(text: string, maxLen: number): string {
+	if (text.length <= maxLen) return text
+	return maxLen > 3 ? `${text.slice(0, maxLen - 1)}…` : text.slice(0, maxLen)
+}
 
 function basename(urlOrPath: string): string {
 	const parts = urlOrPath.split('/')
@@ -214,11 +219,10 @@ export function MediaModal({
 					</text>
 				)}
 			</box>
-			<box border={['top']} style={{ height: 2 }}>
+			<box border={['top']} style={{ height: 2, width: termWidth }}>
 				<text>
 					<span fg={theme.paragraph.textColor}>
-						{sanitizeForTerminal(filename)} | {typeLabel}
-						{frameInfoLabel(frameInfo)} | {position}
+						{truncate(`${sanitizeForTerminal(filename)} | ${typeLabel}${frameInfoLabel(frameInfo)} | ${position}`, termWidth - 2)}
 					</span>
 				</text>
 			</box>
