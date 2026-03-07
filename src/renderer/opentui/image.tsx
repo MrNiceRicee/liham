@@ -1,10 +1,10 @@
 // image renderer component — Kitty virtual placements, half-block fallback, text fallback.
 // thin rendering shell — loading logic lives in use-image-loader.ts.
 
-import { resolveRenderLib, type BoxRenderable, type StyledText } from '@opentui/core'
+import { resolveRenderLib, type BoxRenderable, type StyledText, type TextRenderable } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
 import { writeSync } from 'node:fs'
-import { memo, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { memo, useContext, useEffect, useRef, type ReactNode } from 'react'
 
 import type { LoadedImage } from '../../image/types.ts'
 import type { ImageNode } from '../../ir/types.ts'
@@ -86,12 +86,12 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	// pre-rendered animation frames as StyledText for atomic rendering
 	const renderedFramesRef = useRef<StyledText[] | null>(null)
 	const renderedFrameRowsRef = useRef<number>(0)
-	const [frameIndex, setFrameIndex] = useState(0)
-	const frameStartRef = useRef(performance.now())
+	const animTextRef = useRef<TextRenderable | null>(null)
 
-	// pre-render all frames as StyledText when animated image loads
+	// pre-render frames + start animation timer — bypasses React for frame updates.
+	// directly mutates TextRenderable.content to avoid reconciliation overhead.
 	useEffect(() => {
-		if (ctx == null || image?.frames == null) {
+		if (ctx == null || image?.frames == null || image.delays == null) {
 			renderedFramesRef.current = null
 			renderedFrameRowsRef.current = 0
 			return
@@ -104,22 +104,25 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 			styledFrames.push(mergedSpansToStyledText(rows))
 		}
 		renderedFramesRef.current = styledFrames
-		setFrameIndex(0)
-	}, [image, ctx?.bgColor])
 
-	// frame cycling timer
-	useEffect(() => {
-		if (image?.frames == null || image.delays == null) return
-		const delay = image.delays[frameIndex] ?? 100
-		const elapsed = performance.now() - frameStartRef.current
-		const adjusted = Math.max(0, delay - elapsed)
+		let currentFrame = 0
+		let timer: ReturnType<typeof setTimeout>
 
-		const timer = setTimeout(() => {
-			frameStartRef.current = performance.now()
-			setFrameIndex(i => (i + 1) % image.frames!.length)
-		}, adjusted)
+		const advance = () => {
+			currentFrame = (currentFrame + 1) % styledFrames.length
+			const text = animTextRef.current
+			if (text != null) {
+				text.content = styledFrames[currentFrame]!
+			}
+			const delay = image.delays![currentFrame] ?? 100
+			timer = setTimeout(advance, delay)
+		}
+
+		const firstDelay = image.delays[0] ?? 100
+		timer = setTimeout(advance, firstDelay)
+
 		return () => { clearTimeout(timer) }
-	}, [image, frameIndex])
+	}, [image, ctx?.bgColor])
 
 	// kitty transmit + cleanup lifecycle
 	useEffect(() => {
@@ -166,7 +169,7 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	if (state === 'loaded' && image != null) {
 		return (
 			<box ref={boxRef} key={nodeKey}>
-				{renderLoadedImage(image, node, nodeKey, ctx, frameIndex, renderedFramesRef.current, renderedFrameRowsRef.current)}
+				{renderLoadedImage(image, node, nodeKey, ctx, renderedFramesRef.current, renderedFrameRowsRef.current, animTextRef)}
 			</box>
 		)
 	}
@@ -226,9 +229,9 @@ function renderLoadedImage(
 	node: ImageNode,
 	key: string,
 	ctx: NonNullable<ReturnType<typeof useContext<typeof ImageContext>>>,
-	frameIndex: number,
 	preRenderedFrames: StyledText[] | null,
 	preRenderedRowCount: number,
+	animTextRef: React.RefObject<TextRenderable | null>,
 ): ReactNode {
 	// degrade to halfblock for animated GIFs and linked images
 	let protocol = ctx.capabilities.protocol
@@ -236,20 +239,13 @@ function renderLoadedImage(
 	if (node.href != null && protocol === 'kitty-virtual') protocol = 'halfblock'
 
 	if (protocol === 'halfblock') {
-		if (image.frames != null) {
-			const safeIndex = Math.min(frameIndex, image.frames.length - 1)
-			const styledFrame = preRenderedFrames?.[safeIndex]
-			if (styledFrame != null) {
-				// single text element with StyledText content — atomic update, no tearing
-				return (
-					<box key={key} style={{ height: preRenderedRowCount, width: image.terminalCols }}>
-						<text content={styledFrame} />
-					</box>
-				)
-			}
-			// fallback: pre-rendering not ready yet
-			const rows = renderHalfBlockMerged(image, ctx.bgColor)
-			return <HalfBlockRows key={key} rows={rows} width={image.terminalCols} href={node.href} />
+		if (image.frames != null && preRenderedFrames != null && preRenderedFrames.length > 0) {
+			// render first frame; timer directly mutates text.content for subsequent frames
+			return (
+				<box key={key} style={{ height: preRenderedRowCount, width: image.terminalCols }}>
+					<text ref={animTextRef} content={preRenderedFrames[0]} />
+				</box>
+			)
 		}
 		const rows = renderHalfBlockMerged(image, ctx.bgColor)
 		return <HalfBlockRows key={key} rows={rows} width={image.terminalCols} href={node.href} />
