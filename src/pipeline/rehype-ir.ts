@@ -9,6 +9,7 @@ import type { IRNode, TableCellNode, TableRowNode } from '../ir/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 
 import { getHighlightColor } from './hljs-colors.ts'
+import { sanitizeImageSrc } from './sanitize-image-src.ts'
 import { sanitizeUrl } from './sanitize-url.ts'
 import { sanitizeForTerminal } from './sanitize.ts'
 
@@ -504,7 +505,7 @@ const INLINE_COMPILERS: Record<string, InlineCompiler> = {
 	img: (state, node) => {
 		const alt = typeof node.properties?.['alt'] === 'string' ? node.properties['alt'] : 'image'
 		const src = typeof node.properties?.['src'] === 'string' ? node.properties['src'] : ''
-		const url = sanitizeUrl(src)
+		const url = sanitizeImageSrc(src)
 		return {
 			type: 'image',
 			alt: sanitizeForTerminal(alt),

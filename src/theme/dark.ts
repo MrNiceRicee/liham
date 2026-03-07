@@ -29,6 +29,8 @@ export const darkTheme: ThemeTokens = {
 	},
 	image: {
 		fallbackColor: '#565f89',
+		loadingColor: '#7aa2f7',
+		placeholderBg: '#1a1b26',
 	},
 	inlineCode: {
 		backgroundColor: '#343b58',

@@ -29,6 +29,8 @@ export interface LinkTokens {
 
 export interface ImageTokens {
 	fallbackColor: string
+	loadingColor: string
+	placeholderBg: string
 }
 
 export interface InlineCodeTokens {
