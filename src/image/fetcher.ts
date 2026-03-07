@@ -29,7 +29,7 @@ function isBlockedHost(hostname: string): boolean {
 async function fetchWithRedirects(url: string, signal: AbortSignal): Promise<ImageResult<Response>> {
 	let currentUrl = url
 	for (let hops = 0; hops < MAX_REDIRECTS; hops++) {
-		const response = await fetch(currentUrl, { redirect: 'manual', signal, decompress: false } as RequestInit)
+		const response = await fetch(currentUrl, { redirect: 'manual', signal, decompress: false })
 		if (response.status < 300 || response.status >= 400) {
 			return response.ok ? { ok: true, value: response } : { ok: false, error: 'remote image failed' }
 		}

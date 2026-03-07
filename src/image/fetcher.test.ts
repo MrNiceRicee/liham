@@ -1,11 +1,11 @@
 // tests for remote image fetcher — SSRF blocking, size limits, timeouts, magic bytes.
 /* eslint-disable sonarjs/no-clear-text-protocols -- intentional: SSRF tests require http:// URLs */
 
-import { afterEach, describe, expect, mock, test } from 'bun:test'
+import { afterEach, describe, expect, test } from 'bun:test'
 
 import { fetchRemoteImage } from './fetcher.ts'
 
-// minimal valid PNG: 8-byte magic + IHDR chunk + IEND chunk
+// minimal valid PNG: 8-byte magic + IHDR chunk start
 const PNG_MAGIC = new Uint8Array([
 	0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, // PNG signature
 	0x00, 0x00, 0x00, 0x0d, // IHDR length
@@ -21,26 +21,24 @@ afterEach(() => {
 	globalThis.fetch = originalFetch
 })
 
-function mockFetch(body: Uint8Array, status = 200, headers?: Record<string, string>): void {
-	globalThis.fetch = mock(() =>
-		Promise.resolve(new Response(body, { status, headers })),
-	) as typeof fetch
+function stubFetch(body: Uint8Array | null, status = 200, headers?: Record<string, string>): void {
+	globalThis.fetch = () => Promise.resolve(new Response(body, { status, headers }))
 }
 
-function mockFetchRedirect(location: string, then: Uint8Array): void {
+function stubFetchRedirect(location: string, then: Uint8Array): void {
 	let call = 0
-	globalThis.fetch = mock(() => {
+	globalThis.fetch = () => {
 		call++
 		if (call === 1) {
 			return Promise.resolve(new Response(null, { status: 302, headers: { location } }))
 		}
 		return Promise.resolve(new Response(then, { status: 200 }))
-	}) as typeof fetch
+	}
 }
 
 describe('fetchRemoteImage', () => {
 	test('fetches valid PNG', async () => {
-		mockFetch(PNG_MAGIC)
+		stubFetch(PNG_MAGIC)
 		const result = await fetchRemoteImage('https://example.com/img.png')
 		expect(result.ok).toBe(true)
 		if (result.ok) {
@@ -50,7 +48,7 @@ describe('fetchRemoteImage', () => {
 	})
 
 	test('rejects bad magic bytes', async () => {
-		mockFetch(BAD_MAGIC)
+		stubFetch(BAD_MAGIC)
 		const result = await fetchRemoteImage('https://example.com/img.bin')
 		expect(result.ok).toBe(false)
 		if (!result.ok) expect(result.error).toBe('remote image failed')
@@ -93,13 +91,13 @@ describe('fetchRemoteImage', () => {
 	})
 
 	test('follows redirects', async () => {
-		mockFetchRedirect('https://cdn.example.com/img.png', PNG_MAGIC)
+		stubFetchRedirect('https://cdn.example.com/img.png', PNG_MAGIC)
 		const result = await fetchRemoteImage('https://example.com/redirect')
 		expect(result.ok).toBe(true)
 	})
 
 	test('blocks redirect to localhost', async () => {
-		mockFetchRedirect('http://127.0.0.1/secret', PNG_MAGIC)
+		stubFetchRedirect('http://127.0.0.1/secret', PNG_MAGIC)
 		const result = await fetchRemoteImage('https://example.com/redirect')
 		expect(result.ok).toBe(false)
 		if (!result.ok) expect(result.error).toBe('remote image blocked')
@@ -107,21 +105,21 @@ describe('fetchRemoteImage', () => {
 
 	test('rejects responses larger than 10MB', async () => {
 		const bigBody = new Uint8Array(11 * 1024 * 1024)
-		mockFetch(bigBody)
+		stubFetch(bigBody)
 		const result = await fetchRemoteImage('https://example.com/huge.png')
 		expect(result.ok).toBe(false)
 		if (!result.ok) expect(result.error).toBe('remote image too large')
 	})
 
 	test('handles network error', async () => {
-		globalThis.fetch = mock(() => Promise.reject(new Error('network error'))) as typeof fetch
+		globalThis.fetch = () => Promise.reject(new Error('network error'))
 		const result = await fetchRemoteImage('https://example.com/img.png')
 		expect(result.ok).toBe(false)
 		if (!result.ok) expect(result.error).toBe('remote image failed')
 	})
 
 	test('handles HTTP error status', async () => {
-		mockFetch(PNG_MAGIC, 404)
+		stubFetch(PNG_MAGIC, 404)
 		const result = await fetchRemoteImage('https://example.com/missing.png')
 		expect(result.ok).toBe(false)
 		if (!result.ok) expect(result.error).toBe('remote image failed')
