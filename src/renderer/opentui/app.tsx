@@ -518,6 +518,7 @@ export function App(props: Readonly<AppProps>) {
 			capabilities: props.imageCapabilities,
 			bgColor: props.theme.image.placeholderBg,
 			maxCols,
+			scrollRef: previewRef,
 		}
 	}, [state.mode, state.currentFile, props.imageCapabilities, props.theme.image.placeholderBg, panes.preview?.width, state.dimensions.width])
 

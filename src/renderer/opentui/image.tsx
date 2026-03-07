@@ -1,10 +1,10 @@
 // image renderer component — Kitty virtual placements, half-block fallback, text fallback.
 // thin rendering shell — loading logic lives in use-image-loader.ts.
 
-import { resolveRenderLib } from '@opentui/core'
+import { resolveRenderLib, type BoxRenderable } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
 import { writeSync } from 'node:fs'
-import { memo, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { memo, useContext, useEffect, useRef, type ReactNode } from 'react'
 
 import type { LoadedImage } from '../../image/types.ts'
 import type { ImageNode } from '../../ir/types.ts'
@@ -12,7 +12,7 @@ import type { ImageNode } from '../../ir/types.ts'
 import { renderHalfBlockMerged, type MergedSpan } from '../../image/halfblock.ts'
 import { buildCleanupCommand, buildTransmitChunks, buildVirtualPlacement, generateImageId } from '../../image/kitty.ts'
 import { ImageContext } from './image-context.tsx'
-import { useImageLoader } from './use-image-loader.ts'
+import { useImageLoader, useViewportVisibility } from './use-image-loader.ts'
 
 // re-export for consumers that import from here
 export { clearImageCache } from './use-image-loader.ts'
@@ -78,46 +78,15 @@ function KittyPlaceholder({ rows, cols }: { readonly rows: number; readonly cols
 function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly nodeKey: string }): ReactNode {
 	const ctx = useContext(ImageContext)
 	const renderer = useRenderer()
-	const { state, image, errorMsg } = useImageLoader(node.url, ctx)
+	const boxRef = useRef<BoxRenderable | null>(null)
+	const isVisible = useViewportVisibility(boxRef, ctx?.scrollRef)
+	const { state, image, errorMsg } = useImageLoader(node.url, ctx, isVisible)
 	const kittyIdRef = useRef<number | null>(null)
-
-	// pre-rendered half-block frames for animation
-	const renderedFramesRef = useRef<MergedSpan[][][] | null>(null)
-	const [frameIndex, setFrameIndex] = useState(0)
-	const frameStartRef = useRef(performance.now())
-
-	// pre-render all frames when animated image loads
-	useEffect(() => {
-		if (ctx == null || image?.frames == null) {
-			renderedFramesRef.current = null
-			return
-		}
-		renderedFramesRef.current = image.frames.map(rgba => {
-			const frameImg: LoadedImage = { ...image, rgba }
-			return renderHalfBlockMerged(frameImg, ctx.bgColor)
-		})
-		setFrameIndex(0)
-	}, [image, ctx?.bgColor])
-
-	// frame cycling timer
-	useEffect(() => {
-		if (image?.frames == null || image.delays == null) return
-		const delay = image.delays[frameIndex] ?? 100
-		const elapsed = performance.now() - frameStartRef.current
-		const adjusted = Math.max(0, delay - elapsed)
-
-		const timer = setTimeout(() => {
-			frameStartRef.current = performance.now()
-			setFrameIndex(i => (i + 1) % image.frames!.length)
-		}, adjusted)
-		return () => { clearTimeout(timer) }
-	}, [image, frameIndex])
 
 	// kitty transmit + cleanup lifecycle
 	useEffect(() => {
 		if (ctx == null || image == null) return
 		if (ctx.capabilities.protocol !== 'kitty-virtual') return
-		if (image.frames != null) return // animated → halfblock only
 		if (renderer == null) return
 
 		transmitKittyImage(image, renderer)
@@ -133,25 +102,34 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	const fgProps: Record<string, unknown> = {}
 	if (node.style.fg != null) fgProps['fg'] = node.style.fg
 
-	if (state === 'loading') {
+	// wrap all states in a ref'd box for viewport position tracking
+	if (state === 'idle' || state === 'loading') {
 		return (
-			<text key={nodeKey}>
-				<span {...fgProps}>{`[loading: ${node.alt}]`}</span>
-			</text>
+			<box ref={boxRef} key={nodeKey}>
+				<text>
+					<span {...fgProps}>{`[loading: ${node.alt}]`}</span>
+				</text>
+			</box>
 		)
 	}
 
 	if (state === 'error') {
 		const suffix = errorMsg.length > 0 ? ` (${errorMsg})` : ''
 		return (
-			<text key={nodeKey}>
-				<span {...fgProps}>{`[image: ${node.alt}${suffix}]`}</span>
-			</text>
+			<box ref={boxRef} key={nodeKey}>
+				<text>
+					<span {...fgProps}>{`[image: ${node.alt}${suffix}]`}</span>
+				</text>
+			</box>
 		)
 	}
 
 	if (state === 'loaded' && image != null) {
-		return renderLoadedImage(image, node, nodeKey, ctx, frameIndex, renderedFramesRef.current)
+		return (
+			<box ref={boxRef} key={nodeKey}>
+				{renderLoadedImage(image, node, nodeKey, ctx)}
+			</box>
+		)
 	}
 
 	return renderTextFallback(node, nodeKey)
@@ -209,20 +187,12 @@ function renderLoadedImage(
 	node: ImageNode,
 	key: string,
 	ctx: NonNullable<ReturnType<typeof useContext<typeof ImageContext>>>,
-	frameIndex: number,
-	preRenderedFrames: MergedSpan[][][] | null,
 ): ReactNode {
-	// degrade to halfblock for animated GIFs and linked images
+	// degrade to halfblock for linked images (OSC 8 per-row wrapping needs text elements)
 	let protocol = ctx.capabilities.protocol
-	if (image.frames != null) protocol = 'halfblock'
 	if (node.href != null && protocol === 'kitty-virtual') protocol = 'halfblock'
 
 	if (protocol === 'halfblock') {
-		if (image.frames != null) {
-			const safeIndex = Math.min(frameIndex, image.frames.length - 1)
-			const rows = preRenderedFrames?.[safeIndex] ?? renderHalfBlockMerged(image, ctx.bgColor)
-			return <HalfBlockRows key={key} rows={rows} width={image.terminalCols} href={node.href} />
-		}
 		const rows = renderHalfBlockMerged(image, ctx.bgColor)
 		return <HalfBlockRows key={key} rows={rows} width={image.terminalCols} href={node.href} />
 	}
