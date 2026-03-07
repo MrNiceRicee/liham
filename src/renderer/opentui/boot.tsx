@@ -1,8 +1,10 @@
 // opentui boot — owns the full OpenTUI app lifecycle.
 // creates the CLI renderer, mounts the React tree, handles cleanup.
 
-import { createCliRenderer } from '@opentui/core'
-import { createRoot } from '@opentui/react'
+import { createCliRenderer, FrameBufferRenderable } from '@opentui/core'
+import { createRoot, extend } from '@opentui/react'
+
+extend({ 'frame-buffer': FrameBufferRenderable })
 
 import type { ImageCapabilities } from '../../image/types.ts'
 import type { IRNode } from '../../ir/types.ts'

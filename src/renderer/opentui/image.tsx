@@ -1,7 +1,7 @@
 // image renderer component — Kitty virtual placements, half-block fallback, text fallback.
 // thin rendering shell — loading logic lives in use-image-loader.ts.
 
-import { resolveRenderLib, type BoxRenderable, type StyledText, type TextRenderable } from '@opentui/core'
+import { resolveRenderLib, RGBA, type BoxRenderable, type FrameBufferRenderable } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
 import { writeSync } from 'node:fs'
 import { memo, useContext, useEffect, useRef, type ReactNode } from 'react'
@@ -9,7 +9,7 @@ import { memo, useContext, useEffect, useRef, type ReactNode } from 'react'
 import type { LoadedImage } from '../../image/types.ts'
 import type { ImageNode } from '../../ir/types.ts'
 
-import { mergedSpansToStyledText, renderHalfBlockMerged, type MergedSpan } from '../../image/halfblock.ts'
+import { drawMergedSpansToBuffer, renderHalfBlockMerged, type MergedSpan } from '../../image/halfblock.ts'
 import { buildCleanupCommand, buildTransmitChunks, buildVirtualPlacement, generateImageId } from '../../image/kitty.ts'
 import { ImageContext } from './image-context.tsx'
 import { useImageLoader, useViewportVisibility } from './use-image-loader.ts'
@@ -67,6 +67,45 @@ const HalfBlockRows = memo(function HalfBlockRows({ rows, width, href }: HalfBlo
 	)
 }, (prev, next) => prev.rows === next.rows && prev.href === next.href)
 
+// -- animated GIF via FrameBuffer (bypasses React reconciliation for frame updates) --
+
+function AnimatedGifBlock({ image, bgColor }: {
+	readonly image: LoadedImage
+	readonly bgColor: string
+}): ReactNode {
+	const fbRef = useRef<FrameBufferRenderable | null>(null)
+
+	useEffect(() => {
+		const fb = fbRef.current
+		if (!fb || !image.frames || !image.delays) return
+
+		// pre-compute all frames as merged span rows
+		const frames = image.frames.map(rgba =>
+			renderHalfBlockMerged({ ...image, rgba }, bgColor),
+		)
+		const bgRGBA = RGBA.fromHex(bgColor)
+
+		// draw first frame
+		let frameIdx = 0
+		drawMergedSpansToBuffer(fb.frameBuffer, frames[0]!, bgRGBA)
+		fb.requestRender()
+
+		// animation timer — writes directly to native buffer
+		const advance = (): void => {
+			frameIdx = (frameIdx + 1) % frames.length
+			drawMergedSpansToBuffer(fb.frameBuffer, frames[frameIdx]!, bgRGBA)
+			fb.requestRender()
+			timer = setTimeout(advance, image.delays![frameIdx] ?? 100)
+		}
+		let timer = setTimeout(advance, image.delays[0] ?? 100)
+
+		return () => { clearTimeout(timer) }
+	}, [image, bgColor])
+
+	const rows = Math.ceil(image.height / 2)
+	return <frame-buffer ref={fbRef} width={image.terminalCols} height={rows} />
+}
+
 // -- kitty text fallback for placeholder rendering --
 
 function KittyPlaceholder({ rows, cols }: { readonly rows: number; readonly cols: number }): ReactNode {
@@ -82,47 +121,6 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	const isVisible = useViewportVisibility(boxRef, ctx?.scrollRef)
 	const { state, image, errorMsg } = useImageLoader(node.url, ctx, isVisible)
 	const kittyIdRef = useRef<number | null>(null)
-
-	// pre-rendered animation frames as StyledText for atomic rendering
-	const renderedFramesRef = useRef<StyledText[] | null>(null)
-	const renderedFrameRowsRef = useRef<number>(0)
-	const animTextRef = useRef<TextRenderable | null>(null)
-
-	// pre-render frames + start animation timer — bypasses React for frame updates.
-	// directly mutates TextRenderable.content to avoid reconciliation overhead.
-	useEffect(() => {
-		if (ctx == null || image?.frames == null || image.delays == null) {
-			renderedFramesRef.current = null
-			renderedFrameRowsRef.current = 0
-			return
-		}
-		const styledFrames: StyledText[] = []
-		for (const rgba of image.frames) {
-			const frameImg: LoadedImage = { ...image, rgba }
-			const rows = renderHalfBlockMerged(frameImg, ctx.bgColor)
-			renderedFrameRowsRef.current = rows.length
-			styledFrames.push(mergedSpansToStyledText(rows))
-		}
-		renderedFramesRef.current = styledFrames
-
-		let currentFrame = 0
-		let timer: ReturnType<typeof setTimeout>
-
-		const advance = () => {
-			currentFrame = (currentFrame + 1) % styledFrames.length
-			const text = animTextRef.current
-			if (text != null) {
-				text.content = styledFrames[currentFrame]!
-			}
-			const delay = image.delays![currentFrame] ?? 100
-			timer = setTimeout(advance, delay)
-		}
-
-		const firstDelay = image.delays[0] ?? 100
-		timer = setTimeout(advance, firstDelay)
-
-		return () => { clearTimeout(timer) }
-	}, [image, ctx?.bgColor])
 
 	// kitty transmit + cleanup lifecycle
 	useEffect(() => {
@@ -169,7 +167,7 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	if (state === 'loaded' && image != null) {
 		return (
 			<box ref={boxRef} key={nodeKey}>
-				{renderLoadedImage(image, node, nodeKey, ctx, renderedFramesRef.current, renderedFrameRowsRef.current, animTextRef)}
+				{renderLoadedImage(image, node, nodeKey, ctx)}
 			</box>
 		)
 	}
@@ -229,9 +227,6 @@ function renderLoadedImage(
 	node: ImageNode,
 	key: string,
 	ctx: NonNullable<ReturnType<typeof useContext<typeof ImageContext>>>,
-	preRenderedFrames: StyledText[] | null,
-	preRenderedRowCount: number,
-	animTextRef: React.RefObject<TextRenderable | null>,
 ): ReactNode {
 	// degrade to halfblock for animated GIFs and linked images
 	let protocol = ctx.capabilities.protocol
@@ -239,13 +234,8 @@ function renderLoadedImage(
 	if (node.href != null && protocol === 'kitty-virtual') protocol = 'halfblock'
 
 	if (protocol === 'halfblock') {
-		if (image.frames != null && preRenderedFrames != null && preRenderedFrames.length > 0) {
-			// render first frame; timer directly mutates text.content for subsequent frames
-			return (
-				<box key={key} style={{ height: preRenderedRowCount, width: image.terminalCols }}>
-					<text ref={animTextRef} content={preRenderedFrames[0]} />
-				</box>
-			)
+		if (image.frames != null && image.delays != null) {
+			return <AnimatedGifBlock key={key} image={image} bgColor={ctx.bgColor} />
 		}
 		const rows = renderHalfBlockMerged(image, ctx.bgColor)
 		return <HalfBlockRows key={key} rows={rows} width={image.terminalCols} href={node.href} />
