@@ -480,7 +480,8 @@ export function App(props: Readonly<AppProps>) {
 	const mediaFocusCtx: MediaFocusContextValue = useMemo(() => ({
 		focusedMediaIndex: state.mediaFocusIndex,
 		onMediaClick,
-	}), [state.mediaFocusIndex, onMediaClick])
+		focusBorderColor: props.theme.pane.focusedBorderColor,
+	}), [state.mediaFocusIndex, onMediaClick, props.theme.pane.focusedBorderColor])
 
 	const viewerLayout = state.mode !== 'browser'
 		? renderViewerLayout(
@@ -500,15 +501,31 @@ export function App(props: Readonly<AppProps>) {
 			)
 		: null
 
-	const withImageCtx = imageCtx != null
-		? <ImageContext.Provider value={imageCtx}>{viewerLayout}</ImageContext.Provider>
-		: viewerLayout
+	const showModal = state.mode === 'viewer' && state.mediaModal.kind !== 'closed'
 
-	const wrappedViewerLayout = withImageCtx != null
-		? <MediaFocusContext.Provider value={mediaFocusCtx}>{withImageCtx}</MediaFocusContext.Provider>
+	const modalElement = showModal
+		? <MediaModal
+				mediaNodes={viewerState.mediaNodes}
+				mediaIndex={state.mediaModal.kind === 'image' ? state.mediaModal.mediaIndex : 0}
+				theme={props.theme}
+				termWidth={state.dimensions.width}
+				termHeight={state.dimensions.height}
+			/>
 		: null
 
-	const showModal = state.mode === 'viewer' && state.mediaModal.kind !== 'closed'
+	// wrap viewer layout + modal inside both context providers so modal has ImageContext
+	const viewerContent = (
+		<>
+			{viewerLayout}
+			{modalElement}
+		</>
+	)
+
+	const withImageCtx = imageCtx != null
+		? <ImageContext.Provider value={imageCtx}>{viewerContent}</ImageContext.Provider>
+		: viewerContent
+
+	const wrappedViewerLayout = <MediaFocusContext.Provider value={mediaFocusCtx}>{withImageCtx}</MediaFocusContext.Provider>
 
 	return (
 		<box style={{ position: 'relative', flexDirection: 'column', width: '100%', height: '100%' }}>
@@ -530,15 +547,6 @@ export function App(props: Readonly<AppProps>) {
 				renderTimeMs={renderTimeMs}
 				fileDeleted={state.fileDeleted}
 			/>
-			{showModal && (
-				<MediaModal
-					mediaNodes={viewerState.mediaNodes}
-					mediaIndex={state.mediaModal.kind === 'image' ? state.mediaModal.mediaIndex : 0}
-					theme={props.theme}
-					termWidth={state.dimensions.width}
-					termHeight={state.dimensions.height}
-				/>
-			)}
 		</box>
 	)
 }

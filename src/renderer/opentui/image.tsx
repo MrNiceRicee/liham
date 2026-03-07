@@ -128,11 +128,12 @@ function ImageBlock({ node, nodeKey, mediaIndex }: { readonly node: ImageNode; r
 	if (node.style.fg != null) fgProps['fg'] = node.style.fg
 
 	const focusBorder = isFocused ? ['bottom'] as const : undefined
+	const focusBorderColor = isFocused ? focusCtx?.focusBorderColor : undefined
 
 	// wrap all states in a ref'd box for viewport position tracking
 	if (state === 'idle' || state === 'loading') {
 		return (
-			<box ref={boxRef} key={nodeKey} border={focusBorder} onMouseDown={handleMouseDown}>
+			<box ref={boxRef} key={nodeKey} border={focusBorder} borderColor={focusBorderColor} onMouseDown={handleMouseDown}>
 				<text>
 					<span {...fgProps}>{`[loading: ${node.alt}]`}</span>
 				</text>
@@ -143,7 +144,7 @@ function ImageBlock({ node, nodeKey, mediaIndex }: { readonly node: ImageNode; r
 	if (state === 'error') {
 		const suffix = errorMsg.length > 0 ? ` (${errorMsg})` : ''
 		return (
-			<box ref={boxRef} key={nodeKey} border={focusBorder} onMouseDown={handleMouseDown}>
+			<box ref={boxRef} key={nodeKey} border={focusBorder} borderColor={focusBorderColor} onMouseDown={handleMouseDown}>
 				<text>
 					<span {...fgProps}>{`[image: ${node.alt}${suffix}]`}</span>
 				</text>
@@ -153,7 +154,7 @@ function ImageBlock({ node, nodeKey, mediaIndex }: { readonly node: ImageNode; r
 
 	if (state === 'loaded' && image != null) {
 		return (
-			<box ref={boxRef} key={nodeKey} border={focusBorder} onMouseDown={handleMouseDown}>
+			<box ref={boxRef} key={nodeKey} border={focusBorder} borderColor={focusBorderColor} onMouseDown={handleMouseDown}>
 				{renderLoadedImage(image, node, nodeKey, ctx)}
 			</box>
 		)
