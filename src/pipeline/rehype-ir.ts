@@ -233,7 +233,10 @@ function compileParagraph(state: CompilerState, node: Element): IRNode {
 	const children = withAncestors(state, node)
 	// standalone media: <p><img></p>, <p><video></p>, <p><audio></p> → promote to block
 	const first = children[0]
-	if (children.length === 1 && (first?.type === 'image' || first?.type === 'video' || first?.type === 'audio')) {
+	if (
+		children.length === 1 &&
+		(first?.type === 'image' || first?.type === 'video' || first?.type === 'audio')
+	) {
 		return first
 	}
 	return {
@@ -296,13 +299,14 @@ function extractAlignments(node: Element): ('left' | 'center' | 'right' | null)[
 	for (const child of node.children) {
 		if (child.type !== 'element') continue
 		// find first tr (may be inside thead)
-		const section =
-			child.tagName === 'thead' || child.tagName === 'tbody' ? child : null
+		const section = child.tagName === 'thead' || child.tagName === 'tbody' ? child : null
 		const container = section ?? node
 		for (const row of container.children) {
 			if (row.type !== 'element' || row.tagName !== 'tr') continue
 			return row.children
-				.filter((c): c is Element => c.type === 'element' && (c.tagName === 'th' || c.tagName === 'td'))
+				.filter(
+					(c): c is Element => c.type === 'element' && (c.tagName === 'th' || c.tagName === 'td'),
+				)
 				.map((cell) => {
 					const align = cell.properties?.['align']
 					if (align === 'left' || align === 'center' || align === 'right') return align
@@ -315,7 +319,11 @@ function extractAlignments(node: Element): ('left' | 'center' | 'right' | null)[
 
 const TABLE_SECTIONS = new Set(['thead', 'tbody', 'tfoot'])
 
-function collectTableRows(state: CompilerState, section: Element, isHeader: boolean): TableRowNode[] {
+function collectTableRows(
+	state: CompilerState,
+	section: Element,
+	isHeader: boolean,
+): TableRowNode[] {
 	const rows: TableRowNode[] = []
 	state.ancestors.push(section)
 	for (const child of section.children) {
@@ -355,7 +363,9 @@ function compileTable(state: CompilerState, node: Element): IRNode {
 function compileTableRow(state: CompilerState, node: Element, isHeader: boolean): TableRowNode {
 	const { theme } = state
 	const fg = isHeader ? theme.table.headerColor : theme.table.cellColor
-	const cells = withAncestors(state, node).filter((child): child is TableCellNode => child.type === 'tableCell')
+	const cells = withAncestors(state, node).filter(
+		(child): child is TableCellNode => child.type === 'tableCell',
+	)
 	return {
 		type: 'tableRow',
 		isHeader,

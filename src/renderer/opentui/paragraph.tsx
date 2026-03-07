@@ -7,11 +7,7 @@ export function renderParagraph(node: ParagraphNode, key: string) {
 
 	return (
 		<box key={key} style={{ marginBottom: 1 }}>
-			<text>
-				{node.style.fg != null
-					? <span fg={node.style.fg}>{children}</span>
-					: children}
-			</text>
+			<text>{node.style.fg != null ? <span fg={node.style.fg}>{children}</span> : children}</text>
 		</box>
 	)
 }

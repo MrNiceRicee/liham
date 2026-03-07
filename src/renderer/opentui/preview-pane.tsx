@@ -16,10 +16,17 @@ interface PreviewPaneProps {
 	onMouseScroll?: () => void
 }
 
-export function PreviewPane({ content, focused, theme, scrollRef, width, height, onMouseDown, onMouseScroll }: Readonly<PreviewPaneProps>) {
-	const borderColor = focused
-		? theme.pane.focusedBorderColor
-		: theme.pane.unfocusedBorderColor
+export function PreviewPane({
+	content,
+	focused,
+	theme,
+	scrollRef,
+	width,
+	height,
+	onMouseDown,
+	onMouseScroll,
+}: Readonly<PreviewPaneProps>) {
+	const borderColor = focused ? theme.pane.focusedBorderColor : theme.pane.unfocusedBorderColor
 
 	const rootOptions: Record<string, unknown> = { flexGrow: 1, borderColor, borderStyle: 'single' }
 	rootOptions['width'] = width ?? '100%'

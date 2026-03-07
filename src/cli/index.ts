@@ -94,8 +94,22 @@ const options = {
 } as const
 
 type CliMode =
-	| { mode: 'info'; layout: LayoutMode; renderer: RendererName; theme: ThemeName; noImages: boolean }
-	| { mode: 'browser'; dir: string; layout: LayoutMode; renderer: RendererName; theme: ThemeName; noWatch: boolean; noImages: boolean }
+	| {
+			mode: 'info'
+			layout: LayoutMode
+			renderer: RendererName
+			theme: ThemeName
+			noImages: boolean
+	  }
+	| {
+			mode: 'browser'
+			dir: string
+			layout: LayoutMode
+			renderer: RendererName
+			theme: ThemeName
+			noWatch: boolean
+			noImages: boolean
+	  }
 	| {
 			mode: 'viewer'
 			filePath: string
@@ -285,7 +299,9 @@ async function main() {
 			? `${detection.imageCapabilities.protocol} (--no-images)`
 			: detection.imageCapabilities.protocol
 		console.log(`image protocol: ${protocolLabel}`)
-		console.log(`cell pixels: ${String(detection.imageCapabilities.cellPixelWidth)}x${String(detection.imageCapabilities.cellPixelHeight)}`)
+		console.log(
+			`cell pixels: ${String(detection.imageCapabilities.cellPixelWidth)}x${String(detection.imageCapabilities.cellPixelHeight)}`,
+		)
 		console.log(`sharp: ${String(isSharpAvailable())}`)
 		console.log(`TERM: ${process.env['TERM'] ?? '(unset)'}`)
 		console.log(`TERM_PROGRAM: ${process.env['TERM_PROGRAM'] ?? '(unset)'}`)
@@ -301,7 +317,14 @@ async function main() {
 	}
 
 	if (args.mode === 'browser') {
-		await boot({ mode: 'browser', dir: args.dir, theme: detection.tokens, imageCapabilities: detection.imageCapabilities, layout: args.layout, noWatch: args.noWatch })
+		await boot({
+			mode: 'browser',
+			dir: args.dir,
+			theme: detection.tokens,
+			imageCapabilities: detection.imageCapabilities,
+			layout: args.layout,
+			noWatch: args.noWatch,
+		})
 		return
 	}
 

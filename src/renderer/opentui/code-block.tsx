@@ -23,7 +23,13 @@ export function renderCodeBlock(node: CodeBlockNode, key: string) {
 	return (
 		<box key={key} style={boxStyle} title={node.language ?? ''}>
 			{hasHighlightedChildren ? (
-				<text>{fg != null ? <span fg={fg}>{renderInlineChildren(node.children, key)}</span> : renderInlineChildren(node.children, key)}</text>
+				<text>
+					{fg != null ? (
+						<span fg={fg}>{renderInlineChildren(node.children, key)}</span>
+					) : (
+						renderInlineChildren(node.children, key)
+					)}
+				</text>
 			) : (
 				<text>{fg != null ? <span fg={fg}>{node.code}</span> : node.code}</text>
 			)}

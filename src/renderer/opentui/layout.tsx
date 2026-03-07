@@ -3,8 +3,7 @@
 import type { ScrollBoxRenderable } from '@opentui/core'
 import type { ReactNode } from 'react'
 
-import type { AppState } from '../../app/state.ts'
-import type { paneDimensions } from '../../app/state.ts'
+import type { AppState, paneDimensions } from '../../app/state.ts'
 import type { FuzzyMatch } from '../../browser/fuzzy.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 
@@ -53,7 +52,9 @@ export function renderBrowserLayout(
 		<box style={{ flexDirection: direction, flexGrow: 1 }}>
 			{browserPane}
 			<PreviewPane
-				content={previewContent ?? <text color={theme.fallback.textColor}>select a file to preview</text>}
+				content={
+					previewContent ?? <text color={theme.fallback.textColor}>select a file to preview</text>
+				}
 				focused={false}
 				theme={theme}
 				scrollRef={previewRef}

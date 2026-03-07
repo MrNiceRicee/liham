@@ -10,10 +10,7 @@ export interface ImageCache {
 	totalBytes(): number
 }
 
-export function createImageCache(
-	budgetBytes: number,
-	onEvict?: (key: string) => void,
-): ImageCache {
+export function createImageCache(budgetBytes: number, onEvict?: (key: string) => void): ImageCache {
 	const entries = new Map<string, LoadedImage>()
 	let currentBytes = 0
 

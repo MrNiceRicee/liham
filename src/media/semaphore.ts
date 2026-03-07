@@ -11,24 +11,34 @@ export function createSemaphore(max: number): Semaphore {
 
 	return {
 		async acquire(signal?: AbortSignal) {
-			if (active < max) { active++; return }
+			if (active < max) {
+				active++
+				return
+			}
 			return new Promise<void>((resolve, reject) => {
 				const entry = { resolve, rejected: false }
 				queue.push(entry)
-				signal?.addEventListener('abort', () => {
-					const idx = queue.indexOf(entry)
-					if (idx !== -1) {
-						queue.splice(idx, 1)
-						entry.rejected = true
-						reject(signal.reason)
-					}
-				}, { once: true })
+				signal?.addEventListener(
+					'abort',
+					() => {
+						const idx = queue.indexOf(entry)
+						if (idx !== -1) {
+							queue.splice(idx, 1)
+							entry.rejected = true
+							reject(signal.reason)
+						}
+					},
+					{ once: true },
+				)
 			})
 		},
 		release() {
 			while (queue.length > 0) {
 				const entry = queue.shift()!
-				if (!entry.rejected) { entry.resolve(); return }
+				if (!entry.rejected) {
+					entry.resolve()
+					return
+				}
 			}
 			active--
 		},

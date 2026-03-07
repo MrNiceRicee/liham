@@ -56,9 +56,7 @@ describe('sanitizeUrl', () => {
 	})
 
 	it('strips percent-encoded ESC (%1b)', () => {
-		expect(sanitizeUrl('https://evil.com/%1b%5d52;c;data%07')).toBe(
-			'https://evil.com/%5d52;c;data',
-		)
+		expect(sanitizeUrl('https://evil.com/%1b%5d52;c;data%07')).toBe('https://evil.com/%5d52;c;data')
 	})
 
 	it('strips percent-encoded null (%00)', () => {
@@ -78,9 +76,7 @@ describe('sanitizeUrl', () => {
 	})
 
 	it('passes URL with fragment', () => {
-		expect(sanitizeUrl('https://example.com/page#section')).toBe(
-			'https://example.com/page#section',
-		)
+		expect(sanitizeUrl('https://example.com/page#section')).toBe('https://example.com/page#section')
 	})
 
 	it('passes URL with query params', () => {

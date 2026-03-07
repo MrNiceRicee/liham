@@ -1,8 +1,7 @@
 // file watcher — monitors parent directory for changes to a specific file.
 // ports the Go v1 fsnotify pattern to node:fs watch().
 
-import { existsSync, statSync } from 'node:fs'
-import { watch, type FSWatcher } from 'node:fs'
+import { existsSync, type FSWatcher, statSync, watch } from 'node:fs'
 import { basename, dirname, resolve } from 'node:path'
 
 export type WatcherEvent =

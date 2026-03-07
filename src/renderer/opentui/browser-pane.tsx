@@ -46,9 +46,15 @@ function HighlightedName({
 		const charHighlighted = posSet.has(i)
 		if (charHighlighted !== isHighlight && current.length > 0) {
 			segments.push(
-				isHighlight
-					? <text key={`h-${String(i)}`} color={highlightColor} bold>{current}</text>
-					: <text key={`n-${String(i)}`} color={normalColor}>{current}</text>,
+				isHighlight ? (
+					<text key={`h-${String(i)}`} color={highlightColor} bold>
+						{current}
+					</text>
+				) : (
+					<text key={`n-${String(i)}`} color={normalColor}>
+						{current}
+					</text>
+				),
 			)
 			current = ''
 		}
@@ -58,9 +64,15 @@ function HighlightedName({
 
 	if (current.length > 0) {
 		segments.push(
-			isHighlight
-				? <text key="h-end" color={highlightColor} bold>{current}</text>
-				: <text key="n-end" color={normalColor}>{current}</text>,
+			isHighlight ? (
+				<text key="h-end" color={highlightColor} bold>
+					{current}
+				</text>
+			) : (
+				<text key="n-end" color={normalColor}>
+					{current}
+				</text>
+			),
 		)
 	}
 
@@ -94,9 +106,7 @@ function buildFileList(
 		const prefix = isSelected ? '> ' : '  '
 		const fgColor = isSelected ? bt.selectedFg : textColor
 		const dirOffset = entry.directory ? entry.directory.length + 1 : 0
-		const namePositions = positions
-			.filter((p) => p >= dirOffset)
-			.map((p) => p - dirOffset)
+		const namePositions = positions.filter((p) => p >= dirOffset).map((p) => p - dirOffset)
 
 		items.push(
 			<box
@@ -133,16 +143,13 @@ export function BrowserPane({
 	onMouseDown,
 	onMouseScroll,
 }: Readonly<BrowserPaneProps>) {
-	const borderColor = focused
-		? theme.pane.focusedBorderColor
-		: theme.pane.unfocusedBorderColor
+	const borderColor = focused ? theme.pane.focusedBorderColor : theme.pane.unfocusedBorderColor
 
 	const bt = theme.browser
 	const matchCount = matches.length
 
-	const countLabel = filter.length > 0
-		? `${String(matchCount)}/${String(totalFiles)}`
-		: String(totalFiles)
+	const countLabel =
+		filter.length > 0 ? `${String(matchCount)}/${String(totalFiles)}` : String(totalFiles)
 
 	// main content based on scan status
 	let content: ReactNode
@@ -161,12 +168,12 @@ export function BrowserPane({
 	return (
 		<box style={{ flexDirection: 'column', width: '100%', flexGrow: 1 }}>
 			{/* filter input */}
-			<box
-				border={['bottom']}
-				style={{ height: 2, width: '100%', rootOptions: { borderColor } }}
-			>
+			<box border={['bottom']} style={{ height: 2, width: '100%', rootOptions: { borderColor } }}>
 				<box style={{ flexDirection: 'row', width: '100%' }}>
-					<text color={bt.filterColor}>{'> '}{filter}</text>
+					<text color={bt.filterColor}>
+						{'> '}
+						{filter}
+					</text>
 					<box style={{ flexGrow: 1 }} />
 					<text color={bt.fileCountColor}>{countLabel}</text>
 				</box>
@@ -185,9 +192,7 @@ export function BrowserPane({
 					rootOptions: { width: '100%', flexGrow: 1, borderColor, borderStyle: 'single' },
 				}}
 			>
-				<box style={{ flexDirection: 'column', padding: 1 }}>
-					{content}
-				</box>
+				<box style={{ flexDirection: 'column', padding: 1 }}>{content}</box>
 			</scrollbox>
 		</box>
 	)

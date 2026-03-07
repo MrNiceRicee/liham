@@ -1,9 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { mkdir, rm, writeFile, unlink } from 'node:fs/promises'
+import { mkdir, rm, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { createDirectoryWatcher, createFileWatcher, isEditorTemp, type WatcherEvent } from './watcher.ts'
+import {
+	createDirectoryWatcher,
+	createFileWatcher,
+	isEditorTemp,
+	type WatcherEvent,
+} from './watcher.ts'
 
 // -- isEditorTemp tests --
 
@@ -236,7 +241,9 @@ describe('createDirectoryWatcher', () => {
 	test('fires event on .md file creation', async () => {
 		let eventCount = 0
 		const watcher = createDirectoryWatcher(DIR_TEST_DIR, {
-			onEvent: () => { eventCount++ },
+			onEvent: () => {
+				eventCount++
+			},
 			debounceMs: 50,
 		})
 
@@ -258,7 +265,9 @@ describe('createDirectoryWatcher', () => {
 
 		let eventCount = 0
 		const watcher = createDirectoryWatcher(DIR_TEST_DIR, {
-			onEvent: () => { eventCount++ },
+			onEvent: () => {
+				eventCount++
+			},
 			debounceMs: 50,
 		})
 
@@ -276,7 +285,9 @@ describe('createDirectoryWatcher', () => {
 	test('fires event on non-.md file creation (rescan filters by extension)', async () => {
 		let eventCount = 0
 		const watcher = createDirectoryWatcher(DIR_TEST_DIR, {
-			onEvent: () => { eventCount++ },
+			onEvent: () => {
+				eventCount++
+			},
 			debounceMs: 50,
 		})
 
@@ -299,7 +310,9 @@ describe('createDirectoryWatcher', () => {
 
 		let eventCount = 0
 		const watcher = createDirectoryWatcher(tempDir, {
-			onEvent: () => { eventCount++ },
+			onEvent: () => {
+				eventCount++
+			},
 			debounceMs: 50,
 		})
 
@@ -319,7 +332,9 @@ describe('createDirectoryWatcher', () => {
 	test('debounce coalesces rapid events into single callback', async () => {
 		let eventCount = 0
 		const watcher = createDirectoryWatcher(DIR_TEST_DIR, {
-			onEvent: () => { eventCount++ },
+			onEvent: () => {
+				eventCount++
+			},
 			debounceMs: 100,
 		})
 
@@ -344,7 +359,9 @@ describe('createDirectoryWatcher', () => {
 	test('close() stops further events', async () => {
 		let eventCount = 0
 		const watcher = createDirectoryWatcher(DIR_TEST_DIR, {
-			onEvent: () => { eventCount++ },
+			onEvent: () => {
+				eventCount++
+			},
 			debounceMs: 50,
 		})
 

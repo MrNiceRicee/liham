@@ -53,17 +53,23 @@ function isBlockedHost(hostname: string): boolean {
 }
 
 // follow redirects with per-hop SSRF validation
-async function fetchWithRedirects(url: string, signal: AbortSignal): Promise<ImageResult<Response>> {
+async function fetchWithRedirects(
+	url: string,
+	signal: AbortSignal,
+): Promise<ImageResult<Response>> {
 	let currentUrl = url
 	for (let hops = 0; hops < MAX_REDIRECTS; hops++) {
 		const response = await fetch(currentUrl, { redirect: 'manual', signal, decompress: false })
 		if (response.status < 300 || response.status >= 400) {
-			return response.ok ? { ok: true, value: response } : { ok: false, error: 'remote image failed' }
+			return response.ok
+				? { ok: true, value: response }
+				: { ok: false, error: 'remote image failed' }
 		}
 		const location = response.headers.get('location')
 		if (location == null) return { ok: false, error: 'remote image failed' }
 		currentUrl = new URL(location, currentUrl).href
-		if (isBlockedHost(new URL(currentUrl).hostname)) return { ok: false, error: 'remote image blocked' }
+		if (isBlockedHost(new URL(currentUrl).hostname))
+			return { ok: false, error: 'remote image blocked' }
 	}
 	return { ok: false, error: 'remote image failed' }
 }
@@ -104,9 +110,7 @@ export async function fetchRemoteImage(
 		if (isBlockedHost(new URL(url).hostname)) return { ok: false, error: 'remote image blocked' }
 
 		const timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS)
-		const combined = signal != null
-			? AbortSignal.any([timeoutSignal, signal])
-			: timeoutSignal
+		const combined = signal != null ? AbortSignal.any([timeoutSignal, signal]) : timeoutSignal
 
 		const fetchResult = await fetchWithRedirects(url, combined)
 		if (!fetchResult.ok) return fetchResult

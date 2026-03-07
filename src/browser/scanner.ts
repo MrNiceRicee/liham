@@ -73,7 +73,13 @@ async function processEntry(
 	dir: string,
 	root: string,
 	depth: number,
-	ctx: { entries: FileEntry[]; maxFiles: number; maxDepth: number; excludeDirs: Set<string>; walk: (d: string, depth: number) => Promise<void> },
+	ctx: {
+		entries: FileEntry[]
+		maxFiles: number
+		maxDepth: number
+		excludeDirs: Set<string>
+		walk: (d: string, depth: number) => Promise<void>
+	},
 ): Promise<void> {
 	const name = String(entry.name)
 	if (hasControlChars(name)) return
@@ -92,15 +98,10 @@ async function processEntry(
 	ctx.entries.push(toFileEntry(root, fullPath, name))
 }
 
-export async function scanDirectory(
-	root: string,
-	options?: ScanOptions,
-): Promise<FileEntry[]> {
+export async function scanDirectory(root: string, options?: ScanOptions): Promise<FileEntry[]> {
 	const maxDepth = options?.maxDepth ?? DEFAULT_MAX_DEPTH
 	const maxFiles = options?.maxFiles ?? DEFAULT_MAX_FILES
-	const excludeDirs = options?.excludeDirs
-		? new Set(options.excludeDirs)
-		: DEFAULT_EXCLUDE_DIRS
+	const excludeDirs = options?.excludeDirs ? new Set(options.excludeDirs) : DEFAULT_EXCLUDE_DIRS
 
 	const entries: FileEntry[] = []
 

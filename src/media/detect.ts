@@ -123,7 +123,14 @@ function shouldSkipQuery(): boolean {
 
 async function queryTerminal(): Promise<DetectionResult> {
 	if (shouldSkipQuery()) {
-		return { theme: null, image: { protocol: 'text', cellPixelWidth: DEFAULT_CELL_WIDTH, cellPixelHeight: DEFAULT_CELL_HEIGHT } }
+		return {
+			theme: null,
+			image: {
+				protocol: 'text',
+				cellPixelWidth: DEFAULT_CELL_WIDTH,
+				cellPixelHeight: DEFAULT_CELL_HEIGHT,
+			},
+		}
 	}
 
 	const stdin = process.stdin
@@ -135,10 +142,7 @@ async function queryTerminal(): Promise<DetectionResult> {
 
 		// combined query: OSC 11 + Kitty graphics + CSI 16t + DA1 sentinel
 		const query =
-			'\x1b]11;?\x1b\\' +
-			'\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\' +
-			'\x1b[16t' +
-			'\x1b[c'
+			'\x1b]11;?\x1b\\' + '\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\' + '\x1b[16t' + '\x1b[c'
 
 		process.stdout.write(query)
 
@@ -192,7 +196,11 @@ async function queryTerminal(): Promise<DetectionResult> {
 	} catch {
 		return {
 			theme: null,
-			image: { protocol: 'text', cellPixelWidth: DEFAULT_CELL_WIDTH, cellPixelHeight: DEFAULT_CELL_HEIGHT },
+			image: {
+				protocol: 'text',
+				cellPixelWidth: DEFAULT_CELL_WIDTH,
+				cellPixelHeight: DEFAULT_CELL_HEIGHT,
+			},
 		}
 	} finally {
 		stdin.setRawMode(wasRaw ?? false)
@@ -209,7 +217,11 @@ export async function detectCapabilities(): Promise<DetectionResult> {
 	if (override != null && shouldSkipQuery()) {
 		return {
 			theme: null,
-			image: { protocol: override, cellPixelWidth: DEFAULT_CELL_WIDTH, cellPixelHeight: DEFAULT_CELL_HEIGHT },
+			image: {
+				protocol: override,
+				cellPixelWidth: DEFAULT_CELL_WIDTH,
+				cellPixelHeight: DEFAULT_CELL_HEIGHT,
+			},
 		}
 	}
 

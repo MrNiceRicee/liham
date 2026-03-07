@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react'
 
-import { isBlockNode, type CoreIRNode, type IRNode, type MediaIRNode } from '../../ir/types.ts'
+import { type CoreIRNode, type IRNode, isBlockNode, type MediaIRNode } from '../../ir/types.ts'
 import { renderBlockquote } from './blockquote.tsx'
 import { renderCodeBlock } from './code-block.tsx'
 import { renderCustom, renderUnknown } from './fallback.tsx'
@@ -75,13 +75,21 @@ function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 		case 'video': {
 			const mediaIndex = ctx.media.length
 			ctx.media.push({ node, index: mediaIndex })
-			return <text key={key}><span style={{ fg: node.style.fg, dim: true }}>[video: {node.alt}]</span></text>
+			return (
+				<text key={key}>
+					<span style={{ fg: node.style.fg, dim: true }}>[video: {node.alt}]</span>
+				</text>
+			)
 		}
 
 		case 'audio': {
 			const mediaIndex = ctx.media.length
 			ctx.media.push({ node, index: mediaIndex })
-			return <text key={key}><span style={{ fg: node.style.fg, dim: true }}>[audio: {node.alt}]</span></text>
+			return (
+				<text key={key}>
+					<span style={{ fg: node.style.fg, dim: true }}>[audio: {node.alt}]</span>
+				</text>
+			)
 		}
 
 		case 'table':
@@ -106,7 +114,11 @@ function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 }
 
 // internal renderChildren that threads RenderContext
-function renderChildrenInternal(children: IRNode[], parentKey: string, ctx: RenderContext): ReactNode[] {
+function renderChildrenInternal(
+	children: IRNode[],
+	parentKey: string,
+	ctx: RenderContext,
+): ReactNode[] {
 	const results: ReactNode[] = []
 	let inlineGroup: { node: IRNode; index: number }[] = []
 	let wrapCount = 0
@@ -143,7 +155,11 @@ function renderChildrenInternal(children: IRNode[], parentKey: string, ctx: Rend
 // renders children with block-context awareness:
 // groups consecutive inline nodes into <text> wrappers,
 // renders block nodes directly.
-export function renderChildren(children: IRNode[], parentKey: string, maxWidth?: number): ReactNode[] {
+export function renderChildren(
+	children: IRNode[],
+	parentKey: string,
+	maxWidth?: number,
+): ReactNode[] {
 	return renderChildrenInternal(children, parentKey, { maxWidth, media: [] })
 }
 

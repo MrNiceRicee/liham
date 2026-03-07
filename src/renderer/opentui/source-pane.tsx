@@ -26,11 +26,18 @@ function chunkLines(text: string, chunkSize: number): string[] {
 	return chunks
 }
 
-export function SourcePane({ content, focused, theme, scrollRef, width, height, onMouseDown, onMouseScroll }: Readonly<SourcePaneProps>) {
+export function SourcePane({
+	content,
+	focused,
+	theme,
+	scrollRef,
+	width,
+	height,
+	onMouseDown,
+	onMouseScroll,
+}: Readonly<SourcePaneProps>) {
 	const chunks = chunkLines(content, 100)
-	const borderColor = focused
-		? theme.pane.focusedBorderColor
-		: theme.pane.unfocusedBorderColor
+	const borderColor = focused ? theme.pane.focusedBorderColor : theme.pane.unfocusedBorderColor
 
 	const rootOptions: Record<string, unknown> = { flexGrow: 1, borderColor, borderStyle: 'single' }
 	rootOptions['width'] = width ?? '100%'

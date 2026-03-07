@@ -28,11 +28,15 @@ export function isValidMagicBytes(bytes: Uint8Array): boolean {
 	if (matchesBytes(bytes, 0, MAGIC_JPEG)) return true
 	if (matchesBytes(bytes, 0, MAGIC_GIF)) return true
 	// WebP: RIFF at offset 0 AND WEBP at offset 8
-	if (matchesBytes(bytes, 0, MAGIC_WEBP_RIFF) && matchesBytes(bytes, 8, MAGIC_WEBP_WEBP)) return true
+	if (matchesBytes(bytes, 0, MAGIC_WEBP_RIFF) && matchesBytes(bytes, 8, MAGIC_WEBP_WEBP))
+		return true
 	return false
 }
 
-export async function resolveImagePath(src: string, basePath: string): Promise<ImageResult<string>> {
+export async function resolveImagePath(
+	src: string,
+	basePath: string,
+): Promise<ImageResult<string>> {
 	try {
 		const resolved = isAbsolute(src) ? resolve(src) : resolve(join(basePath, src))
 		// realpath canonicalizes symlinks — prevents following malicious symlinks
@@ -43,7 +47,10 @@ export async function resolveImagePath(src: string, basePath: string): Promise<I
 	}
 }
 
-export async function loadImageFile(src: string, basePath: string): Promise<ImageResult<LocalFile>> {
+export async function loadImageFile(
+	src: string,
+	basePath: string,
+): Promise<ImageResult<LocalFile>> {
 	const pathResult = await resolveImagePath(src, basePath)
 	if (!pathResult.ok) return pathResult
 

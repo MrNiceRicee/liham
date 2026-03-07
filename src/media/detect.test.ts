@@ -52,10 +52,7 @@ describe('parseDetectionResponse', () => {
 
 	test('parses combined response with all components', () => {
 		const response =
-			'\x1b]11;rgb:1a1a/1b1b/2626\x1b\\' +
-			'\x1b_Gi=31;OK\x1b\\' +
-			'\x1b[6;18;9t' +
-			'\x1b[?62;4c'
+			'\x1b]11;rgb:1a1a/1b1b/2626\x1b\\' + '\x1b_Gi=31;OK\x1b\\' + '\x1b[6;18;9t' + '\x1b[?62;4c'
 		const result = parseDetectionResponse(response)
 		expect(result.theme).toBe('dark')
 		expect(result.kittySupported).toBe(true)
@@ -64,10 +61,7 @@ describe('parseDetectionResponse', () => {
 	})
 
 	test('handles responses in any order', () => {
-		const response =
-			'\x1b[6;16;8t' +
-			'\x1b_Gi=31;OK\x1b\\' +
-			'\x1b]11;rgb:ffff/ffff/ffff\x1b\\'
+		const response = '\x1b[6;16;8t' + '\x1b_Gi=31;OK\x1b\\' + '\x1b]11;rgb:ffff/ffff/ffff\x1b\\'
 		const result = parseDetectionResponse(response)
 		expect(result.theme).toBe('light')
 		expect(result.kittySupported).toBe(true)

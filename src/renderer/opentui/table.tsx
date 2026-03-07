@@ -209,14 +209,26 @@ function renderPlainLine(
 		const cell = cells[i]
 		const cellFg = cell?.style.fg
 
-		parts.push(<span key={`${lineKey}-b${String(i)}`} {...borderFg}>{'│'}</span>)
+		parts.push(
+			<span key={`${lineKey}-b${String(i)}`} {...borderFg}>
+				{'│'}
+			</span>,
+		)
 		if (cellFg != null) {
-			parts.push(<span key={`${lineKey}-t${String(i)}`} fg={cellFg}>{padded}</span>)
+			parts.push(
+				<span key={`${lineKey}-t${String(i)}`} fg={cellFg}>
+					{padded}
+				</span>,
+			)
 		} else {
 			parts.push(padded)
 		}
 	}
-	parts.push(<span key={`${lineKey}-br`} {...borderFg}>{'│'}</span>)
+	parts.push(
+		<span key={`${lineKey}-br`} {...borderFg}>
+			{'│'}
+		</span>,
+	)
 
 	return <text key={lineKey}>{parts}</text>
 }
@@ -328,22 +340,24 @@ export function renderTable(node: TableNode, key: string, maxWidth?: number) {
 
 	return (
 		<box key={key} style={{ flexDirection: 'column', marginBottom: 1 }}>
-			<text><span {...borderFg}>{buildSeparator(colWidths, '┌', '┬', '┐', '─')}</span></text>
+			<text>
+				<span {...borderFg}>{buildSeparator(colWidths, '┌', '┬', '┐', '─')}</span>
+			</text>
 			{rows}
-			<text><span {...borderFg}>{buildSeparator(colWidths, '└', '┴', '┘', '─')}</span></text>
+			<text>
+				<span {...borderFg}>{buildSeparator(colWidths, '└', '┴', '┘', '─')}</span>
+			</text>
 			{overflowCount > 0 && (
-				<text><span fg="#565f89">{`… ${String(overflowCount)} more rows`}</span></text>
+				<text>
+					<span fg="#565f89">{`… ${String(overflowCount)} more rows`}</span>
+				</text>
 			)}
 		</box>
 	)
 }
 
 // standalone renderers for orphan cases in index.tsx
-export function renderTableRow(
-	node: TableRowNode,
-	key: string,
-	ctx: { colWidths: number[] },
-) {
+export function renderTableRow(node: TableRowNode, key: string, ctx: { colWidths: number[] }) {
 	const borderFg: Record<string, unknown> = {}
 	return (
 		<box key={key} style={{ flexDirection: 'column' }}>
@@ -364,9 +378,11 @@ export function renderTableCell(
 
 	return (
 		<text key={key}>
-			{Object.keys(textStyle).length > 0
-				? <span {...textStyle}>{renderInlineChildren(node.children, key)}</span>
-				: renderInlineChildren(node.children, key)}
+			{Object.keys(textStyle).length > 0 ? (
+				<span {...textStyle}>{renderInlineChildren(node.children, key)}</span>
+			) : (
+				renderInlineChildren(node.children, key)
+			)}
 		</text>
 	)
 }

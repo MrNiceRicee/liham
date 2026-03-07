@@ -15,7 +15,9 @@ describe('createSemaphore', () => {
 		await sem.acquire()
 
 		let resolved = false
-		const waiting = sem.acquire().then(() => { resolved = true })
+		const waiting = sem.acquire().then(() => {
+			resolved = true
+		})
 
 		// yield — should still be blocked
 		await new Promise((r) => setTimeout(r, 10))
@@ -32,7 +34,9 @@ describe('createSemaphore', () => {
 
 		const controller = new AbortController()
 		let rejected = false
-		const waiting = sem.acquire(controller.signal).catch(() => { rejected = true })
+		const waiting = sem.acquire(controller.signal).catch(() => {
+			rejected = true
+		})
 
 		controller.abort(new Error('unmounted'))
 		await waiting

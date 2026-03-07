@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 
-import { decodeImage, getImageDimensions, initSharp, type DecodeOptions } from './decoder.ts'
+import { type DecodeOptions, decodeImage, getImageDimensions, initSharp } from './decoder.ts'
 
-function decode(overrides: Partial<DecodeOptions> & Pick<DecodeOptions, 'bytes' | 'source'>): ReturnType<typeof decodeImage> {
+function decode(
+	overrides: Partial<DecodeOptions> & Pick<DecodeOptions, 'bytes' | 'source'>,
+): ReturnType<typeof decodeImage> {
 	return decodeImage({
 		targetCols: 80,
 		cellPixelWidth: 8,
@@ -57,7 +59,11 @@ describe('decodeImage', () => {
 	})
 
 	test('decodes for kitty purpose', async () => {
-		const result = await decode({ bytes: new Uint8Array(PNG_4x4), source: 'test.png', purpose: 'kitty' })
+		const result = await decode({
+			bytes: new Uint8Array(PNG_4x4),
+			source: 'test.png',
+			purpose: 'kitty',
+		})
 		expect(result.ok).toBe(true)
 		if (result.ok) {
 			expect(result.value.width).toBe(4)
@@ -83,7 +89,11 @@ describe('decodeImage', () => {
 	})
 
 	test('small image not enlarged', async () => {
-		const result = await decode({ bytes: new Uint8Array(PNG_4x4), source: 'test.png', purpose: 'kitty' })
+		const result = await decode({
+			bytes: new Uint8Array(PNG_4x4),
+			source: 'test.png',
+			purpose: 'kitty',
+		})
 		expect(result.ok).toBe(true)
 		if (result.ok) {
 			// 4px wide image, target would be 80*8=640px — but withoutEnlargement prevents upscale
@@ -113,8 +123,16 @@ describe('decodeImage', () => {
 
 	test('animated GIF clamps delays <= 10ms to 100ms', async () => {
 		const sharp = (await import('sharp')).default
-		const frame1 = await sharp({ create: { width: 2, height: 2, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 1 } } }).png().toBuffer()
-		const frame2 = await sharp({ create: { width: 2, height: 2, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } } }).png().toBuffer()
+		const frame1 = await sharp({
+			create: { width: 2, height: 2, channels: 4, background: { r: 255, g: 0, b: 0, alpha: 1 } },
+		})
+			.png()
+			.toBuffer()
+		const frame2 = await sharp({
+			create: { width: 2, height: 2, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } },
+		})
+			.png()
+			.toBuffer()
 		const gif = await sharp(frame1, { animated: true })
 			.joinChannel(frame2)
 			.gif({ delay: [0, 5] })
@@ -136,7 +154,10 @@ describe('decodeImage', () => {
 			bytes: gif,
 			source: 'duck.gif',
 			targetCols: 40,
-			shouldContinue: () => { callCount++; return callCount < 3 },
+			shouldContinue: () => {
+				callCount++
+				return callCount < 3
+			},
 		})
 		expect(result.ok).toBe(true)
 		if (result.ok && result.value.frames != null) {
@@ -147,8 +168,16 @@ describe('decodeImage', () => {
 
 	test('static GIF has no frames/delays', async () => {
 		const sharp = (await import('sharp')).default
-		const gif = await sharp({ create: { width: 4, height: 4, channels: 4, background: { r: 0, g: 0, b: 255, alpha: 1 } } }).gif().toBuffer()
-		const result = await decode({ bytes: new Uint8Array(gif), source: 'static.gif', targetCols: 40 })
+		const gif = await sharp({
+			create: { width: 4, height: 4, channels: 4, background: { r: 0, g: 0, b: 255, alpha: 1 } },
+		})
+			.gif()
+			.toBuffer()
+		const result = await decode({
+			bytes: new Uint8Array(gif),
+			source: 'static.gif',
+			targetCols: 40,
+		})
 		expect(result.ok).toBe(true)
 		if (result.ok) {
 			expect(result.value.frames).toBeUndefined()

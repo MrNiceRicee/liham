@@ -13,10 +13,10 @@ function flushTimers(advanceMs: number) {
 	let processed = true
 	while (processed) {
 		processed = false
-		const ready = pendingTimers.filter(t => t.delay <= mockNow)
+		const ready = pendingTimers.filter((t) => t.delay <= mockNow)
 		if (ready.length > 0) {
 			const timer = ready[0]!
-			pendingTimers = pendingTimers.filter(t => t !== timer)
+			pendingTimers = pendingTimers.filter((t) => t !== timer)
 			timer.callback()
 			processed = true
 		}
@@ -25,7 +25,7 @@ function flushTimers(advanceMs: number) {
 
 function flushNextTimer() {
 	if (pendingTimers.length === 0) return
-	const next = pendingTimers.reduce((a, b) => a.delay < b.delay ? a : b, pendingTimers[0]!)
+	const next = pendingTimers.reduce((a, b) => (a.delay < b.delay ? a : b), pendingTimers[0]!)
 	const advance = Math.max(0, next.delay - mockNow)
 	flushTimers(advance)
 }
@@ -43,7 +43,7 @@ beforeEach(() => {
 	}
 	// @ts-expect-error -- replacing global clearTimeout for test control
 	globalThis.clearTimeout = (id: number) => {
-		pendingTimers = pendingTimers.filter(t => t.id !== id)
+		pendingTimers = pendingTimers.filter((t) => t.id !== id)
 	}
 	// @ts-expect-error -- replacing performance.now for deterministic timing
 	performance.now = () => mockNow
@@ -63,7 +63,7 @@ describe('createFrameTimer', () => {
 
 	test('play transitions to playing and fires onFrame(0)', () => {
 		const frames: number[] = []
-		const timer = createFrameTimer({ delays: [100, 200], onFrame: i => frames.push(i) })
+		const timer = createFrameTimer({ delays: [100, 200], onFrame: (i) => frames.push(i) })
 		timer.play()
 		expect(timer.state).toBe('playing')
 		expect(frames).toEqual([0])
@@ -72,7 +72,7 @@ describe('createFrameTimer', () => {
 
 	test('cycles through frames with correct delays', () => {
 		const frames: number[] = []
-		const timer = createFrameTimer({ delays: [100, 200, 150], onFrame: i => frames.push(i) })
+		const timer = createFrameTimer({ delays: [100, 200, 150], onFrame: (i) => frames.push(i) })
 		timer.play()
 		expect(frames).toEqual([0])
 
@@ -90,7 +90,7 @@ describe('createFrameTimer', () => {
 
 	test('pause stops frame cycling', () => {
 		const frames: number[] = []
-		const timer = createFrameTimer({ delays: [100, 100], onFrame: i => frames.push(i) })
+		const timer = createFrameTimer({ delays: [100, 100], onFrame: (i) => frames.push(i) })
 		timer.play()
 		flushNextTimer()
 		expect(frames).toEqual([0, 1])
@@ -107,7 +107,7 @@ describe('createFrameTimer', () => {
 
 	test('play after pause resumes from current frame', () => {
 		const frames: number[] = []
-		const timer = createFrameTimer({ delays: [100, 200, 300], onFrame: i => frames.push(i) })
+		const timer = createFrameTimer({ delays: [100, 200, 300], onFrame: (i) => frames.push(i) })
 		timer.play()
 		flushNextTimer() // frame 1
 		timer.pause()
@@ -126,11 +126,15 @@ describe('createFrameTimer', () => {
 
 	test('non-loop stops at last frame with ended state', () => {
 		const frames: number[] = []
-		const timer = createFrameTimer({ delays: [100, 100, 100], onFrame: i => frames.push(i), loop: false })
-		timer.play()          // fires onFrame(0)
-		flushNextTimer()      // fires onFrame(1)
-		flushNextTimer()      // fires onFrame(2)
-		flushNextTimer()      // timer after last frame → ended, no onFrame
+		const timer = createFrameTimer({
+			delays: [100, 100, 100],
+			onFrame: (i) => frames.push(i),
+			loop: false,
+		})
+		timer.play() // fires onFrame(0)
+		flushNextTimer() // fires onFrame(1)
+		flushNextTimer() // fires onFrame(2)
+		flushNextTimer() // timer after last frame → ended, no onFrame
 		expect(timer.state).toBe('ended')
 		expect(timer.currentFrame).toBe(2)
 
@@ -143,7 +147,11 @@ describe('createFrameTimer', () => {
 
 	test('play after ended restarts from frame 0', () => {
 		const frames: number[] = []
-		const timer = createFrameTimer({ delays: [100, 100], onFrame: i => frames.push(i), loop: false })
+		const timer = createFrameTimer({
+			delays: [100, 100],
+			onFrame: (i) => frames.push(i),
+			loop: false,
+		})
 		timer.play()
 		flushNextTimer() // frame 1
 		flushNextTimer() // timer after last → ended
@@ -159,7 +167,7 @@ describe('createFrameTimer', () => {
 
 	test('seek jumps to target frame', () => {
 		const frames: number[] = []
-		const timer = createFrameTimer({ delays: [100, 200, 300], onFrame: i => frames.push(i) })
+		const timer = createFrameTimer({ delays: [100, 200, 300], onFrame: (i) => frames.push(i) })
 		timer.play()
 		timer.seek(2)
 		expect(timer.currentFrame).toBe(2)
@@ -170,7 +178,7 @@ describe('createFrameTimer', () => {
 
 	test('seek clamps to valid range', () => {
 		const frames: number[] = []
-		const timer = createFrameTimer({ delays: [100, 200], onFrame: i => frames.push(i) })
+		const timer = createFrameTimer({ delays: [100, 200], onFrame: (i) => frames.push(i) })
 
 		timer.seek(-5)
 		expect(timer.currentFrame).toBe(0)
@@ -193,7 +201,7 @@ describe('createFrameTimer', () => {
 
 	test('calling play while already playing is a no-op', () => {
 		const frames: number[] = []
-		const timer = createFrameTimer({ delays: [100], onFrame: i => frames.push(i) })
+		const timer = createFrameTimer({ delays: [100], onFrame: (i) => frames.push(i) })
 		timer.play()
 		timer.play()
 		timer.play()
@@ -203,7 +211,7 @@ describe('createFrameTimer', () => {
 
 	test('single-frame delays array works', () => {
 		const frames: number[] = []
-		const timer = createFrameTimer({ delays: [50], onFrame: i => frames.push(i) })
+		const timer = createFrameTimer({ delays: [50], onFrame: (i) => frames.push(i) })
 		timer.play()
 		flushNextTimer()
 		flushNextTimer()

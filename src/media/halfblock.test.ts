@@ -20,8 +20,22 @@ describe('renderHalfBlock', () => {
 	test('2x2 image produces 1 row, 2 cells', () => {
 		// top-left: red, top-right: green, bottom-left: blue, bottom-right: white
 		const img = makeImage(2, 2, [
-			255, 0, 0, 255, 0, 255, 0, 255, // top row
-			0, 0, 255, 255, 255, 255, 255, 255, // bottom row
+			255,
+			0,
+			0,
+			255,
+			0,
+			255,
+			0,
+			255, // top row
+			0,
+			0,
+			255,
+			255,
+			255,
+			255,
+			255,
+			255, // bottom row
 		])
 		const grid = renderHalfBlock(img, '#000000')
 		expect(grid.length).toBe(1)
@@ -40,8 +54,14 @@ describe('renderHalfBlock', () => {
 
 	test('same color top/bottom produces space', () => {
 		const img = makeImage(1, 2, [
-			128, 128, 128, 255, // top
-			128, 128, 128, 255, // bottom
+			128,
+			128,
+			128,
+			255, // top
+			128,
+			128,
+			128,
+			255, // bottom
 		])
 		const grid = renderHalfBlock(img, '#000000')
 		expect(grid[0]![0]!.char).toBe(' ')
@@ -52,8 +72,14 @@ describe('renderHalfBlock', () => {
 	test('transparent pixels blend against bgColor', () => {
 		// fully transparent pixel should become bg color
 		const img = makeImage(1, 2, [
-			0, 0, 0, 0, // top: fully transparent
-			0, 0, 0, 0, // bottom: fully transparent
+			0,
+			0,
+			0,
+			0, // top: fully transparent
+			0,
+			0,
+			0,
+			0, // bottom: fully transparent
 		])
 		const grid = renderHalfBlock(img, '#1a1b26')
 		expect(grid[0]![0]!.char).toBe(' ')
@@ -63,8 +89,14 @@ describe('renderHalfBlock', () => {
 	test('semi-transparent pixel blends correctly', () => {
 		// 50% alpha red on black bg -> ~#800000
 		const img = makeImage(1, 2, [
-			255, 0, 0, 128, // top: 50% red
-			255, 0, 0, 128, // bottom: 50% red
+			255,
+			0,
+			0,
+			128, // top: 50% red
+			255,
+			0,
+			0,
+			128, // bottom: 50% red
 		])
 		const grid = renderHalfBlock(img, '#000000')
 		expect(grid[0]![0]!.char).toBe(' ')
@@ -74,8 +106,14 @@ describe('renderHalfBlock', () => {
 
 	test('1x2 image produces 1 row, 1 cell', () => {
 		const img = makeImage(1, 2, [
-			255, 0, 0, 255, // top
-			0, 0, 255, 255, // bottom
+			255,
+			0,
+			0,
+			255, // top
+			0,
+			0,
+			255,
+			255, // bottom
 		])
 		const grid = renderHalfBlock(img, '#000000')
 		expect(grid.length).toBe(1)

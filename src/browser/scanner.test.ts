@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { mkdir, rm, writeFile, chmod } from 'node:fs/promises'
+import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { scanDirectory, type FileEntry } from './scanner.ts'
+import { type FileEntry, scanDirectory } from './scanner.ts'
 
 // -- test fixtures --
 
@@ -31,14 +31,7 @@ beforeAll(async () => {
 	//     HEAD.md
 	//   empty/
 
-	const dirs = [
-		'',
-		'docs',
-		'deep/level1/level2/level3',
-		'node_modules/pkg',
-		'.git',
-		'empty',
-	]
+	const dirs = ['', 'docs', 'deep/level1/level2/level3', 'node_modules/pkg', '.git', 'empty']
 	for (const d of dirs) {
 		await mkdir(join(TEST_DIR, d), { recursive: true })
 	}

@@ -276,8 +276,7 @@ describe('IR compiler — table nodes', () => {
 		expect(rows.length).toBe(2)
 		const header = rows[0]!
 		const data = rows[1]!
-		if (header.type !== 'tableRow' || data.type !== 'tableRow')
-			throw new Error('expected tableRow')
+		if (header.type !== 'tableRow' || data.type !== 'tableRow') throw new Error('expected tableRow')
 		expect(header.isHeader).toBe(true)
 		expect(data.isHeader).toBe(false)
 	})
@@ -413,7 +412,7 @@ describe('IR compiler — URL sanitization', () => {
 		const ir = await compileToIR('[![alt](./img.png)](https://example.com)')
 		if (ir.type !== 'root') throw new Error('expected root')
 		const root = ir as N & RootNode
-		const imgChild = root.children.find(c => c.type === 'image')
+		const imgChild = root.children.find((c) => c.type === 'image')
 		expect(imgChild).toBeDefined()
 	})
 
@@ -478,7 +477,7 @@ describe('IR compiler — media nodes', () => {
 		const ir = await compileToIR('![clip](video.mp4)')
 		if (ir.type !== 'root') throw new Error('expected root')
 		const root = ir as N & RootNode
-		const videoChild = root.children.find(c => c.type === 'video')
+		const videoChild = root.children.find((c) => c.type === 'video')
 		expect(videoChild).toBeDefined()
 	})
 
@@ -486,7 +485,7 @@ describe('IR compiler — media nodes', () => {
 		const ir = await compileToIR('![song](track.mp3)')
 		if (ir.type !== 'root') throw new Error('expected root')
 		const root = ir as N & RootNode
-		const audioChild = root.children.find(c => c.type === 'audio')
+		const audioChild = root.children.find((c) => c.type === 'audio')
 		expect(audioChild).toBeDefined()
 	})
 
@@ -522,8 +521,12 @@ describe('isBlockNode helper', () => {
 		expect(isBlockNode({ type: 'listItem', bullet: '•', style: {}, children: [] })).toBe(true)
 		expect(isBlockNode({ type: 'thematicBreak', style: { color: '', char: '' } })).toBe(true)
 		expect(isBlockNode({ type: 'unknown', tagName: 'div', style: {}, children: [] })).toBe(true)
-		expect(isBlockNode({ type: 'video', alt: '', autoplay: false, loop: false, style: {} })).toBe(true)
-		expect(isBlockNode({ type: 'audio', alt: '', autoplay: false, loop: false, style: {} })).toBe(true)
+		expect(isBlockNode({ type: 'video', alt: '', autoplay: false, loop: false, style: {} })).toBe(
+			true,
+		)
+		expect(isBlockNode({ type: 'audio', alt: '', autoplay: false, loop: false, style: {} })).toBe(
+			true,
+		)
 	})
 
 	it('returns false for inline types', () => {

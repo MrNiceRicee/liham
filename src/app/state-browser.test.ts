@@ -2,13 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { FileEntry } from '../browser/scanner.ts'
 
-import {
-	type AppState,
-	appReducer,
-	initialState,
-	legendEntries,
-	paneDimensions,
-} from './state.ts'
+import { type AppState, appReducer, initialState, legendEntries, paneDimensions } from './state.ts'
 
 // -- helpers --
 
@@ -26,7 +20,10 @@ function mockFile(name: string, dir = ''): FileEntry {
 describe('ScanComplete action', () => {
 	test('populates files and resets cursor', () => {
 		const files = [mockFile('a.md'), mockFile('b.md')]
-		const s = stateWith({ mode: 'browser', browser: { ...initialState('preview-only', 'browser').browser, cursorIndex: 5 } })
+		const s = stateWith({
+			mode: 'browser',
+			browser: { ...initialState('preview-only', 'browser').browser, cursorIndex: 5 },
+		})
 		const next = appReducer(s, { type: 'ScanComplete', files })
 		expect(next.browser.files).toEqual(files)
 		expect(next.browser.scanStatus).toBe('complete')
@@ -153,7 +150,13 @@ describe('OpenFile action', () => {
 		const files = [mockFile('a.md')]
 		const s = stateWith({
 			mode: 'browser',
-			browser: { ...initialState('preview-only', 'browser').browser, files, filter: 'a', cursorIndex: 0, scanStatus: 'complete' },
+			browser: {
+				...initialState('preview-only', 'browser').browser,
+				files,
+				filter: 'a',
+				cursorIndex: 0,
+				scanStatus: 'complete',
+			},
 		})
 		const next = appReducer(s, { type: 'OpenFile', path: '/test/a.md' })
 		expect(next.browser.files).toEqual(files)
@@ -181,7 +184,12 @@ describe('ReturnToBrowser action', () => {
 		const s = stateWith({
 			mode: 'viewer',
 			fromBrowser: true,
-			browser: { ...initialState('preview-only', 'browser').browser, filter: 'docs', cursorIndex: 2, scanStatus: 'complete' },
+			browser: {
+				...initialState('preview-only', 'browser').browser,
+				filter: 'docs',
+				cursorIndex: 2,
+				scanStatus: 'complete',
+			},
 		})
 		const next = appReducer(s, { type: 'ReturnToBrowser' })
 		expect(next.browser.filter).toBe('docs')

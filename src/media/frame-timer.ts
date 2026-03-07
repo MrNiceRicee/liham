@@ -18,7 +18,11 @@ export interface FrameTimerOptions {
 	loop?: boolean
 }
 
-export function createFrameTimer({ delays, onFrame, loop = true }: FrameTimerOptions): FrameTimerHandle {
+export function createFrameTimer({
+	delays,
+	onFrame,
+	loop = true,
+}: FrameTimerOptions): FrameTimerHandle {
 	let state: PlaybackState = 'idle'
 	let frameIndex = 0
 	let timerId: ReturnType<typeof setTimeout> | null = null
@@ -62,7 +66,10 @@ export function createFrameTimer({ delays, onFrame, loop = true }: FrameTimerOpt
 		pause() {
 			if (state !== 'playing') return
 			state = 'paused'
-			if (timerId != null) { clearTimeout(timerId); timerId = null }
+			if (timerId != null) {
+				clearTimeout(timerId)
+				timerId = null
+			}
 		},
 		seek(index: number) {
 			frameIndex = Math.max(0, Math.min(index, delays.length - 1))
@@ -70,15 +77,25 @@ export function createFrameTimer({ delays, onFrame, loop = true }: FrameTimerOpt
 			epochMs = performance.now() - accumulated
 			onFrame(frameIndex)
 			if (state === 'playing') {
-				if (timerId != null) { clearTimeout(timerId); timerId = null }
+				if (timerId != null) {
+					clearTimeout(timerId)
+					timerId = null
+				}
 				scheduleNext()
 			}
 		},
 		dispose() {
 			state = 'idle'
-			if (timerId != null) { clearTimeout(timerId); timerId = null }
+			if (timerId != null) {
+				clearTimeout(timerId)
+				timerId = null
+			}
 		},
-		get state() { return state },
-		get currentFrame() { return frameIndex },
+		get state() {
+			return state
+		},
+		get currentFrame() {
+			return frameIndex
+		},
 	}
 }

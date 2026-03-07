@@ -24,7 +24,14 @@ export type BootContext =
 			filePath: string
 			noWatch: boolean
 	  }
-	| { mode: 'browser'; dir: string; theme: ThemeTokens; imageCapabilities: ImageCapabilities; layout: LayoutMode; noWatch: boolean }
+	| {
+			mode: 'browser'
+			dir: string
+			theme: ThemeTokens
+			imageCapabilities: ImageCapabilities
+			layout: LayoutMode
+			noWatch: boolean
+	  }
 
 export async function boot(ctx: BootContext): Promise<void> {
 	const renderer = await createCliRenderer({
@@ -36,7 +43,14 @@ export async function boot(ctx: BootContext): Promise<void> {
 	try {
 		if (ctx.mode === 'browser') {
 			createRoot(renderer).render(
-				<App mode="browser" dir={ctx.dir} layout={ctx.layout} theme={ctx.theme} imageCapabilities={ctx.imageCapabilities} noWatch={ctx.noWatch} />,
+				<App
+					mode="browser"
+					dir={ctx.dir}
+					layout={ctx.layout}
+					theme={ctx.theme}
+					imageCapabilities={ctx.imageCapabilities}
+					noWatch={ctx.noWatch}
+				/>,
 			)
 		} else {
 			// compute preview pane width for table layout at render time

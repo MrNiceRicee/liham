@@ -48,12 +48,22 @@ export function renderHalfBlock(image: LoadedImage, bgColor: string): HalfBlockG
 			const botIdx = ((y + 1) * width + x) * 4
 
 			const topColor = blend(
-				rgba[topIdx]!, rgba[topIdx + 1]!, rgba[topIdx + 2]!, rgba[topIdx + 3]!,
-				bgR, bgG, bgB,
+				rgba[topIdx]!,
+				rgba[topIdx + 1]!,
+				rgba[topIdx + 2]!,
+				rgba[topIdx + 3]!,
+				bgR,
+				bgG,
+				bgB,
 			)
 			const botColor = blend(
-				rgba[botIdx]!, rgba[botIdx + 1]!, rgba[botIdx + 2]!, rgba[botIdx + 3]!,
-				bgR, bgG, bgB,
+				rgba[botIdx]!,
+				rgba[botIdx + 1]!,
+				rgba[botIdx + 2]!,
+				rgba[botIdx + 3]!,
+				bgR,
+				bgG,
+				bgB,
 			)
 
 			// same-color optimization: space with bg only
@@ -94,8 +104,24 @@ function mergeRow(
 		const topIdx = (y * width + x) * 4
 		const botIdx = ((y + 1) * width + x) * 4
 
-		const topColor = blend(rgba[topIdx]!, rgba[topIdx + 1]!, rgba[topIdx + 2]!, rgba[topIdx + 3]!, bgR, bgG, bgB)
-		const botColor = blend(rgba[botIdx]!, rgba[botIdx + 1]!, rgba[botIdx + 2]!, rgba[botIdx + 3]!, bgR, bgG, bgB)
+		const topColor = blend(
+			rgba[topIdx]!,
+			rgba[topIdx + 1]!,
+			rgba[topIdx + 2]!,
+			rgba[topIdx + 3]!,
+			bgR,
+			bgG,
+			bgB,
+		)
+		const botColor = blend(
+			rgba[botIdx]!,
+			rgba[botIdx + 1]!,
+			rgba[botIdx + 2]!,
+			rgba[botIdx + 3]!,
+			bgR,
+			bgG,
+			bgB,
+		)
 
 		const fg = topColor === botColor ? '' : botColor
 		const bg = topColor
