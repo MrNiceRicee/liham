@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 
-import { createFrameTimer, type FrameTimerHandle } from './frame-timer.ts'
+import { createFrameTimer } from './frame-timer.ts'
 
 // fake timers — bun:test mock for setTimeout/clearTimeout
 let pendingTimers: { callback: () => void; delay: number; id: number }[] = []
@@ -25,7 +25,7 @@ function flushTimers(advanceMs: number) {
 
 function flushNextTimer() {
 	if (pendingTimers.length === 0) return
-	const next = pendingTimers.reduce((a, b) => a.delay < b.delay ? a : b)
+	const next = pendingTimers.reduce((a, b) => a.delay < b.delay ? a : b, pendingTimers[0]!)
 	const advance = Math.max(0, next.delay - mockNow)
 	flushTimers(advance)
 }

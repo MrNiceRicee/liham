@@ -6,8 +6,8 @@ import { useRenderer } from '@opentui/react'
 import { writeSync } from 'node:fs'
 import { memo, useContext, useEffect, useRef, type ReactNode } from 'react'
 
-import type { LoadedImage } from '../../media/types.ts'
 import type { ImageNode } from '../../ir/types.ts'
+import type { LoadedImage } from '../../media/types.ts'
 
 import { renderHalfBlockMerged, type MergedSpan } from '../../media/halfblock.ts'
 import { buildCleanupCommand, buildTransmitChunks, buildVirtualPlacement, generateImageId } from '../../media/kitty.ts'
