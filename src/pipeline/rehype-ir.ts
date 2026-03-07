@@ -228,10 +228,15 @@ function compileHeading(state: CompilerState, node: Element): IRNode {
 }
 
 function compileParagraph(state: CompilerState, node: Element): IRNode {
+	const children = withAncestors(state, node)
+	// standalone image: <p><img></p> → promote to block so ImageBlock component renders
+	if (children.length === 1 && children[0]?.type === 'image') {
+		return children[0]
+	}
 	return {
 		type: 'paragraph',
 		style: { fg: state.theme.paragraph.textColor },
-		children: withAncestors(state, node),
+		children,
 	}
 }
 

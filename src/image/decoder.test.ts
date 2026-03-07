@@ -41,7 +41,7 @@ describe('decodeImage', () => {
 			expect(result.value.height).toBe(4)
 			expect(result.value.rgba.length).toBe(4 * 4 * 4)
 			expect(result.value.terminalRows).toBe(2) // 4 pixels / 2
-			expect(result.value.terminalCols).toBe(1) // ceil(4 / 8)
+			expect(result.value.terminalCols).toBe(4) // halfblock: 1 pixel = 1 column
 			expect(result.value.source).toBe('test.png')
 		}
 	})

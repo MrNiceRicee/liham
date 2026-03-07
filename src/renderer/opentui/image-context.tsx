@@ -9,6 +9,7 @@ export interface ImageContextValue {
 	basePath: string
 	capabilities: ImageCapabilities
 	bgColor: string
+	maxCols: number
 }
 
 export const ImageContext = createContext<ImageContextValue | undefined>(undefined)

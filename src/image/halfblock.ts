@@ -66,3 +66,61 @@ export function renderHalfBlock(image: LoadedImage, bgColor: string): HalfBlockG
 
 	return grid
 }
+
+// merged span representation — consecutive same-colored cells combined into one
+export interface MergedSpan {
+	text: string
+	fg: string
+	bg: string
+}
+
+// merge consecutive same-colored cells in a row into single spans
+function mergeRow(
+	rgba: Uint8Array,
+	y: number,
+	width: number,
+	bgR: number,
+	bgG: number,
+	bgB: number,
+): MergedSpan[] {
+	const spans: MergedSpan[] = []
+	let curFg = ''
+	let curBg = ''
+	let curText = ''
+
+	for (let x = 0; x < width; x++) {
+		const topIdx = (y * width + x) * 4
+		const botIdx = ((y + 1) * width + x) * 4
+
+		const topColor = blend(rgba[topIdx]!, rgba[topIdx + 1]!, rgba[topIdx + 2]!, rgba[topIdx + 3]!, bgR, bgG, bgB)
+		const botColor = blend(rgba[botIdx]!, rgba[botIdx + 1]!, rgba[botIdx + 2]!, rgba[botIdx + 3]!, bgR, bgG, bgB)
+
+		const fg = topColor === botColor ? '' : botColor
+		const bg = topColor
+		const ch = topColor === botColor ? ' ' : '▄'
+
+		if (fg === curFg && bg === curBg) {
+			curText += ch
+		} else {
+			if (curText.length > 0) spans.push({ text: curText, fg: curFg, bg: curBg })
+			curFg = fg
+			curBg = bg
+			curText = ch
+		}
+	}
+	if (curText.length > 0) spans.push({ text: curText, fg: curFg, bg: curBg })
+	return spans
+}
+
+// renders image as rows of merged spans — dramatically fewer elements for React
+export function renderHalfBlockMerged(image: LoadedImage, bgColor: string): MergedSpan[][] {
+	const { rgba, width, height } = image
+	const [bgR, bgG, bgB] = parseHex(bgColor)
+	const rows: MergedSpan[][] = []
+
+	for (let y = 0; y < height; y += 2) {
+		rows.push(mergeRow(rgba, y, width, bgR, bgG, bgB))
+	}
+
+	return rows
+}

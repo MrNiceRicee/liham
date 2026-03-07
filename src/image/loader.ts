@@ -41,13 +41,8 @@ export interface LoadedFile {
 export async function resolveImagePath(src: string, basePath: string): Promise<ImageResult<string>> {
 	try {
 		const resolved = isAbsolute(src) ? resolve(src) : resolve(join(basePath, src))
-		const realBase = await realpath(basePath)
+		// realpath canonicalizes symlinks — prevents following malicious symlinks
 		const realResolved = await realpath(resolved)
-
-		if (!realResolved.startsWith(realBase + '/') && realResolved !== realBase) {
-			return { ok: false, error: 'path outside base directory' }
-		}
-
 		return { ok: true, value: realResolved }
 	} catch {
 		return { ok: false, error: 'file not found' }

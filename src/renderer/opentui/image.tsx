@@ -2,7 +2,7 @@
 // first stateful renderer component in the codebase (uses hooks).
 
 import { resolveRenderLib } from '@opentui/core'
-import { useRenderer, useTerminalDimensions } from '@opentui/react'
+import { useRenderer } from '@opentui/react'
 import { writeSync } from 'node:fs'
 import { memo, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 
@@ -11,7 +11,7 @@ import type { ImageNode } from '../../ir/types.ts'
 
 import { createImageCache, imageCacheKey, type ImageCache } from '../../image/cache.ts'
 import { decodeImage } from '../../image/decoder.ts'
-import { renderHalfBlock } from '../../image/halfblock.ts'
+import { renderHalfBlockMerged } from '../../image/halfblock.ts'
 import { buildCleanupCommand, buildTransmitChunks, buildVirtualPlacement, generateImageId } from '../../image/kitty.ts'
 import { loadImageFile } from '../../image/loader.ts'
 import { ImageContext } from './image-context.tsx'
@@ -53,18 +53,20 @@ interface HalfBlockRowsProps {
 }
 
 const HalfBlockRows = memo(function HalfBlockRows({ image, bgColor }: HalfBlockRowsProps) {
-	const grid = renderHalfBlock(image, bgColor)
+	const rows = renderHalfBlockMerged(image, bgColor)
+	// per-row <text> elements inside height-constrained box for proper viewport culling.
+	// merged spans dramatically reduce React element count (consecutive same-colored cells combined).
 	return (
-		<box style={{ flexDirection: 'column' }}>
-			{grid.map((row, rowIdx) => (
+		<box style={{ height: rows.length, width: image.terminalCols }}>
+			{rows.map((spans, rowIdx) => (
 				<text key={`hb-${String(rowIdx)}`}>
-					{row.map((cell, colIdx) => {
+					{spans.map((s, sIdx) => {
 						const props: Record<string, unknown> = {}
-						if (cell.bg.length > 0) props['bg'] = cell.bg
-						if (cell.fg.length > 0) props['fg'] = cell.fg
+						if (s.bg.length > 0) props['bg'] = s.bg
+						if (s.fg.length > 0) props['fg'] = s.fg
 						return (
-							<span key={`hb-${String(rowIdx)}-${String(colIdx)}`} {...props}>
-								{cell.char}
+							<span key={`s-${String(rowIdx)}-${String(sIdx)}`} {...props}>
+								{s.text}
 							</span>
 						)
 					})}
@@ -87,7 +89,6 @@ function KittyPlaceholder({ rows, cols }: { readonly rows: number; readonly cols
 function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly nodeKey: string }): ReactNode {
 	const ctx = useContext(ImageContext)
 	const renderer = useRenderer()
-	const dims = useTerminalDimensions()
 	const [state, setState] = useState<ImageState>('idle')
 	const [image, setImage] = useState<LoadedImage | null>(null)
 	const [errorMsg, setErrorMsg] = useState('')
@@ -99,9 +100,8 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 		return renderTextFallback(node, nodeKey)
 	}
 
-	const { basePath, capabilities, bgColor } = ctx
+	const { basePath, capabilities, bgColor, maxCols } = ctx
 	const protocol = capabilities.protocol
-	const terminalWidth = dims.width
 
 	useEffect(() => {
 		const thisLoadId = ++loadIdRef.current
@@ -123,7 +123,7 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 
 			const { bytes, absolutePath, mtime } = loadResult.value
 			const purpose = protocol === 'kitty-virtual' ? 'kitty' : 'halfblock'
-			const targetCols = Math.max(1, terminalWidth - 2) // leave margin
+			const targetCols = maxCols
 			const cacheKey = imageCacheKey(absolutePath, mtime, targetCols)
 
 			// check LRU cache first
@@ -179,7 +179,7 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 			// cleanup kitty image on unmount/URL change
 			cleanupKittyImage(renderer)
 		}
-	}, [node.url, basePath, terminalWidth, protocol])
+	}, [node.url, basePath, maxCols, protocol])
 
 	const fgProps: Record<string, unknown> = {}
 	if (node.style.fg != null) fgProps['fg'] = node.style.fg

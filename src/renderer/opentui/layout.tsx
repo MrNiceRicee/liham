@@ -92,6 +92,8 @@ export function renderViewerLayout(
 				focused={sourceFocused}
 				theme={theme}
 				scrollRef={sourceRef}
+				width={panes.source?.width}
+				height={panes.source?.height}
 				onMouseDown={mouse.onSourceMouseDown}
 				onMouseScroll={mouse.onSourceMouseScroll}
 			/>
@@ -100,6 +102,8 @@ export function renderViewerLayout(
 				focused={!sourceFocused}
 				theme={theme}
 				scrollRef={previewRef}
+				width={panes.preview?.width}
+				height={panes.preview?.height}
 				onMouseDown={mouse.onPreviewMouseDown}
 				onMouseScroll={mouse.onPreviewMouseScroll}
 			/>

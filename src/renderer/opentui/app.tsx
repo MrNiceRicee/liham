@@ -510,12 +510,16 @@ export function App(props: Readonly<AppProps>) {
 	// image context for viewer mode — provides basePath for relative image resolution
 	const imageCtx: ImageContextValue | undefined = useMemo(() => {
 		if (state.mode !== 'viewer' || state.currentFile == null) return undefined
+		const previewWidth = panes.preview?.width ?? state.dimensions.width
+		// subtract padding/borders (scrollbox border + internal padding)
+		const maxCols = Math.max(1, previewWidth - 4)
 		return {
 			basePath: dirname(state.currentFile),
 			capabilities: props.imageCapabilities,
 			bgColor: props.theme.image.placeholderBg,
+			maxCols,
 		}
-	}, [state.mode, state.currentFile, props.imageCapabilities, props.theme.image.placeholderBg])
+	}, [state.mode, state.currentFile, props.imageCapabilities, props.theme.image.placeholderBg, panes.preview?.width, state.dimensions.width])
 
 	const viewerLayout = state.mode !== 'browser'
 		? renderViewerLayout(

@@ -266,6 +266,8 @@ async function main() {
 
 	if (args.mode === 'info') {
 		const detection = await resolveDetection(args.theme)
+		const { initSharp } = await import('../image/decoder.ts')
+		await initSharp()
 		console.log(`theme: ${detection.themeName}`)
 		console.log(`renderer: ${args.renderer}`)
 		console.log(`image protocol: ${detection.imageCapabilities.protocol}`)

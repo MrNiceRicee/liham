@@ -10,6 +10,8 @@ interface SourcePaneProps {
 	focused: boolean
 	theme: ThemeTokens
 	scrollRef: RefObject<ScrollBoxRenderable | null>
+	width?: number
+	height?: number
 	onMouseDown?: () => void
 	onMouseScroll?: () => void
 }
@@ -24,11 +26,15 @@ function chunkLines(text: string, chunkSize: number): string[] {
 	return chunks
 }
 
-export function SourcePane({ content, focused, theme, scrollRef, onMouseDown, onMouseScroll }: Readonly<SourcePaneProps>) {
+export function SourcePane({ content, focused, theme, scrollRef, width, height, onMouseDown, onMouseScroll }: Readonly<SourcePaneProps>) {
 	const chunks = chunkLines(content, 100)
 	const borderColor = focused
 		? theme.pane.focusedBorderColor
 		: theme.pane.unfocusedBorderColor
+
+	const rootOptions: Record<string, unknown> = { flexGrow: 1, borderColor, borderStyle: 'single' }
+	rootOptions['width'] = width ?? '100%'
+	if (height != null) rootOptions['height'] = height
 
 	return (
 		<scrollbox
@@ -38,9 +44,7 @@ export function SourcePane({ content, focused, theme, scrollRef, onMouseDown, on
 			border
 			onMouseDown={onMouseDown}
 			onMouseScroll={onMouseScroll}
-			style={{
-				rootOptions: { width: '100%', flexGrow: 1, borderColor, borderStyle: 'single' },
-			}}
+			style={{ rootOptions }}
 		>
 			<box style={{ flexDirection: 'column', padding: 1 }}>
 				{chunks.map((chunk, i) => (

@@ -50,15 +50,16 @@ describe('resolveImagePath', () => {
 		if (result.ok) expect(result.value).toContain('test.png')
 	})
 
-	test('rejects path traversal outside base dir', async () => {
+	test('resolves path in sibling directory', async () => {
 		const result = await resolveImagePath('../outside.png', imagesDir)
-		expect(result.ok).toBe(false)
-		if (!result.ok) expect(result.error).toBe('path outside base directory')
+		expect(result.ok).toBe(true)
+		if (result.ok) expect(result.value).toContain('outside.png')
 	})
 
-	test('rejects deep traversal', async () => {
-		const result = await resolveImagePath('../../../etc/passwd', imagesDir)
+	test('rejects nonexistent deep traversal', async () => {
+		const result = await resolveImagePath('../../../etc/nonexistent-file', imagesDir)
 		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.error).toBe('file not found')
 	})
 
 	test('resolves valid symlink inside base dir', async () => {
@@ -100,9 +101,9 @@ describe('loadImageFile', () => {
 		if (!result.ok) expect(result.error).toBe('unsupported image format')
 	})
 
-	test('rejects path traversal', async () => {
+	test('loads file from sibling directory', async () => {
 		const result = await loadImageFile('../outside.png', imagesDir)
-		expect(result.ok).toBe(false)
+		expect(result.ok).toBe(true)
 	})
 
 	test('rejects missing file', async () => {

@@ -121,7 +121,11 @@ async function decodeInternal(
 			return { ok: false, error: 'image too large to decode' }
 		}
 
-		const targetWidth = targetCols * cellPixelWidth
+		// halfblock: 1 pixel = 1 terminal column, 2 pixels = 1 terminal row
+		// kitty: actual pixel dimensions mapped to cell grid
+		const targetWidth = purpose === 'halfblock'
+			? targetCols
+			: targetCols * cellPixelWidth
 
 		const { data, info } = await sharp(bytes, {
 			limitInputPixels: MAX_DECODED_PIXELS,
@@ -153,7 +157,9 @@ async function decodeInternal(
 			rgba = new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
 		}
 
-		const terminalCols = Math.ceil(width / cellPixelWidth)
+		// halfblock: width IS terminal cols (1:1), height/2 IS terminal rows
+		// kitty: map pixel dimensions back to cell grid
+		const terminalCols = purpose === 'halfblock' ? width : Math.ceil(width / cellPixelWidth)
 		const terminalRows = purpose === 'halfblock' ? height / 2 : Math.ceil(height / cellPixelHeight)
 
 		return {

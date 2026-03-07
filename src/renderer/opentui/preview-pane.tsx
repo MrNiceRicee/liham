@@ -10,14 +10,20 @@ interface PreviewPaneProps {
 	focused: boolean
 	theme: ThemeTokens
 	scrollRef: RefObject<ScrollBoxRenderable | null>
+	width?: number
+	height?: number
 	onMouseDown?: () => void
 	onMouseScroll?: () => void
 }
 
-export function PreviewPane({ content, focused, theme, scrollRef, onMouseDown, onMouseScroll }: Readonly<PreviewPaneProps>) {
+export function PreviewPane({ content, focused, theme, scrollRef, width, height, onMouseDown, onMouseScroll }: Readonly<PreviewPaneProps>) {
 	const borderColor = focused
 		? theme.pane.focusedBorderColor
 		: theme.pane.unfocusedBorderColor
+
+	const rootOptions: Record<string, unknown> = { flexGrow: 1, borderColor, borderStyle: 'single' }
+	rootOptions['width'] = width ?? '100%'
+	if (height != null) rootOptions['height'] = height
 
 	return (
 		<scrollbox
@@ -27,9 +33,7 @@ export function PreviewPane({ content, focused, theme, scrollRef, onMouseDown, o
 			border
 			onMouseDown={onMouseDown}
 			onMouseScroll={onMouseScroll}
-			style={{
-				rootOptions: { width: '100%', flexGrow: 1, borderColor, borderStyle: 'single' },
-			}}
+			style={{ rootOptions }}
 		>
 			<box style={{ flexDirection: 'column', padding: 1 }}>{content}</box>
 		</scrollbox>

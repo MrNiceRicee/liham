@@ -148,9 +148,15 @@ describe('processMarkdown structure', () => {
 		expect(collectText(links[0]!.element)).toBe('click here')
 	})
 
-	it('renders images as [image: alt] text', async () => {
+	it('promotes standalone image to block-level ImageBlock component', async () => {
 		const tree = await render('![my picture](img.png)')
-		expect(collectText(tree)).toContain('[image: my picture]')
+		// standalone image is promoted out of paragraph — rendered as ImageBlock component
+		const imageComponents = findAll(tree, (el) => {
+			const node = prop<{ type: string }>(el, 'node')
+			return node?.type === 'image'
+		})
+		expect(imageComponents.length).toBe(1)
+		expect(prop<{ alt: string }>(imageComponents[0]!.element, 'node')?.alt).toBe('my picture')
 	})
 
 	it('renders unordered list with bullet markers', async () => {
