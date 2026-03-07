@@ -28,15 +28,17 @@ export function createFrameTimer({
 	let timerId: ReturnType<typeof setTimeout> | null = null
 	let epochMs = 0
 	let accumulated = 0
+	let disposed = false
 
 	function scheduleNext() {
-		if (state !== 'playing') return
+		if (state !== 'playing' || disposed) return
 		const delay = delays[frameIndex] ?? 100
 		const now = performance.now()
 		const expected = epochMs + accumulated + delay
 		const adjusted = Math.max(0, expected - now)
 
 		timerId = setTimeout(() => {
+			if (disposed) return
 			accumulated += delay
 			const nextIndex = frameIndex + 1
 
@@ -85,6 +87,7 @@ export function createFrameTimer({
 			}
 		},
 		dispose() {
+			disposed = true
 			state = 'idle'
 			if (timerId != null) {
 				clearTimeout(timerId)

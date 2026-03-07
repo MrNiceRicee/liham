@@ -1,13 +1,15 @@
 // media modal overlay — full-screen media viewer with info bar.
 // absolute positioned sibling of scrollbox content (does not scroll with content).
 
-import { type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { MediaIRNode } from '../../ir/types.ts'
 import type { AnimationLimits } from '../../media/decoder.ts'
+import type { LoadedImage } from '../../media/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import type { MediaEntry } from './index.tsx'
 
+import { createFrameTimer, type FrameTimerHandle } from '../../media/frame-timer.ts'
 import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
 import { sanitizeForTerminal } from '../../pipeline/sanitize.ts'
 import { ImageContext } from './image-context.tsx'
@@ -73,6 +75,55 @@ function ModalHalfBlockRows({
 	)
 }
 
+// -- lazy pre-computed halfblock grids for animation --
+
+function computeGrid(image: LoadedImage, frameIndex: number, bgColor: string): MergedSpan[][] {
+	const frame = image.frames?.[frameIndex]
+	if (frame == null) return renderHalfBlockMerged(image, bgColor)
+	// build a single-frame LoadedImage view for renderHalfBlockMerged
+	const frameView: LoadedImage = { ...image, rgba: frame }
+	return renderHalfBlockMerged(frameView, bgColor)
+}
+
+function useFrameGridCache(image: LoadedImage | null, bgColor: string) {
+	const cacheRef = useRef(new Map<number, MergedSpan[][]>())
+
+	// reset cache when image changes
+	useEffect(() => {
+		cacheRef.current = new Map()
+	}, [image])
+
+	const getGrid = useCallback(
+		(frameIndex: number): MergedSpan[][] => {
+			if (image == null) return []
+			const cached = cacheRef.current.get(frameIndex)
+			if (cached != null) return cached
+			const grid = computeGrid(image, frameIndex, bgColor)
+			cacheRef.current.set(frameIndex, grid)
+			return grid
+		},
+		[image, bgColor],
+	)
+
+	// pre-compute the next frame in a microtask
+	const precomputeNext = useCallback(
+		(currentIndex: number) => {
+			if (image?.frames == null) return
+			const next = (currentIndex + 1) % image.frames.length
+			if (!cacheRef.current.has(next)) {
+				setTimeout(() => {
+					if (image.frames == null) return
+					const grid = computeGrid(image, next, bgColor)
+					cacheRef.current.set(next, grid)
+				}, 0)
+			}
+		},
+		[image, bgColor],
+	)
+
+	return { getGrid, precomputeNext }
+}
+
 // -- modal image content --
 
 export interface FrameInfo {
@@ -96,7 +147,6 @@ function ModalImageContent({
 	readonly onFrameInfo: (info: FrameInfo | null) => void
 }): ReactNode {
 	const ctx = useContext(ImageContext)
-	// override context with full-viewport dimensions + raised animation limits for lightbox
 	const modalCtx = useMemo(
 		() =>
 			ctx != null ? { ...ctx, maxCols, maxRows, animationLimits: MODAL_ANIMATION_LIMITS } : null,
@@ -104,12 +154,44 @@ function ModalImageContent({
 	)
 	const { state, image } = useImageLoader(url, modalCtx, true)
 
+	// animation state
+	const [frameIndex, setFrameIndex] = useState(0)
+	const timerRef = useRef<FrameTimerHandle | null>(null)
+	const { getGrid, precomputeNext } = useFrameGridCache(image, ctx?.bgColor ?? '')
+
+	const isAnimated = image?.frames != null && image.frames.length > 1
+
 	// report frame info to parent for info bar
 	useEffect(() => {
-		if (image?.frames != null && image.frames.length > 1) {
-			onFrameInfo({ frameCount: image.frames.length, capped: false })
+		if (isAnimated) {
+			onFrameInfo({ frameCount: image.frames!.length, capped: false })
 		} else {
 			onFrameInfo(null)
+		}
+	}, [image, isAnimated])
+
+	// start/stop frame timer
+	useEffect(() => {
+		if (!isAnimated || image?.delays == null) return
+		setFrameIndex(0)
+
+		const timer = createFrameTimer({
+			delays: image.delays,
+			onFrame: (idx) => {
+				setFrameIndex(idx)
+				precomputeNext(idx)
+			},
+			loop: true,
+		})
+		timerRef.current = timer
+		// pre-compute first two frames eagerly
+		getGrid(0)
+		precomputeNext(0)
+		timer.play()
+
+		return () => {
+			timer.dispose()
+			timerRef.current = null
 		}
 	}, [image])
 
@@ -137,8 +219,7 @@ function ModalImageContent({
 		)
 	}
 
-	// always use halfblock in modal for simplicity (same as inline animated GIF)
-	const rows = renderHalfBlockMerged(image, ctx.bgColor)
+	const rows = isAnimated ? getGrid(frameIndex) : renderHalfBlockMerged(image, ctx.bgColor)
 	return <ModalHalfBlockRows rows={rows} width={image.terminalCols} />
 }
 

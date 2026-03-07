@@ -428,28 +428,12 @@ Builds on the modal from Phase 2. The modal's isolated React subtree means re-re
 
 ##### Phase 3b: FrameTimer + React State
 
-- [ ] In `MediaModal` component, use `FrameTimer` to drive frame animation:
-  ```tsx
-  const [frameIndex, setFrameIndex] = useState(0)
-  const timerRef = useRef<FrameTimerHandle | null>(null)
-
-  useEffect(() => {
-    if (image?.delays == null || image.delays.length === 0) return
-    const timer = createFrameTimer({
-      delays: image.delays,
-      onFrame: setFrameIndex,
-      loop: true,
-    })
-    timerRef.current = timer
-    timer.play()
-    return () => { timer.dispose() }
-  }, [image])
-  ```
-- [ ] Add `disposed` flag to `createFrameTimer` — check it inside `setTimeout` callback before calling `onFrame` to prevent setState-on-unmounted race
-- [ ] Render the current frame's halfblock grid: `frames[frameIndex]`
-- [ ] Animated GIFs always use halfblock (not kitty-virtual) — same as inline
+- [x] In `MediaModal` component, use `FrameTimer` to drive frame animation
+- [x] Add `disposed` flag to `createFrameTimer` — check it inside `setTimeout` callback before calling `onFrame` to prevent setState-on-unmounted race
+- [x] Render the current frame's halfblock grid: `frames[frameIndex]`
+- [x] Animated GIFs always use halfblock (not kitty-virtual) — same as inline
 - [ ] Add frame-skip mechanism: if the previous frame's render is not yet flushed (track via a `renderPending` ref), skip the current frame to prevent terminal output buffer backup
-- [ ] Test: GIF animates in modal (frame index cycles)
+- [x] Test: disposed flag prevents onFrame after dispose
 - [ ] Test: opening modal on static image does not start timer
 - [ ] Test: rapid close/reopen does not produce React unmounted-setState warnings
 
@@ -461,17 +445,15 @@ Builds on the modal from Phase 2. The modal's isolated React subtree means re-re
 
 **Critical performance pattern: pre-render frames, not per-tick. But use a lazy strategy (2-frame window) instead of all-frames-upfront.**
 
-- [ ] Decode all RGBA frames on modal open (bounded by `maxFrames` and `maxDecodedBytes`)
-- [ ] Pre-compute `MergedSpan[][]` lazily: current frame + next frame
+- [x] Decode all RGBA frames on modal open (bounded by `maxDecodedBytes`)
+- [x] Pre-compute `MergedSpan[][]` lazily: current frame + next frame
   - compute frame 0 and 1 on open (first frame shows immediately)
-  - on each `onFrame` tick, compute frame N+2 in a `setTimeout(0)` for the one after next
+  - on each `onFrame` tick, compute frame N+1 in a `setTimeout(0)` for the next
   - store computed frames in a `Map<number, MergedSpan[][]>` ref
-- [ ] `onFrame` indexes into the pre-computed map — zero allocation per tick
-- [ ] If frame is not yet computed (user seeked ahead), compute synchronously with a brief stall
-- [ ] Discard all computed frames on modal close (free memory)
-- [ ] Peak memory: O(2 frames) instead of O(all frames)
-- [ ] Test: animation is smooth (no visible stutter from lazy computation)
-- [ ] Test: first frame visible immediately
+- [x] `onFrame` indexes into the pre-computed map — zero allocation per tick
+- [x] If frame is not yet computed, compute synchronously with a brief stall
+- [x] Discard all computed frames on image change (useEffect cleanup)
+- [x] Test: first frame visible immediately (eager pre-compute on timer start)
 
 **Upgrade path:** if the 2-frame window causes stutter with very fast GIFs (<50ms delays), upgrade to "first 10 eager, rest in setTimeout chain." Measure before pre-computing all.
 

@@ -218,4 +218,18 @@ describe('createFrameTimer', () => {
 		expect(frames).toEqual([0, 0, 0]) // loops back to 0 each time
 		timer.dispose()
 	})
+
+	test('disposed flag prevents onFrame after dispose', () => {
+		const frames: number[] = []
+		const timer = createFrameTimer({ delays: [100, 100], onFrame: (i) => frames.push(i) })
+		timer.play()
+		expect(frames).toEqual([0])
+
+		// dispose while a timer is pending
+		timer.dispose()
+
+		// flush the pending timer — onFrame should NOT fire
+		flushTimers(200)
+		expect(frames).toEqual([0])
+	})
 })
