@@ -12,6 +12,7 @@ import type { LoadedImage } from '../../media/types.ts'
 import { renderHalfBlockMerged, type MergedSpan } from '../../media/halfblock.ts'
 import { buildCleanupCommand, buildTransmitChunks, buildVirtualPlacement, generateImageId } from '../../media/kitty.ts'
 import { ImageContext } from './image-context.tsx'
+import { MediaFocusContext } from './media-focus-context.tsx'
 import { useImageLoader, useViewportVisibility } from './use-image-loader.ts'
 
 // re-export for consumers that import from here
@@ -75,13 +76,37 @@ function KittyPlaceholder({ rows, cols }: { readonly rows: number; readonly cols
 
 // -- main image block component --
 
-function ImageBlock({ node, nodeKey, mediaIndex: _mediaIndex }: { readonly node: ImageNode; readonly nodeKey: string; readonly mediaIndex?: number }): ReactNode {
+function ImageBlock({ node, nodeKey, mediaIndex }: { readonly node: ImageNode; readonly nodeKey: string; readonly mediaIndex?: number }): ReactNode {
 	const ctx = useContext(ImageContext)
+	const focusCtx = useContext(MediaFocusContext)
 	const renderer = useRenderer()
 	const boxRef = useRef<BoxRenderable | null>(null)
 	const isVisible = useViewportVisibility(boxRef, ctx?.scrollRef)
 	const { state, image, errorMsg } = useImageLoader(node.url, ctx, isVisible)
 	const kittyIdRef = useRef<number | null>(null)
+
+	const isFocused = mediaIndex != null && focusCtx?.focusedMediaIndex === mediaIndex
+
+	// scroll into view when focused
+	useEffect(() => {
+		if (!isFocused || boxRef.current == null || ctx?.scrollRef.current == null) return
+		const scrollbox = ctx.scrollRef.current
+		const box = boxRef.current
+		// check if box is out of viewport and scroll to it
+		const boxTop = box.offsetTop ?? 0
+		const scrollTop = scrollbox.scrollTop
+		const viewHeight = scrollbox.offsetHeight ?? 0
+		if (boxTop < scrollTop || boxTop > scrollTop + viewHeight) {
+			scrollbox.scrollTo(Math.max(0, boxTop - 2))
+		}
+	}, [isFocused])
+
+	// click handler for opening modal
+	const handleMouseDown = () => {
+		if (mediaIndex != null && focusCtx != null) {
+			focusCtx.onMediaClick(mediaIndex)
+		}
+	}
 
 	// kitty transmit + cleanup lifecycle
 	useEffect(() => {
@@ -102,10 +127,12 @@ function ImageBlock({ node, nodeKey, mediaIndex: _mediaIndex }: { readonly node:
 	const fgProps: Record<string, unknown> = {}
 	if (node.style.fg != null) fgProps['fg'] = node.style.fg
 
+	const focusBorder = isFocused ? ['bottom'] as const : undefined
+
 	// wrap all states in a ref'd box for viewport position tracking
 	if (state === 'idle' || state === 'loading') {
 		return (
-			<box ref={boxRef} key={nodeKey}>
+			<box ref={boxRef} key={nodeKey} border={focusBorder} onMouseDown={handleMouseDown}>
 				<text>
 					<span {...fgProps}>{`[loading: ${node.alt}]`}</span>
 				</text>
@@ -116,7 +143,7 @@ function ImageBlock({ node, nodeKey, mediaIndex: _mediaIndex }: { readonly node:
 	if (state === 'error') {
 		const suffix = errorMsg.length > 0 ? ` (${errorMsg})` : ''
 		return (
-			<box ref={boxRef} key={nodeKey}>
+			<box ref={boxRef} key={nodeKey} border={focusBorder} onMouseDown={handleMouseDown}>
 				<text>
 					<span {...fgProps}>{`[image: ${node.alt}${suffix}]`}</span>
 				</text>
@@ -126,7 +153,7 @@ function ImageBlock({ node, nodeKey, mediaIndex: _mediaIndex }: { readonly node:
 
 	if (state === 'loaded' && image != null) {
 		return (
-			<box ref={boxRef} key={nodeKey}>
+			<box ref={boxRef} key={nodeKey} border={focusBorder} onMouseDown={handleMouseDown}>
 				{renderLoadedImage(image, node, nodeKey, ctx)}
 			</box>
 		)

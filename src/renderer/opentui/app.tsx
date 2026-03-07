@@ -37,6 +37,7 @@ import { ImageContext, type ImageContextValue } from './image-context.tsx'
 import { clearImageCache } from './image.tsx'
 import { type MediaEntry, renderToOpenTUI, renderToOpenTUIWithMedia } from './index.tsx'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
+import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-context.tsx'
 import { StatusBar } from './status-bar.tsx'
 import { VIEWER_KEY_MAP, VIEWER_SHIFT_KEY_MAP, applyScroll, syncScroll } from './viewer-keys.ts'
 
@@ -453,6 +454,17 @@ export function App(props: Readonly<AppProps>) {
 		}
 	}, [state.mode, state.currentFile, props.imageCapabilities, props.theme.image.placeholderBg, panes.preview?.width, state.dimensions.width])
 
+	// media focus context — separate from ImageContext for update frequency isolation
+	const onMediaClick = useCallback((index: number) => {
+		dispatch({ type: 'FocusMedia', index })
+		dispatch({ type: 'OpenMediaModal' })
+	}, [])
+
+	const mediaFocusCtx: MediaFocusContextValue = useMemo(() => ({
+		focusedMediaIndex: state.mediaFocusIndex,
+		onMediaClick,
+	}), [state.mediaFocusIndex, onMediaClick])
+
 	const viewerLayout = state.mode !== 'browser'
 		? renderViewerLayout(
 				state,
@@ -471,9 +483,13 @@ export function App(props: Readonly<AppProps>) {
 			)
 		: null
 
-	const wrappedViewerLayout = imageCtx != null
+	const withImageCtx = imageCtx != null
 		? <ImageContext.Provider value={imageCtx}>{viewerLayout}</ImageContext.Provider>
 		: viewerLayout
+
+	const wrappedViewerLayout = withImageCtx != null
+		? <MediaFocusContext.Provider value={mediaFocusCtx}>{withImageCtx}</MediaFocusContext.Provider>
+		: null
 
 	return (
 		<box style={{ flexDirection: 'column', width: '100%', height: '100%' }}>
