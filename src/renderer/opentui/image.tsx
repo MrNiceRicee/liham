@@ -1,16 +1,21 @@
 // image renderer component — Kitty virtual placements, half-block fallback, text fallback.
 // thin rendering shell — loading logic lives in use-image-loader.ts.
 
-import { resolveRenderLib, type BoxRenderable } from '@opentui/core'
+import { type BoxRenderable, resolveRenderLib } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
 import { writeSync } from 'node:fs'
-import { memo, useContext, useEffect, useRef, type ReactNode } from 'react'
+import { memo, type ReactNode, useContext, useEffect, useRef } from 'react'
 
 import type { ImageNode } from '../../ir/types.ts'
 import type { LoadedImage } from '../../media/types.ts'
 
-import { renderHalfBlockMerged, type MergedSpan } from '../../media/halfblock.ts'
-import { buildCleanupCommand, buildTransmitChunks, buildVirtualPlacement, generateImageId } from '../../media/kitty.ts'
+import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
+import {
+	buildCleanupCommand,
+	buildTransmitChunks,
+	buildVirtualPlacement,
+	generateImageId,
+} from '../../media/kitty.ts'
 import { ImageContext } from './image-context.tsx'
 import { MediaFocusContext } from './media-focus-context.tsx'
 import { useImageLoader, useViewportVisibility } from './use-image-loader.ts'
@@ -54,29 +59,48 @@ function renderSpans(spans: MergedSpan[], rowIdx: number): ReactNode[] {
 	})
 }
 
-const HalfBlockRows = memo(function HalfBlockRows({ rows, width, href }: HalfBlockRowsProps) {
-	return (
-		<box style={{ height: rows.length, width }}>
-			{rows.map((spans, rowIdx) => (
-				<text key={`hb-${String(rowIdx)}`}>
-					{href != null
-						? <a href={href}>{renderSpans(spans, rowIdx)}</a>
-						: renderSpans(spans, rowIdx)}
-				</text>
-			))}
-		</box>
-	)
-}, (prev, next) => prev.rows === next.rows && prev.href === next.href)
+const HalfBlockRows = memo(
+	function HalfBlockRows({ rows, width, href }: HalfBlockRowsProps) {
+		return (
+			<box style={{ height: rows.length, width }}>
+				{rows.map((spans, rowIdx) => (
+					<text key={`hb-${String(rowIdx)}`}>
+						{href != null ? (
+							<a href={href}>{renderSpans(spans, rowIdx)}</a>
+						) : (
+							renderSpans(spans, rowIdx)
+						)}
+					</text>
+				))}
+			</box>
+		)
+	},
+	(prev, next) => prev.rows === next.rows && prev.href === next.href,
+)
 
 // -- kitty text fallback for placeholder rendering --
 
-function KittyPlaceholder({ rows, cols }: { readonly rows: number; readonly cols: number }): ReactNode {
+function KittyPlaceholder({
+	rows,
+	cols,
+}: {
+	readonly rows: number
+	readonly cols: number
+}): ReactNode {
 	return <box style={{ height: rows, width: cols }} />
 }
 
 // -- main image block component --
 
-function ImageBlock({ node, nodeKey, mediaIndex }: { readonly node: ImageNode; readonly nodeKey: string; readonly mediaIndex?: number }): ReactNode {
+function ImageBlock({
+	node,
+	nodeKey,
+	mediaIndex,
+}: {
+	readonly node: ImageNode
+	readonly nodeKey: string
+	readonly mediaIndex?: number
+}): ReactNode {
 	const ctx = useContext(ImageContext)
 	const focusCtx = useContext(MediaFocusContext)
 	const renderer = useRenderer()
@@ -92,11 +116,13 @@ function ImageBlock({ node, nodeKey, mediaIndex }: { readonly node: ImageNode; r
 		if (!isFocused || boxRef.current == null || ctx?.scrollRef.current == null) return
 		const scrollbox = ctx.scrollRef.current
 		const box = boxRef.current
-		// check if box is out of viewport and scroll to it
-		const boxTop = box.offsetTop ?? 0
+		// box.y is the layout position within the scrollbox content
+		const boxTop = box.y
+		const boxBottom = boxTop + box.height
 		const scrollTop = scrollbox.scrollTop
-		const viewHeight = scrollbox.offsetHeight ?? 0
-		if (boxTop < scrollTop || boxTop > scrollTop + viewHeight) {
+		const viewHeight = scrollbox.height
+		// scroll only if image is not fully visible
+		if (boxTop < scrollTop || boxBottom > scrollTop + viewHeight) {
 			scrollbox.scrollTo(Math.max(0, boxTop - 2))
 		}
 	}, [isFocused])
@@ -116,7 +142,9 @@ function ImageBlock({ node, nodeKey, mediaIndex }: { readonly node: ImageNode; r
 
 		transmitKittyImage(image, renderer)
 
-		return () => { cleanupKittyImage(renderer) }
+		return () => {
+			cleanupKittyImage(renderer)
+		}
 	}, [image, ctx?.capabilities.protocol])
 
 	// conditional rendering AFTER all hooks
@@ -127,16 +155,27 @@ function ImageBlock({ node, nodeKey, mediaIndex }: { readonly node: ImageNode; r
 	const fgProps: Record<string, unknown> = {}
 	if (node.style.fg != null) fgProps['fg'] = node.style.fg
 
-	const focusBorder = isFocused ? ['bottom'] as const : undefined
+	const focusBorder = isFocused ? true : undefined
 	const focusBorderColor = isFocused ? focusCtx?.focusBorderColor : undefined
+	const focusLabel =
+		isFocused && focusCtx != null
+			? buildFocusLabel(node, mediaIndex, focusCtx.mediaCount, focusCtx.focusBorderColor)
+			: null
 
 	// wrap all states in a ref'd box for viewport position tracking
 	if (state === 'idle' || state === 'loading') {
 		return (
-			<box ref={boxRef} key={nodeKey} border={focusBorder} borderColor={focusBorderColor} onMouseDown={handleMouseDown}>
+			<box
+				ref={boxRef}
+				key={nodeKey}
+				border={focusBorder}
+				borderColor={focusBorderColor}
+				onMouseDown={handleMouseDown}
+			>
 				<text>
 					<span {...fgProps}>{`[loading: ${node.alt}]`}</span>
 				</text>
+				{focusLabel}
 			</box>
 		)
 	}
@@ -144,18 +183,32 @@ function ImageBlock({ node, nodeKey, mediaIndex }: { readonly node: ImageNode; r
 	if (state === 'error') {
 		const suffix = errorMsg.length > 0 ? ` (${errorMsg})` : ''
 		return (
-			<box ref={boxRef} key={nodeKey} border={focusBorder} borderColor={focusBorderColor} onMouseDown={handleMouseDown}>
+			<box
+				ref={boxRef}
+				key={nodeKey}
+				border={focusBorder}
+				borderColor={focusBorderColor}
+				onMouseDown={handleMouseDown}
+			>
 				<text>
 					<span {...fgProps}>{`[image: ${node.alt}${suffix}]`}</span>
 				</text>
+				{focusLabel}
 			</box>
 		)
 	}
 
 	if (state === 'loaded' && image != null) {
 		return (
-			<box ref={boxRef} key={nodeKey} border={focusBorder} borderColor={focusBorderColor} onMouseDown={handleMouseDown}>
+			<box
+				ref={boxRef}
+				key={nodeKey}
+				border={focusBorder}
+				borderColor={focusBorderColor}
+				onMouseDown={handleMouseDown}
+			>
 				{renderLoadedImage(image, node, nodeKey, ctx)}
+				{focusLabel}
 			</box>
 		)
 	}
@@ -232,15 +285,33 @@ function renderLoadedImage(
 	return renderTextFallback(node, key)
 }
 
+function mediaBasename(urlOrPath: string): string {
+	const parts = urlOrPath.split('/')
+	return parts[parts.length - 1] ?? urlOrPath
+}
+
+function buildFocusLabel(node: ImageNode, index: number, total: number, color: string): ReactNode {
+	const name = node.url != null ? mediaBasename(node.url) : node.alt
+	return (
+		<text>
+			<span fg={color}>{`▸ ${name} [${String(index + 1)}/${String(total)}]`}</span>
+		</text>
+	)
+}
+
 function renderTextFallback(node: ImageNode, key: string): ReactNode {
 	const props: Record<string, unknown> = {}
 	if (node.style.fg != null) props['fg'] = node.style.fg
 	const label = `[image: ${node.alt}]`
 	return (
 		<text key={key}>
-			{node.href != null
-				? <a href={node.href}><span {...props}>{label}</span></a>
-				: <span {...props}>{label}</span>}
+			{node.href != null ? (
+				<a href={node.href}>
+					<span {...props}>{label}</span>
+				</a>
+			) : (
+				<span {...props}>{label}</span>
+			)}
 		</text>
 	)
 }

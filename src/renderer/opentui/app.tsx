@@ -5,94 +5,54 @@ import type { KeyEvent, ScrollBoxRenderable } from '@opentui/core'
 import { useKeyboard, useOnResize, useRenderer, useTerminalDimensions } from '@opentui/react'
 import { dirname } from 'node:path'
 import {
+	type ReactNode,
 	useCallback,
 	useEffect,
 	useMemo,
 	useReducer,
 	useRef,
 	useState,
-	type ReactNode,
 } from 'react'
 
 import type { ImageCapabilities } from '../../media/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
+import type { MediaEntry } from './index.tsx'
 
 import {
 	type AppAction,
-	type AppState,
-	type LayoutMode,
-	type ScrollDirection,
 	appReducer,
 	initialState,
 	isSplitLayout,
+	type LayoutMode,
 	legendEntries,
 	paneDimensions,
+	type ScrollDirection,
 } from '../../app/state.ts'
 import { fuzzyFilter } from '../../browser/fuzzy.ts'
 import { scanDirectory } from '../../browser/scanner.ts'
-import { processMarkdown } from '../../pipeline/processor.ts'
 import { createDirectoryWatcher, createFileWatcher } from '../../watcher/watcher.ts'
 import { browserKeyHandler } from './browser-keys.ts'
+import {
+	openFileFromBrowser,
+	type PreviewCacheEntry,
+	reloadViewerFile,
+	renderBrowserPreview,
+} from './browser-preview.tsx'
 import { ImageContext, type ImageContextValue } from './image-context.tsx'
 import { clearImageCache } from './image.tsx'
-import { type MediaEntry, renderToOpenTUI, renderToOpenTUIWithMedia } from './index.tsx'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-context.tsx'
+import { MediaGallery } from './media-gallery.tsx'
 import { MediaModal } from './media-modal.tsx'
 import { StatusBar } from './status-bar.tsx'
-import { VIEWER_KEY_MAP, VIEWER_SHIFT_KEY_MAP, applyScroll, handleModalKey, syncScroll } from './viewer-keys.ts'
-
-// -- browser preview cache helper --
-
-interface PreviewCacheEntry {
-	content: ReactNode
-	renderTimeMs: number
-}
-
-function renderBrowserPreview(
-	filePath: string,
-	cursorSnapshot: number,
-	cursorRef: React.RefObject<number>,
-	cache: Map<string, PreviewCacheEntry>,
-	state: AppState,
-	theme: ThemeTokens,
-	setContent: (content: ReactNode) => void,
-	setRenderTime: (ms: number) => void,
-): void {
-	void (async () => {
-		try {
-			const t0 = performance.now()
-			const markdown = await Bun.file(filePath).text()
-			if (cursorRef.current !== cursorSnapshot) return
-
-			const result = await processMarkdown(markdown, theme)
-			if (cursorRef.current !== cursorSnapshot) return
-
-			if (!result.ok) {
-				const errNode = <text color={theme.fallback.textColor}>preview error: {result.error}</text>
-				setContent(errNode)
-				return
-			}
-
-			const panes = paneDimensions(
-				state.layout,
-				state.dimensions.width,
-				state.dimensions.height,
-				'browser',
-			)
-			const width = (panes.preview?.width ?? state.dimensions.width) - 4
-			const rendered = renderToOpenTUI(result.value, width)
-			const elapsed = performance.now() - t0
-			cache.set(filePath, { content: rendered, renderTimeMs: elapsed })
-			if (cursorRef.current === cursorSnapshot) {
-				setContent(rendered)
-				setRenderTime(elapsed)
-			}
-		} catch {
-			setContent(<text color={theme.fallback.textColor}>cannot read file</text>)
-		}
-	})()
-}
+import {
+	applyScroll,
+	createMouseHandlers,
+	handleModalKey,
+	syncScroll,
+	VIEWER_KEY_MAP,
+	VIEWER_SHIFT_KEY_MAP,
+} from './viewer-keys.ts'
 
 type AppProps =
 	| {
@@ -107,7 +67,14 @@ type AppProps =
 			filePath: string
 			noWatch: boolean
 	  }
-	| { mode: 'browser'; dir: string; layout: LayoutMode; theme: ThemeTokens; imageCapabilities: ImageCapabilities; noWatch: boolean }
+	| {
+			mode: 'browser'
+			dir: string
+			layout: LayoutMode
+			theme: ThemeTokens
+			imageCapabilities: ImageCapabilities
+			noWatch: boolean
+	  }
 
 export function App(props: Readonly<AppProps>) {
 	const renderer = useRenderer()
@@ -134,8 +101,13 @@ export function App(props: Readonly<AppProps>) {
 	)
 
 	// unified viewer content — mutable state for live reload
-	const [viewerState, setViewerState] = useState<{ content: ReactNode; raw: string; mediaNodes: MediaEntry[] }>(() => {
-		if (props.mode === 'viewer') return { content: props.content, raw: props.raw, mediaNodes: props.mediaNodes }
+	const [viewerState, setViewerState] = useState<{
+		content: ReactNode
+		raw: string
+		mediaNodes: MediaEntry[]
+	}>(() => {
+		if (props.mode === 'viewer')
+			return { content: props.content, raw: props.raw, mediaNodes: props.mediaNodes }
 		return { content: null, raw: '', mediaNodes: [] }
 	})
 
@@ -246,48 +218,19 @@ export function App(props: Readonly<AppProps>) {
 
 	// -- file watcher for live reload --
 	const fileChangeIdRef = useRef<number>(0)
+	const reloadCtx = useMemo(
+		() => ({
+			changeIdRef: fileChangeIdRef,
+			previewRef,
+			setViewerState,
+			setRenderTimeMs,
+		}),
+		[],
+	)
 
 	const reloadFile = useCallback(
 		(watchedPath: string) => {
-			const changeId = ++fileChangeIdRef.current
-			void (async () => {
-				try {
-					const t0 = performance.now()
-					const markdown = await Bun.file(watchedPath).text()
-					if (fileChangeIdRef.current !== changeId) return
-
-					const result = await processMarkdown(markdown, props.theme)
-					if (fileChangeIdRef.current !== changeId) return
-
-					if (!result.ok) {
-						// keep last good preview, update raw source only
-						setViewerState((prev) => ({ ...prev, raw: markdown }))
-						return
-					}
-
-					const panes = paneDimensions(
-						state.layout,
-						state.dimensions.width,
-						state.dimensions.height,
-						'viewer',
-					)
-					const width = (panes.preview?.width ?? state.dimensions.width) - 4
-					const { jsx: rendered, mediaNodes } = renderToOpenTUIWithMedia(result.value, width)
-					const elapsed = performance.now() - t0
-
-					if (fileChangeIdRef.current !== changeId) return
-
-					// preserve scroll position
-					const scrollBefore = previewRef.current?.scrollTop ?? 0
-					setViewerState({ content: rendered, raw: markdown, mediaNodes })
-					setRenderTimeMs(elapsed)
-					queueMicrotask(() => {
-						previewRef.current?.scrollTo(scrollBefore)
-					})
-				} catch {
-					// read failed — silently ignore (matches Go v1)
-				}
-			})()
+			reloadViewerFile(watchedPath, state, props.theme, reloadCtx)
 		},
 		[props.theme, state.layout, state.dimensions],
 	)
@@ -313,7 +256,6 @@ export function App(props: Readonly<AppProps>) {
 				watcher.close()
 			}
 		} catch {
-			// watcher init failed (e.g. inotify limit) — degrade to static mode
 			return
 		}
 	}, [state.currentFile, state.mode])
@@ -346,34 +288,15 @@ export function App(props: Readonly<AppProps>) {
 
 	// -- handle opening a file from browser --
 	const handleOpenFile = useCallback(
-		async (path: string) => {
-			try {
-				const markdown = await Bun.file(path).text()
-				const result = await processMarkdown(markdown, props.theme)
-
-				if (!result.ok) {
-					// stay in browser, show error in preview
-					setBrowserPreviewContent(
-						<text color={props.theme.fallback.textColor}>pipeline error: {result.error}</text>,
-					)
-					return
-				}
-
-				dispatch({ type: 'OpenFile', path })
-
-				// set the viewer content after mode transition
-				const termWidth = state.dimensions.width
-				const panes = paneDimensions(state.layout, termWidth, state.dimensions.height, 'viewer')
-				const paneChrome = 4
-				const width = (panes.preview?.width ?? termWidth) - paneChrome
-				const { jsx: rendered, mediaNodes } = renderToOpenTUIWithMedia(result.value, width)
-
-				setViewerState({ content: rendered, raw: markdown, mediaNodes })
-			} catch {
-				setBrowserPreviewContent(
-					<text color={props.theme.fallback.textColor}>cannot read file</text>,
-				)
-			}
+		(path: string) => {
+			openFileFromBrowser(
+				path,
+				state,
+				props.theme,
+				dispatch,
+				setViewerState,
+				setBrowserPreviewContent,
+			)
 		},
 		[props.theme, state.dimensions, state.layout],
 	)
@@ -426,28 +349,6 @@ export function App(props: Readonly<AppProps>) {
 		if (action != null) handleAction(action)
 	})
 
-	// -- mouse handlers --
-	const handleSourceMouseDown = () => {
-		if (state.focus !== 'source' && isSplitLayout(state.layout)) {
-			dispatch({ type: 'FocusPane', target: 'source' })
-		}
-	}
-	const handlePreviewMouseDown = () => {
-		if (state.focus !== 'preview' && isSplitLayout(state.layout)) {
-			dispatch({ type: 'FocusPane', target: 'preview' })
-		}
-	}
-	const handleSourceMouseScroll = () => {
-		if (state.scrollSync && isSplitLayout(state.layout) && state.focus === 'source') {
-			queueMicrotask(() => syncScroll(sourceRef.current, previewRef.current))
-		}
-	}
-	const handlePreviewMouseScroll = () => {
-		if (state.scrollSync && isSplitLayout(state.layout) && state.focus === 'preview') {
-			queueMicrotask(() => syncScroll(previewRef.current, sourceRef.current))
-		}
-	}
-
 	const panes = paneDimensions(
 		state.layout,
 		state.dimensions.width,
@@ -469,7 +370,14 @@ export function App(props: Readonly<AppProps>) {
 			maxCols,
 			scrollRef: previewRef,
 		}
-	}, [state.mode, state.currentFile, props.imageCapabilities, props.theme.image.placeholderBg, panes.preview?.width, state.dimensions.width])
+	}, [
+		state.mode,
+		state.currentFile,
+		props.imageCapabilities,
+		props.theme.image.placeholderBg,
+		panes.preview?.width,
+		state.dimensions.width,
+	])
 
 	// media focus context — separate from ImageContext for update frequency isolation
 	const onMediaClick = useCallback((index: number) => {
@@ -477,55 +385,75 @@ export function App(props: Readonly<AppProps>) {
 		dispatch({ type: 'OpenMediaModal' })
 	}, [])
 
-	const mediaFocusCtx: MediaFocusContextValue = useMemo(() => ({
-		focusedMediaIndex: state.mediaFocusIndex,
-		onMediaClick,
-		focusBorderColor: props.theme.pane.focusedBorderColor,
-	}), [state.mediaFocusIndex, onMediaClick, props.theme.pane.focusedBorderColor])
+	const mediaFocusCtx: MediaFocusContextValue = useMemo(
+		() => ({
+			focusedMediaIndex: state.mediaFocusIndex,
+			mediaCount,
+			onMediaClick,
+			focusBorderColor: props.theme.pane.focusedBorderColor,
+		}),
+		[state.mediaFocusIndex, mediaCount, onMediaClick, props.theme.pane.focusedBorderColor],
+	)
 
-	const viewerLayout = state.mode !== 'browser'
-		? renderViewerLayout(
-				state,
-				panes,
-				viewerState.content,
-				viewerState.raw,
-				props.theme,
-				sourceRef,
-				previewRef,
-				{
-					onSourceMouseDown: handleSourceMouseDown,
-					onPreviewMouseDown: handlePreviewMouseDown,
-					onSourceMouseScroll: handleSourceMouseScroll,
-					onPreviewMouseScroll: handlePreviewMouseScroll,
-				},
-			)
-		: null
+	const mouseHandlers = createMouseHandlers(state, dispatch, sourceRef, previewRef)
+
+	const viewerLayout =
+		state.mode !== 'browser'
+			? renderViewerLayout(
+					state,
+					panes,
+					viewerState.content,
+					viewerState.raw,
+					props.theme,
+					sourceRef,
+					previewRef,
+					mouseHandlers,
+				)
+			: null
 
 	const showModal = state.mode === 'viewer' && state.mediaModal.kind !== 'closed'
+	const showGallery =
+		state.mode === 'viewer' && state.mediaFocusIndex != null && !showModal && mediaCount > 0
 
-	const modalElement = showModal
-		? <MediaModal
-				mediaNodes={viewerState.mediaNodes}
-				mediaIndex={state.mediaModal.kind === 'image' ? state.mediaModal.mediaIndex : 0}
-				theme={props.theme}
-				termWidth={state.dimensions.width}
-				termHeight={state.dimensions.height}
-			/>
-		: null
+	const modalElement = showModal ? (
+		<MediaModal
+			mediaNodes={viewerState.mediaNodes}
+			mediaIndex={state.mediaModal.kind === 'image' ? state.mediaModal.mediaIndex : 0}
+			theme={props.theme}
+			termWidth={state.dimensions.width}
+			termHeight={state.dimensions.height}
+		/>
+	) : null
 
-	// wrap viewer layout + modal inside both context providers so modal has ImageContext
+	const galleryElement = showGallery ? (
+		<MediaGallery
+			mediaNodes={viewerState.mediaNodes}
+			focusedIndex={state.mediaFocusIndex!}
+			theme={props.theme}
+			termWidth={state.dimensions.width}
+			termHeight={state.dimensions.height}
+		/>
+	) : null
+
+	// wrap viewer layout + modal + gallery inside both context providers so modal has ImageContext
 	const viewerContent = (
 		<>
 			{viewerLayout}
 			{modalElement}
+			{galleryElement}
 		</>
 	)
 
-	const withImageCtx = imageCtx != null
-		? <ImageContext.Provider value={imageCtx}>{viewerContent}</ImageContext.Provider>
-		: viewerContent
+	const withImageCtx =
+		imageCtx != null ? (
+			<ImageContext.Provider value={imageCtx}>{viewerContent}</ImageContext.Provider>
+		) : (
+			viewerContent
+		)
 
-	const wrappedViewerLayout = <MediaFocusContext.Provider value={mediaFocusCtx}>{withImageCtx}</MediaFocusContext.Provider>
+	const wrappedViewerLayout = (
+		<MediaFocusContext.Provider value={mediaFocusCtx}>{withImageCtx}</MediaFocusContext.Provider>
+	)
 
 	return (
 		<box style={{ position: 'relative', flexDirection: 'column', width: '100%', height: '100%' }}>

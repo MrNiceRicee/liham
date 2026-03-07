@@ -5,6 +5,7 @@ import { createContext } from 'react'
 
 export interface MediaFocusContextValue {
 	focusedMediaIndex: number | null
+	mediaCount: number
 	onMediaClick: (index: number) => void
 	focusBorderColor: string
 }

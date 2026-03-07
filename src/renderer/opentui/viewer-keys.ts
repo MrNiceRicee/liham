@@ -4,6 +4,8 @@ import type { KeyEvent, ScrollBoxRenderable } from '@opentui/core'
 
 import type { AppAction, AppState, ScrollDirection } from '../../app/state.ts'
 
+import { isSplitLayout } from '../../app/state.ts'
+
 // -- viewer mode key maps --
 
 export const VIEWER_KEY_MAP: Record<
@@ -47,7 +49,8 @@ export const VIEWER_SHIFT_KEY_MAP: Record<
 > = {
 	g: () => ({ type: 'Scroll', direction: 'bottom' }),
 	n: (state, mediaCount) => {
-		if (state.layout === 'source-only' || mediaCount === 0) return { type: 'Scroll', direction: 'down' } // no-op fallback
+		if (state.layout === 'source-only' || mediaCount === 0)
+			return { type: 'Scroll', direction: 'down' } // no-op fallback
 		return { type: 'FocusPrevMedia', mediaCount }
 	},
 }
@@ -125,4 +128,31 @@ export function syncScroll(
 	const percent = focusedRef.scrollTop / srcHeight
 	const targetPos = Math.round(percent * otherRef.scrollHeight)
 	otherRef.scrollTo(targetPos)
+}
+
+// mouse handler factory — produces the 4 mouse callbacks for viewer layout
+export function createMouseHandlers(
+	state: AppState,
+	dispatch: React.Dispatch<AppAction>,
+	sourceRef: React.RefObject<ScrollBoxRenderable | null>,
+	previewRef: React.RefObject<ScrollBoxRenderable | null>,
+) {
+	return {
+		onSourceMouseDown() {
+			if (state.focus !== 'source' && isSplitLayout(state.layout))
+				dispatch({ type: 'FocusPane', target: 'source' })
+		},
+		onPreviewMouseDown() {
+			if (state.focus !== 'preview' && isSplitLayout(state.layout))
+				dispatch({ type: 'FocusPane', target: 'preview' })
+		},
+		onSourceMouseScroll() {
+			if (state.scrollSync && isSplitLayout(state.layout) && state.focus === 'source')
+				queueMicrotask(() => syncScroll(sourceRef.current, previewRef.current))
+		},
+		onPreviewMouseScroll() {
+			if (state.scrollSync && isSplitLayout(state.layout) && state.focus === 'preview')
+				queueMicrotask(() => syncScroll(previewRef.current, sourceRef.current))
+		},
+	}
 }
