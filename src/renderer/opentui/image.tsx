@@ -87,7 +87,6 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	useEffect(() => {
 		if (ctx == null || image == null) return
 		if (ctx.capabilities.protocol !== 'kitty-virtual') return
-		if (image.frames != null) return // animated → halfblock only
 		if (renderer == null) return
 
 		transmitKittyImage(image, renderer)
@@ -189,9 +188,8 @@ function renderLoadedImage(
 	key: string,
 	ctx: NonNullable<ReturnType<typeof useContext<typeof ImageContext>>>,
 ): ReactNode {
-	// degrade to halfblock for animated GIFs and linked images
+	// degrade to halfblock for linked images (OSC 8 per-row wrapping needs text elements)
 	let protocol = ctx.capabilities.protocol
-	if (image.frames != null) protocol = 'halfblock'
 	if (node.href != null && protocol === 'kitty-virtual') protocol = 'halfblock'
 
 	if (protocol === 'halfblock') {
