@@ -1,7 +1,7 @@
 ---
 title: "Phase 5b: Browser Directory Watcher"
 type: feat
-status: active
+status: completed
 date: 2026-03-06
 ---
 
@@ -143,20 +143,20 @@ This is mechanical type threading — the flag already exists, just needs to flo
 
 ## Acceptance Criteria
 
-- [ ] Directory changes (create/delete/rename `.md` files) update the browser file list
-- [ ] 300ms debounce coalesces rapid events (e.g., `git checkout`) into single rescan
-- [ ] Cursor tracks previously-selected file by path after rescan
-- [ ] Cursor clamps to `newLength - 1` when selected file is deleted
-- [ ] Filter is preserved across rescans
-- [ ] Browser preview cache is invalidated on rescan
-- [ ] Watcher starts only after initial scan completes (no race)
-- [ ] Watcher stops on browser → viewer transition
-- [ ] Watcher restarts on viewer → browser return
-- [ ] `--no-watch` disables directory watching in browser mode
-- [ ] Editor temp files do not trigger rescans
-- [ ] Watcher init failure degrades gracefully (static file list)
-- [ ] No orphaned FSWatcher instances after mode transitions or quit
-- [ ] All existing tests pass, new tests for `createDirectoryWatcher` and `RescanComplete`
+- [x] Directory changes (create/delete/rename `.md` files) update the browser file list
+- [x] 300ms debounce coalesces rapid events (e.g., `git checkout`) into single rescan
+- [x] Cursor tracks previously-selected file by path after rescan
+- [x] Cursor clamps to `newLength - 1` when selected file is deleted
+- [x] Filter is preserved across rescans
+- [x] Browser preview cache is invalidated on rescan
+- [x] Watcher starts only after initial scan completes (no race)
+- [x] Watcher stops on browser → viewer transition
+- [x] Watcher restarts on viewer → browser return
+- [x] `--no-watch` disables directory watching in browser mode
+- [x] Editor temp files do not trigger rescans
+- [x] Watcher init failure degrades gracefully (static file list)
+- [x] No orphaned FSWatcher instances after mode transitions or quit
+- [x] All existing tests pass, new tests for `createDirectoryWatcher` and `RescanComplete`
 
 ## Risks
 
