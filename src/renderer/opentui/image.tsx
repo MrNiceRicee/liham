@@ -1,7 +1,7 @@
 // image renderer component — Kitty virtual placements, half-block fallback, text fallback.
 // thin rendering shell — loading logic lives in use-image-loader.ts.
 
-import { resolveRenderLib, type BoxRenderable } from '@opentui/core'
+import { resolveRenderLib, type BoxRenderable, type StyledText } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
 import { writeSync } from 'node:fs'
 import { memo, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
@@ -9,7 +9,7 @@ import { memo, useContext, useEffect, useRef, useState, type ReactNode } from 'r
 import type { LoadedImage } from '../../image/types.ts'
 import type { ImageNode } from '../../ir/types.ts'
 
-import { renderHalfBlockMerged, type MergedSpan } from '../../image/halfblock.ts'
+import { mergedSpansToStyledText, renderHalfBlockMerged, type MergedSpan } from '../../image/halfblock.ts'
 import { buildCleanupCommand, buildTransmitChunks, buildVirtualPlacement, generateImageId } from '../../image/kitty.ts'
 import { ImageContext } from './image-context.tsx'
 import { useImageLoader, useViewportVisibility } from './use-image-loader.ts'
@@ -83,21 +83,27 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	const { state, image, errorMsg } = useImageLoader(node.url, ctx, isVisible)
 	const kittyIdRef = useRef<number | null>(null)
 
-	// pre-rendered half-block frames for animation
-	const renderedFramesRef = useRef<MergedSpan[][][] | null>(null)
+	// pre-rendered animation frames as StyledText for atomic rendering
+	const renderedFramesRef = useRef<StyledText[] | null>(null)
+	const renderedFrameRowsRef = useRef<number>(0)
 	const [frameIndex, setFrameIndex] = useState(0)
 	const frameStartRef = useRef(performance.now())
 
-	// pre-render all frames when animated image loads
+	// pre-render all frames as StyledText when animated image loads
 	useEffect(() => {
 		if (ctx == null || image?.frames == null) {
 			renderedFramesRef.current = null
+			renderedFrameRowsRef.current = 0
 			return
 		}
-		renderedFramesRef.current = image.frames.map(rgba => {
+		const styledFrames: StyledText[] = []
+		for (const rgba of image.frames) {
 			const frameImg: LoadedImage = { ...image, rgba }
-			return renderHalfBlockMerged(frameImg, ctx.bgColor)
-		})
+			const rows = renderHalfBlockMerged(frameImg, ctx.bgColor)
+			renderedFrameRowsRef.current = rows.length
+			styledFrames.push(mergedSpansToStyledText(rows))
+		}
+		renderedFramesRef.current = styledFrames
 		setFrameIndex(0)
 	}, [image, ctx?.bgColor])
 
@@ -160,7 +166,7 @@ function ImageBlock({ node, nodeKey }: { readonly node: ImageNode; readonly node
 	if (state === 'loaded' && image != null) {
 		return (
 			<box ref={boxRef} key={nodeKey}>
-				{renderLoadedImage(image, node, nodeKey, ctx, frameIndex, renderedFramesRef.current)}
+				{renderLoadedImage(image, node, nodeKey, ctx, frameIndex, renderedFramesRef.current, renderedFrameRowsRef.current)}
 			</box>
 		)
 	}
@@ -221,7 +227,8 @@ function renderLoadedImage(
 	key: string,
 	ctx: NonNullable<ReturnType<typeof useContext<typeof ImageContext>>>,
 	frameIndex: number,
-	preRenderedFrames: MergedSpan[][][] | null,
+	preRenderedFrames: StyledText[] | null,
+	preRenderedRowCount: number,
 ): ReactNode {
 	// degrade to halfblock for animated GIFs and linked images
 	let protocol = ctx.capabilities.protocol
@@ -231,7 +238,17 @@ function renderLoadedImage(
 	if (protocol === 'halfblock') {
 		if (image.frames != null) {
 			const safeIndex = Math.min(frameIndex, image.frames.length - 1)
-			const rows = preRenderedFrames?.[safeIndex] ?? renderHalfBlockMerged(image, ctx.bgColor)
+			const styledFrame = preRenderedFrames?.[safeIndex]
+			if (styledFrame != null) {
+				// single text element with StyledText content — atomic update, no tearing
+				return (
+					<box key={key} style={{ height: preRenderedRowCount, width: image.terminalCols }}>
+						<text content={styledFrame} />
+					</box>
+				)
+			}
+			// fallback: pre-rendering not ready yet
+			const rows = renderHalfBlockMerged(image, ctx.bgColor)
 			return <HalfBlockRows key={key} rows={rows} width={image.terminalCols} href={node.href} />
 		}
 		const rows = renderHalfBlockMerged(image, ctx.bgColor)

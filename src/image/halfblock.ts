@@ -1,6 +1,8 @@
 // half-block renderer — converts RGBA pixels to styled character grid.
 // uses U+2584 (lower half block): fg = bottom pixel, bg = top pixel.
 
+import { StyledText, bg as stBg, fg as stFg, type TextChunk } from '@opentui/core'
+
 import type { HalfBlockGrid, LoadedImage } from './types.ts'
 
 // parse hex color string (#RRGGBB) to RGB components
@@ -125,4 +127,21 @@ export function renderHalfBlockMerged(image: LoadedImage, bgColor: string): Merg
 	}
 
 	return rows
+}
+
+// convert merged spans to a single StyledText for atomic rendering.
+// avoids N×M React element updates on frame changes (animated GIFs).
+export function mergedSpansToStyledText(rows: MergedSpan[][]): StyledText {
+	const chunks: TextChunk[] = []
+	for (let r = 0; r < rows.length; r++) {
+		if (r > 0) chunks.push({ __isChunk: true, text: '\n' })
+		const spans = rows[r]!
+		for (const span of spans) {
+			let chunk: TextChunk = { __isChunk: true, text: span.text }
+			if (span.fg.length > 0) chunk = stFg(span.fg)(chunk)
+			if (span.bg.length > 0) chunk = stBg(span.bg)(chunk)
+			chunks.push(chunk)
+		}
+	}
+	return new StyledText(chunks)
 }
