@@ -77,6 +77,8 @@ export function handleModalKey(
 		case 'return':
 			// video/audio playback — intercepted by app.tsx before reaching here
 			return null
+		case 'r':
+			return { type: 'ReplayMedia' }
 		case 'g':
 			return { type: 'ToggleGallery' }
 		case 'space':

@@ -91,7 +91,7 @@ export async function playAudio(mediaPath: string, basePath: string): Promise<Pl
 	const filePath = sanitized.path!
 
 	try {
-		activeAudioProc = Bun.spawn(['ffplay', '-nodisp', '-autoexit', filePath], {
+		activeAudioProc = Bun.spawn(['ffplay', '-nodisp', '-vn', '-autoexit', filePath], {
 			stdin: 'ignore',
 			stdout: 'ignore',
 			stderr: 'ignore',

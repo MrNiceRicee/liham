@@ -341,6 +341,7 @@ export function App(props: Readonly<AppProps>) {
 
 	const modalPaused = isModalPaused(state.mediaModal)
 	const contentHeight = Math.max(1, state.dimensions.height - 2)
+	const modalRestartCount = state.mediaModal.kind === 'open' ? state.mediaModal.restartCount : 0
 	const modalElement = showModal ? (
 		<MediaModal
 			mediaNodes={viewerState.mediaNodes}
@@ -349,6 +350,7 @@ export function App(props: Readonly<AppProps>) {
 			termWidth={state.dimensions.width}
 			termHeight={contentHeight}
 			paused={modalPaused}
+			restartCount={modalRestartCount}
 			mediaCapabilities={props.mediaCapabilities}
 			onFrameInfo={setModalFrameInfo}
 		/>

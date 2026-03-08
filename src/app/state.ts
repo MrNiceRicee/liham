@@ -24,7 +24,7 @@ export interface BrowserState {
 
 export type MediaModalState =
 	| { kind: 'closed' }
-	| { kind: 'open'; mediaIndex: number; galleryHidden: boolean; paused: boolean }
+	| { kind: 'open'; mediaIndex: number; galleryHidden: boolean; paused: boolean; restartCount: number }
 
 export interface AppState {
 	mode: AppMode
@@ -82,6 +82,7 @@ export type AppAction =
 	| { type: 'CloseMediaModal' }
 	| { type: 'ToggleGallery' }
 	| { type: 'TogglePlayPause' }
+	| { type: 'ReplayMedia' }
 
 // -- layout helpers --
 
@@ -254,7 +255,7 @@ function mediaFocusReducer(state: AppState, action: MediaFocusAction): AppState 
 
 type MediaModalAction = Extract<
 	AppAction,
-	{ type: 'OpenMediaModal' | 'CloseMediaModal' | 'ToggleGallery' | 'TogglePlayPause' }
+	{ type: 'OpenMediaModal' | 'CloseMediaModal' | 'ToggleGallery' | 'TogglePlayPause' | 'ReplayMedia' }
 >
 
 function mediaModalReducer(state: AppState, action: MediaModalAction): AppState {
@@ -269,6 +270,7 @@ function mediaModalReducer(state: AppState, action: MediaModalAction): AppState 
 					mediaIndex: state.mediaFocusIndex,
 					galleryHidden: prevHidden,
 					paused: false,
+					restartCount: 0,
 				},
 			}
 		}
@@ -284,6 +286,13 @@ function mediaModalReducer(state: AppState, action: MediaModalAction): AppState 
 			return {
 				...state,
 				mediaModal: { ...state.mediaModal, paused: !state.mediaModal.paused },
+			}
+		}
+		case 'ReplayMedia': {
+			if (state.mediaModal.kind !== 'open') return state
+			return {
+				...state,
+				mediaModal: { ...state.mediaModal, paused: false, restartCount: state.mediaModal.restartCount + 1 },
 			}
 		}
 		case 'CloseMediaModal': {
@@ -343,6 +352,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 		case 'CloseMediaModal':
 		case 'ToggleGallery':
 		case 'TogglePlayPause':
+		case 'ReplayMedia':
 			return mediaModalReducer(state, action)
 	}
 }
@@ -486,6 +496,7 @@ function modalLegend(modal: MediaModalState, legendPage: LegendPage): LegendEntr
 		{ key: '?', label: 'more' },
 		{ key: 'n/N', label: 'next/prev' },
 		{ key: 'space', label: modal.kind === 'open' && modal.paused ? 'play' : 'pause' },
+		{ key: 'r', label: 'replay' },
 		{ key: 'g', label: 'gallery' },
 		{ key: 'esc', label: 'close' },
 	]

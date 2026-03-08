@@ -89,6 +89,7 @@ describe('media modal actions', () => {
 			mediaIndex: 1,
 			galleryHidden: false,
 			paused: false,
+			restartCount: 0,
 		})
 	})
 
@@ -101,7 +102,7 @@ describe('media modal actions', () => {
 	test('CloseMediaModal closes open modal, preserves focus', () => {
 		const s = stateWith({
 			mediaFocusIndex: 1,
-			mediaModal: { kind: 'open', mediaIndex: 1, galleryHidden: false, paused: false },
+			mediaModal: { kind: 'open', mediaIndex: 1, galleryHidden: false, paused: false, restartCount: 0 },
 		})
 		const next = appReducer(s, { type: 'CloseMediaModal' })
 		expect(next.mediaModal).toEqual({ kind: 'closed' })
@@ -124,7 +125,7 @@ describe('media modal actions', () => {
 	test('TogglePlayPause pauses when playing', () => {
 		const s = stateWith({
 			mediaFocusIndex: 0,
-			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: false },
+			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: false, restartCount: 0 },
 		})
 		const next = appReducer(s, { type: 'TogglePlayPause' })
 		expect(next.mediaModal).toEqual({
@@ -132,13 +133,14 @@ describe('media modal actions', () => {
 			mediaIndex: 0,
 			galleryHidden: false,
 			paused: true,
+			restartCount: 0,
 		})
 	})
 
 	test('TogglePlayPause resumes when paused', () => {
 		const s = stateWith({
 			mediaFocusIndex: 0,
-			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: true },
+			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: true, restartCount: 0 },
 		})
 		const next = appReducer(s, { type: 'TogglePlayPause' })
 		expect(next.mediaModal).toEqual({
@@ -146,6 +148,7 @@ describe('media modal actions', () => {
 			mediaIndex: 0,
 			galleryHidden: false,
 			paused: false,
+			restartCount: 0,
 		})
 	})
 
@@ -154,25 +157,62 @@ describe('media modal actions', () => {
 		const next = appReducer(s, { type: 'TogglePlayPause' })
 		expect(next).toBe(s)
 	})
+
+	test('ReplayMedia increments restartCount', () => {
+		const s = stateWith({
+			mediaFocusIndex: 0,
+			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: false, restartCount: 0 },
+		})
+		const next = appReducer(s, { type: 'ReplayMedia' })
+		expect(next.mediaModal).toEqual({
+			kind: 'open',
+			mediaIndex: 0,
+			galleryHidden: false,
+			paused: false,
+			restartCount: 1,
+		})
+	})
+
+	test('ReplayMedia resets paused to false', () => {
+		const s = stateWith({
+			mediaFocusIndex: 0,
+			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: true, restartCount: 2 },
+		})
+		const next = appReducer(s, { type: 'ReplayMedia' })
+		expect(next.mediaModal).toEqual({
+			kind: 'open',
+			mediaIndex: 0,
+			galleryHidden: false,
+			paused: false,
+			restartCount: 3,
+		})
+	})
+
+	test('ReplayMedia no-op when modal closed', () => {
+		const s = stateWith({})
+		const next = appReducer(s, { type: 'ReplayMedia' })
+		expect(next).toBe(s)
+	})
 })
 
 describe('media legend entries', () => {
 	test('modal open shows modal legend with pause', () => {
 		const s = stateWith({
 			mediaFocusIndex: 0,
-			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: false },
+			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: false, restartCount: 0 },
 		})
 		const entries = legendEntries(s)
 		expect(entries.some((e) => e.key === 'esc' && e.label === 'close')).toBe(true)
 		expect(entries.some((e) => e.key === 'n/N')).toBe(true)
 		expect(entries.some((e) => e.key === 'g' && e.label === 'gallery')).toBe(true)
 		expect(entries.some((e) => e.key === 'space' && e.label === 'pause')).toBe(true)
+		expect(entries.some((e) => e.key === 'r' && e.label === 'replay')).toBe(true)
 	})
 
 	test('modal paused shows play in legend', () => {
 		const s = stateWith({
 			mediaFocusIndex: 0,
-			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: true },
+			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: true, restartCount: 0 },
 		})
 		const entries = legendEntries(s)
 		expect(entries.some((e) => e.key === 'space' && e.label === 'play')).toBe(true)

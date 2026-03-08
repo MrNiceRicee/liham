@@ -2,6 +2,7 @@
 // absolute positioned sibling of scrollbox content (does not scroll with content).
 // media info (filename, type, frame count) lives in the gallery panel, not here.
 
+import { resolve } from 'node:path'
 import {
 	type ReactNode,
 	useCallback,
@@ -242,6 +243,7 @@ function ModalVideoContent({
 	maxRows,
 	basePath,
 	bgColor,
+	restartCount,
 }: {
 	readonly src: string
 	readonly alt: string
@@ -250,6 +252,7 @@ function ModalVideoContent({
 	readonly maxRows: number
 	readonly basePath: string
 	readonly bgColor: string
+	readonly restartCount: number
 }): ReactNode {
 	const loadIdRef = useRef(0)
 	const renderPendingRef = useRef(false)
@@ -269,9 +272,12 @@ function ModalVideoContent({
 		let proc: ReturnType<typeof Bun.spawn> | null = null
 		let audioStarted = false
 
+		// resolve path once — both ffprobe and ffmpeg need the absolute path
+		const absPath = resolve(basePath, src)
+
 		void (async () => {
-			// 1. probe
-			const result = await probeVideo(src, basePath, controller.signal)
+			// 1. probe (uses absPath; sanitizeMediaPath re-validates internally)
+			const result = await probeVideo(absPath, basePath, controller.signal)
 			if (isStale() || !result.ok) {
 				if (!isStale()) setPlaybackState('error')
 				return
@@ -282,17 +288,17 @@ function ModalVideoContent({
 			const dims = computeVideoDimensions(meta.width, meta.height, maxCols, maxRows)
 			if (dims == null || isStale()) return
 
-			// 3. start video stream
+			// 3. start video stream at native fps
 			proc = createVideoStream({
-				filePath: src,
+				filePath: absPath,
 				width: dims.pixelWidth,
 				height: dims.pixelHeight,
-				fps: 10,
+				fps: meta.fps,
 			})
 
 			// 4. start audio (through playAudio, not inline spawn)
 			if (meta.hasAudio) {
-				void playAudio(src, basePath)
+				void playAudio(absPath, basePath)
 				audioStarted = true
 			}
 
@@ -338,7 +344,7 @@ function ModalVideoContent({
 			}
 			if (audioStarted) void killActiveAudio()
 		}
-	}, [src, basePath, maxCols, maxRows])
+	}, [src, basePath, maxCols, maxRows, restartCount])
 
 	if (playbackState === 'loading') {
 		return (
@@ -399,6 +405,7 @@ export interface MediaModalProps {
 	readonly termWidth: number
 	readonly termHeight: number
 	readonly paused: boolean
+	readonly restartCount: number
 	readonly mediaCapabilities: MediaCapabilities
 	readonly onFrameInfo: (info: FrameInfo | null) => void
 }
@@ -410,6 +417,7 @@ export function MediaModal({
 	termWidth,
 	termHeight,
 	paused,
+	restartCount,
 	mediaCapabilities,
 	onFrameInfo,
 }: MediaModalProps): ReactNode {
@@ -444,6 +452,7 @@ export function MediaModal({
 					maxRows={termHeight}
 					basePath={ctx?.basePath ?? process.cwd()}
 					bgColor={ctx?.bgColor ?? ''}
+					restartCount={restartCount}
 				/>
 			)
 		}
