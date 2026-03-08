@@ -62,6 +62,7 @@ export function handleModalKey(
 	_state: AppState,
 	dispatch: React.Dispatch<AppAction>,
 	mediaCount: number,
+	videoDuration = 0,
 ): AppAction | null {
 	switch (key.name) {
 		case 'escape':
@@ -84,6 +85,12 @@ export function handleModalKey(
 			return { type: 'ToggleGallery' }
 		case 'space':
 			return { type: 'TogglePlayPause' }
+		case 'left':
+			if (videoDuration <= 0) return null
+			return { type: 'SeekMedia', delta: key.shift ? -10 : -5, duration: videoDuration }
+		case 'right':
+			if (videoDuration <= 0) return null
+			return { type: 'SeekMedia', delta: key.shift ? 10 : 5, duration: videoDuration }
 		case 'q':
 			return { type: 'Quit' }
 		default:

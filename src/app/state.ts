@@ -1,6 +1,7 @@
 // app state machine — pure reducer for all app-level state transitions.
 
 import type { FileEntry } from '../browser/scanner.ts'
+import { mediaModalReducer } from './state-media-modal.ts'
 
 export type LayoutMode = 'preview-only' | 'side' | 'top' | 'source-only'
 
@@ -30,6 +31,7 @@ export type MediaModalState =
 			galleryHidden: boolean
 			paused: boolean
 			restartCount: number
+			seekOffset: number
 	  }
 
 export interface AppState {
@@ -89,6 +91,7 @@ export type AppAction =
 	| { type: 'ToggleGallery' }
 	| { type: 'TogglePlayPause' }
 	| { type: 'ReplayMedia' }
+	| { type: 'SeekMedia'; delta: number; duration: number }
 	| { type: 'CopySelection' }
 
 // -- layout helpers --
@@ -260,66 +263,6 @@ function mediaFocusReducer(state: AppState, action: MediaFocusAction): AppState 
 	}
 }
 
-type MediaModalAction = Extract<
-	AppAction,
-	{
-		type: 'OpenMediaModal' | 'CloseMediaModal' | 'ToggleGallery' | 'TogglePlayPause' | 'ReplayMedia'
-	}
->
-
-function mediaModalReducer(state: AppState, action: MediaModalAction): AppState {
-	switch (action.type) {
-		case 'OpenMediaModal': {
-			if (state.mediaFocusIndex == null) return state
-			const prevHidden = state.mediaModal.kind === 'open' ? state.mediaModal.galleryHidden : false
-			return {
-				...state,
-				mediaModal: {
-					kind: 'open',
-					mediaIndex: state.mediaFocusIndex,
-					galleryHidden: prevHidden,
-					paused: false,
-					restartCount: 0,
-				},
-			}
-		}
-		case 'ToggleGallery': {
-			if (state.mediaModal.kind !== 'open') return state
-			return {
-				...state,
-				mediaModal: { ...state.mediaModal, galleryHidden: !state.mediaModal.galleryHidden },
-			}
-		}
-		case 'TogglePlayPause': {
-			if (state.mediaModal.kind !== 'open') return state
-			return {
-				...state,
-				mediaModal: { ...state.mediaModal, paused: !state.mediaModal.paused },
-			}
-		}
-		case 'ReplayMedia': {
-			if (state.mediaModal.kind !== 'open') return state
-			return {
-				...state,
-				mediaModal: {
-					...state.mediaModal,
-					paused: false,
-					restartCount: state.mediaModal.restartCount + 1,
-				},
-			}
-		}
-		case 'CloseMediaModal': {
-			if (state.mediaModal.kind !== 'closed') {
-				return { ...state, mediaModal: { kind: 'closed' } }
-			}
-			if (state.mediaFocusIndex != null) {
-				return { ...state, mediaFocusIndex: null }
-			}
-			return state
-		}
-	}
-}
-
 // -- main reducer --
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -365,6 +308,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 		case 'ToggleGallery':
 		case 'TogglePlayPause':
 		case 'ReplayMedia':
+		case 'SeekMedia':
 			return mediaModalReducer(state, action)
 	}
 }
@@ -508,6 +452,7 @@ function modalLegend(modal: MediaModalState, legendPage: LegendPage): LegendEntr
 		{ key: '?', label: 'more' },
 		{ key: 'n/N', label: 'next/prev' },
 		{ key: 'space', label: modal.kind === 'open' && modal.paused ? 'play' : 'pause' },
+		{ key: '</', label: 'seek' },
 		{ key: 'r', label: 'replay' },
 		{ key: 'g', label: 'gallery' },
 		{ key: 'esc', label: 'close' },

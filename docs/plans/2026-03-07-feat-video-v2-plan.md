@@ -1,7 +1,7 @@
 ---
 title: "Video V2: Progress, Seek, and Pause"
 type: feat
-status: active
+status: completed
 date: 2026-03-07
 origin: docs/brainstorms/2026-03-07-media-modal-and-selection-brainstorm.md
 ---
@@ -114,10 +114,10 @@ The `seekOffset` state value tracks the current playback origin. On seek:
 
 Core plumbing: frame counting, elapsed time callback, and progress bar rendering.
 
-- [ ] Add `seekOffset: number` to `MediaModalState` open variant (default 0)
-- [ ] Update `OpenMediaModal` reducer to set `seekOffset: 0`
-- [ ] Update `ReplayMedia` reducer to set `seekOffset: 0`
-- [ ] Add `VideoPlaybackInfo` type to `media-modal.tsx`:
+- [x]Add `seekOffset: number` to `MediaModalState` open variant (default 0)
+- [x]Update `OpenMediaModal` reducer to set `seekOffset: 0`
+- [x]Update `ReplayMedia` reducer to set `seekOffset: 0`
+- [x]Add `VideoPlaybackInfo` type to `media-modal.tsx`:
   ```ts
   interface VideoPlaybackInfo {
     elapsed: number   // seconds
@@ -125,19 +125,19 @@ Core plumbing: frame counting, elapsed time callback, and progress bar rendering
     paused: boolean
   }
   ```
-- [ ] Add `onVideoInfo` callback prop to `ModalVideoContent` (alongside existing `onFrameInfo` pattern)
-- [ ] Track `frameCount` in the `readFrames` loop, compute `elapsed = seekOffset + (frameCount / fps)`, call `onVideoInfo` periodically (every ~10 frames to avoid excessive re-renders)
-- [ ] Pass `seekOffset` to `ModalVideoContent` from modal state
-- [ ] Store `videoInfo` in `MediaModal` parent state (alongside `frameInfo`)
-- [ ] Add `formatProgressBar(elapsed, duration, barWidth)` helper to `media-gallery.tsx`:
+- [x]Add `onVideoInfo` callback prop to `ModalVideoContent` (alongside existing `onFrameInfo` pattern)
+- [x]Track `frameCount` in the `readFrames` loop, compute `elapsed = seekOffset + (frameCount / fps)`, call `onVideoInfo` periodically (every ~10 frames to avoid excessive re-renders)
+- [x]Pass `seekOffset` to `ModalVideoContent` from modal state
+- [x]Store `videoInfo` in `MediaModal` parent state (alongside `frameInfo`)
+- [x]Add `formatProgressBar(elapsed, duration, barWidth)` helper to `media-gallery.tsx`:
   - returns `~~~~~ooooo 1:23 / 3:45`
   - `formatTimestamp(seconds)` helper: `mm:ss` format, handles hours if >= 3600
   - bar width = available space minus timestamp text minus padding
   - when duration is 0, show elapsed only: `1:23` (no bar, no total)
-- [ ] Render progress bar in gallery info panel when `videoInfo` is present
-- [ ] Test: `formatTimestamp` -- 0 -> `0:00`, 83 -> `1:23`, 3661 -> `1:01:01`
-- [ ] Test: `formatProgressBar` -- correct fill ratio, correct timestamps
-- [ ] Test: `seekOffset: 0` set on `OpenMediaModal` and `ReplayMedia`
+- [x]Render progress bar in gallery info panel when `videoInfo` is present
+- [x]Test: `formatTimestamp` -- 0 -> `0:00`, 83 -> `1:23`, 3661 -> `1:01:01`
+- [x]Test: `formatProgressBar` -- correct fill ratio, correct timestamps
+- [x]Test: `seekOffset: 0` set on `OpenMediaModal` and `ReplayMedia`
 
 **Files:**
 - `src/app/state.ts` -- add `seekOffset` to `MediaModalState`
@@ -149,9 +149,9 @@ Core plumbing: frame counting, elapsed time callback, and progress bar rendering
 
 Wire the existing `TogglePlayPause` action to send SIGSTOP/SIGCONT to ffmpeg and ffplay.
 
-- [ ] Export `getActiveAudioProc()` from `ffplay.ts` (returns the module-level `activeAudioProc` reference)
-- [ ] Export `getActiveVideoProc()` from `video-decoder.ts` (returns module-level `activeVideoProc`)
-- [ ] Add `pauseActiveVideo()` / `resumeActiveVideo()` to `video-decoder.ts`:
+- [x]Export `getActiveAudioProc()` from `ffplay.ts` (returns the module-level `activeAudioProc` reference)
+- [x]Export `getActiveVideoProc()` from `video-decoder.ts` (returns module-level `activeVideoProc`)
+- [x]Add `pauseActiveVideo()` / `resumeActiveVideo()` to `video-decoder.ts`:
   ```ts
   export function pauseActiveVideo(): void {
     if (activeVideoProc != null) activeVideoProc.kill('SIGSTOP')
@@ -160,12 +160,12 @@ Wire the existing `TogglePlayPause` action to send SIGSTOP/SIGCONT to ffmpeg and
     if (activeVideoProc != null) activeVideoProc.kill('SIGCONT')
   }
   ```
-- [ ] Add `pauseActiveAudio()` / `resumeActiveAudio()` to `ffplay.ts` (same pattern)
-- [ ] Update `killActiveVideo()`: send SIGCONT before SIGTERM if process was stopped
+- [x]Add `pauseActiveAudio()` / `resumeActiveAudio()` to `ffplay.ts` (same pattern)
+- [x]Update `killActiveVideo()`: send SIGCONT before SIGTERM if process was stopped
   - Track `videoStopped` boolean alongside `activeVideoProc`
   - On kill: if stopped, SIGCONT first, then SIGTERM -> 500ms -> SIGKILL
-- [ ] Update `killActiveAudio()`: same SIGCONT-before-SIGTERM pattern
-- [ ] In `ModalVideoContent`, react to `paused` prop changes:
+- [x]Update `killActiveAudio()`: same SIGCONT-before-SIGTERM pattern
+- [x]In `ModalVideoContent`, react to `paused` prop changes:
   ```ts
   useEffect(() => {
     if (paused) {
@@ -177,13 +177,13 @@ Wire the existing `TogglePlayPause` action to send SIGSTOP/SIGCONT to ffmpeg and
     }
   }, [paused])
   ```
-- [ ] Pass `paused` from modal state to `ModalVideoContent` (currently not wired)
-- [ ] Drain 1-2 frames from pipe after SIGSTOP before freezing display (the OS pipe buffer may have pre-read frames)
-- [ ] Update progress bar to show pause state: `paused` label in gallery info
-- [ ] Update modal legend: show `pause`/`play` for video (currently space is no-op for video)
-- [ ] Test: `pauseActiveVideo` sends SIGSTOP to active process
-- [ ] Test: `resumeActiveVideo` sends SIGCONT to active process
-- [ ] Test: `killActiveVideo` sends SIGCONT before SIGTERM when stopped
+- [x]Pass `paused` from modal state to `ModalVideoContent` (currently not wired)
+- [x]Drain 1-2 frames from pipe after SIGSTOP before freezing display (the OS pipe buffer may have pre-read frames)
+- [x]Update progress bar to show pause state: `paused` label in gallery info
+- [x]Update modal legend: show `pause`/`play` for video (currently space is no-op for video)
+- [x]Test: `pauseActiveVideo` sends SIGSTOP to active process
+- [x]Test: `resumeActiveVideo` sends SIGCONT to active process
+- [x]Test: `killActiveVideo` sends SIGCONT before SIGTERM when stopped
 
 **Files:**
 - `src/media/video-decoder.ts` -- pause/resume exports, SIGCONT-before-kill
@@ -196,23 +196,23 @@ Wire the existing `TogglePlayPause` action to send SIGSTOP/SIGCONT to ffmpeg and
 
 Kill-and-restart approach with `-ss` offset.
 
-- [ ] Add `SeekMedia` action to `AppAction`:
+- [x]Add `SeekMedia` action to `AppAction`:
   ```ts
   | { type: 'SeekMedia'; delta: number; duration: number }
   ```
-- [ ] Add `SeekMedia` reducer case:
+- [x]Add `SeekMedia` reducer case:
   - Guard: `mediaModal.kind !== 'open'` -> no-op
   - Compute `newOffset = clamp(mediaModal.seekOffset + delta, 0, duration)`
   - If `newOffset === mediaModal.seekOffset` -> no-op (at boundary)
   - Set `seekOffset: newOffset`, increment `restartCount`, set `paused: false`
-- [ ] Add seek key bindings to `handleModalKey` in `viewer-keys.ts`:
+- [x]Add seek key bindings to `handleModalKey` in `viewer-keys.ts`:
   - `left`: `{ type: 'SeekMedia', delta: -5, duration }` (need duration from video info)
   - `right`: `{ type: 'SeekMedia', delta: 5, duration }`
   - `shift+left`: `{ type: 'SeekMedia', delta: -10, duration }`
   - `shift+right`: `{ type: 'SeekMedia', delta: 10, duration }`
   - No-op when duration is 0 (unknown duration, cannot seek)
-- [ ] Thread `duration` to `handleModalKey` -- the video info callback sets duration in a ref accessible from the key handler
-- [ ] Update `createVideoStream` to accept optional `seekOffset`:
+- [x]Thread `duration` to `handleModalKey` -- the video info callback sets duration in a ref accessible from the key handler
+- [x]Update `createVideoStream` to accept optional `seekOffset`:
   ```ts
   interface VideoStreamOptions {
     filePath: string
@@ -223,16 +223,16 @@ Kill-and-restart approach with `-ss` offset.
   }
   ```
   When `seekOffset > 0`, prepend `-ss <offset>` before `-i` in the ffmpeg args (input-level seek for fast keyframe seeking).
-- [ ] Update `playAudio` to accept optional `seekOffset`:
+- [x]Update `playAudio` to accept optional `seekOffset`:
   Add `-ss <offset>` to ffplay args when offset > 0.
-- [ ] In `ModalVideoContent`, pass `seekOffset` to both `createVideoStream` and `playAudio`
-- [ ] Reset `frameCount` to 0 on each playback start (the seekOffset handles the base)
-- [ ] Update legend: add `</>: seek` entry for video modal
-- [ ] Test: `SeekMedia` reducer clamps to `[0, duration]`
-- [ ] Test: `SeekMedia` at boundary is no-op
-- [ ] Test: `SeekMedia` increments `restartCount`
-- [ ] Test: `SeekMedia` resets `paused` to false
-- [ ] Test: `createVideoStream` with seekOffset prepends `-ss`
+- [x]In `ModalVideoContent`, pass `seekOffset` to both `createVideoStream` and `playAudio`
+- [x]Reset `frameCount` to 0 on each playback start (the seekOffset handles the base)
+- [x]Update legend: add `</>: seek` entry for video modal
+- [x]Test: `SeekMedia` reducer clamps to `[0, duration]`
+- [x]Test: `SeekMedia` at boundary is no-op
+- [x]Test: `SeekMedia` increments `restartCount`
+- [x]Test: `SeekMedia` resets `paused` to false
+- [x]Test: `createVideoStream` with seekOffset prepends `-ss`
 
 **Files:**
 - `src/app/state.ts` -- `SeekMedia` action, reducer case
@@ -282,32 +282,32 @@ Following existing co-located test convention:
 ## Acceptance Criteria
 
 ### Progress Bar
-- [ ] Elapsed time tracked via frame counter during video playback
-- [ ] Progress bar rendered in gallery info panel: `~~~~~ooooo 1:23 / 3:45`
-- [ ] Timestamps in `mm:ss` format (hours shown when >= 60 min)
-- [ ] Videos with unknown duration show elapsed time only (no bar)
-- [ ] Progress bar updates smoothly during playback (every ~1s)
+- [x]Elapsed time tracked via frame counter during video playback
+- [x]Progress bar rendered in gallery info panel: `~~~~~ooooo 1:23 / 3:45`
+- [x]Timestamps in `mm:ss` format (hours shown when >= 60 min)
+- [x]Videos with unknown duration show elapsed time only (no bar)
+- [x]Progress bar updates smoothly during playback (every ~1s)
 
 ### Pause
-- [ ] Space bar pauses video (SIGSTOP to ffmpeg) and audio (SIGSTOP to ffplay)
-- [ ] Space bar resumes (SIGCONT to both)
-- [ ] Progress bar shows "paused" state
-- [ ] Gallery info shows play/pause state
-- [ ] Legend shows pause/play for video (not just GIF)
-- [ ] Stopped processes are SIGCONT'd before SIGTERM/SIGKILL on cleanup
+- [x]Space bar pauses video (SIGSTOP to ffmpeg) and audio (SIGSTOP to ffplay)
+- [x]Space bar resumes (SIGCONT to both)
+- [x]Progress bar shows "paused" state
+- [x]Gallery info shows play/pause state
+- [x]Legend shows pause/play for video (not just GIF)
+- [x]Stopped processes are SIGCONT'd before SIGTERM/SIGKILL on cleanup
 
 ### Seek
-- [ ] Left/right arrow keys seek +/-5 seconds
-- [ ] Shift+left/right seek +/-10 seconds
-- [ ] Seek restarts ffmpeg with `-ss <offset>` and ffplay at same offset
-- [ ] Seek clamps to [0, duration] -- no negative or past-end
-- [ ] Seek is no-op when duration is unknown (0)
-- [ ] Progress bar and elapsed time update after seek
-- [ ] Seek while paused resumes playback
-- [ ] Legend shows seek key bindings when video is in modal
+- [x]Left/right arrow keys seek +/-5 seconds
+- [x]Shift+left/right seek +/-10 seconds
+- [x]Seek restarts ffmpeg with `-ss <offset>` and ffplay at same offset
+- [x]Seek clamps to [0, duration] -- no negative or past-end
+- [x]Seek is no-op when duration is unknown (0)
+- [x]Progress bar and elapsed time update after seek
+- [x]Seek while paused resumes playback
+- [x]Legend shows seek key bindings when video is in modal
 
 ### Quality Gates
-- [ ] No orphaned ffmpeg/ffplay processes on any exit path (pause, seek, close, quit)
-- [ ] All new state actions have reducer unit tests
-- [ ] Existing tests continue passing
-- [ ] SIGCONT sent before SIGTERM/SIGKILL for stopped processes
+- [x]No orphaned ffmpeg/ffplay processes on any exit path (pause, seek, close, quit)
+- [x]All new state actions have reducer unit tests
+- [x]Existing tests continue passing
+- [x]SIGCONT sent before SIGTERM/SIGKILL for stopped processes

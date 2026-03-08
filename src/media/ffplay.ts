@@ -60,11 +60,31 @@ export type PlayResult = { ok: true } | { ok: false; error: string }
 // -- audio playback --
 
 let activeAudioProc: ReturnType<typeof Bun.spawn> | null = null
+let audioStopped = false
+
+export function pauseActiveAudio(): void {
+	if (activeAudioProc != null && !audioStopped) {
+		activeAudioProc.kill('SIGSTOP')
+		audioStopped = true
+	}
+}
+
+export function resumeActiveAudio(): void {
+	if (activeAudioProc != null && audioStopped) {
+		activeAudioProc.kill('SIGCONT')
+		audioStopped = false
+	}
+}
 
 export async function killActiveAudio(): Promise<void> {
 	if (activeAudioProc == null) return
 	const proc = activeAudioProc
 	activeAudioProc = null
+	// must resume stopped process before SIGTERM
+	if (audioStopped) {
+		proc.kill('SIGCONT')
+		audioStopped = false
+	}
 	proc.kill('SIGTERM')
 	await Promise.race([proc.exited, new Promise((r) => setTimeout(r, 500))])
 	// escalate if still running
@@ -75,7 +95,11 @@ export async function killActiveAudio(): Promise<void> {
 	}
 }
 
-export async function playAudio(mediaPath: string, basePath: string): Promise<PlayResult> {
+export async function playAudio(
+	mediaPath: string,
+	basePath: string,
+	seekOffset = 0,
+): Promise<PlayResult> {
 	if (!isFfplayAvailable()) {
 		return { ok: false, error: 'ffplay not found' }
 	}
@@ -91,7 +115,10 @@ export async function playAudio(mediaPath: string, basePath: string): Promise<Pl
 	const filePath = sanitized.path!
 
 	try {
-		activeAudioProc = Bun.spawn(['ffplay', '-nodisp', '-vn', '-autoexit', filePath], {
+		const args = ['ffplay', '-nodisp', '-vn', '-autoexit']
+		if (seekOffset > 0) args.push('-ss', String(seekOffset))
+		args.push(filePath)
+		activeAudioProc = Bun.spawn(args, {
 			stdin: 'ignore',
 			stdout: 'ignore',
 			stderr: 'ignore',

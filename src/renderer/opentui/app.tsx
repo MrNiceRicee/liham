@@ -44,7 +44,7 @@ import type { MediaEntry } from './index.tsx'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-context.tsx'
 import { MediaGallery } from './media-gallery.tsx'
-import { type FrameInfo, MediaModal } from './media-modal.tsx'
+import { type FrameInfo, MediaModal, type VideoPlaybackInfo } from './media-modal.tsx'
 import { StatusBar } from './status-bar.tsx'
 import {
 	applyScroll,
@@ -76,6 +76,7 @@ function deriveModalState(state: AppState, isViewer: boolean) {
 		paused: isModalPaused(modal),
 		contentHeight: Math.max(1, state.dimensions.height - 2),
 		restartCount: modal.kind === 'open' ? modal.restartCount : 0,
+		seekOffset: modal.kind === 'open' ? modal.seekOffset : 0,
 	}
 }
 
@@ -132,6 +133,7 @@ function dispatchViewerKey(
 	mediaNodes: MediaEntry[],
 	onAudioPlay: (entry: MediaEntry) => void,
 	onAction: (action: AppAction) => void,
+	videoDuration: number,
 	renderer?: ReturnType<typeof useRenderer> | null,
 ) {
 	// intercept return on audio — play directly instead of opening modal
@@ -145,7 +147,7 @@ function dispatchViewerKey(
 
 	const action =
 		state.mediaModal.kind !== 'closed'
-			? handleModalKey(key, state, dispatch, mediaCount)
+			? handleModalKey(key, state, dispatch, mediaCount, videoDuration)
 			: handleViewerKey(key, state, dispatch, mediaCount, renderer)
 	if (action == null) return
 	if (action.type === 'ReturnToBrowser') clearImageCache()
@@ -200,6 +202,9 @@ export function App(props: Readonly<AppProps>) {
 
 	// modal animation frame info — shared between modal and gallery
 	const [modalFrameInfo, setModalFrameInfo] = useState<FrameInfo | null>(null)
+
+	// video playback info — elapsed time, duration for progress bar
+	const [videoInfo, setVideoInfo] = useState<VideoPlaybackInfo | null>(null)
 
 	// unified viewer content — mutable state for live reload
 	const [viewerState, setViewerState] = useState<{
@@ -342,6 +347,7 @@ export function App(props: Readonly<AppProps>) {
 			viewerState.mediaNodes,
 			handleAudioPlay,
 			handleAction,
+			videoInfo?.duration ?? 0,
 			renderer,
 		)
 	})
@@ -417,8 +423,10 @@ export function App(props: Readonly<AppProps>) {
 			termHeight={modalDerived.contentHeight}
 			paused={modalDerived.paused}
 			restartCount={modalDerived.restartCount}
+			seekOffset={modalDerived.seekOffset}
 			mediaCapabilities={props.mediaCapabilities}
 			onFrameInfo={setModalFrameInfo}
+			onVideoInfo={setVideoInfo}
 		/>
 	) : null
 
@@ -431,6 +439,7 @@ export function App(props: Readonly<AppProps>) {
 			termHeight={modalDerived.contentHeight}
 			frameInfo={modalFrameInfo}
 			paused={modalDerived.paused}
+			videoInfo={videoInfo}
 		/>
 	) : null
 

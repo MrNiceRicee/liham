@@ -15,15 +15,22 @@ import {
 
 import type { MediaIRNode } from '../../ir/types.ts'
 import type { AnimationLimits } from '../../media/decoder.ts'
-import { killActiveAudio, playAudio } from '../../media/ffplay.ts'
+import {
+	killActiveAudio,
+	pauseActiveAudio,
+	playAudio,
+	resumeActiveAudio,
+} from '../../media/ffplay.ts'
 import { createFrameTimer, type FrameTimerHandle } from '../../media/frame-timer.ts'
 import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
 import type { LoadedImage, MediaCapabilities } from '../../media/types.ts'
 import {
 	computeVideoDimensions,
 	createVideoStream,
+	pauseActiveVideo,
 	probeVideo,
 	readFrames,
+	resumeActiveVideo,
 } from '../../media/video-decoder.ts'
 import { sanitizeForTerminal } from '../../pipeline/sanitize.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
@@ -127,6 +134,12 @@ function useFrameGridCache(image: LoadedImage | null, bgColor: string) {
 export interface FrameInfo {
 	frameCount: number
 	capped: boolean
+}
+
+export interface VideoPlaybackInfo {
+	elapsed: number // seconds
+	duration: number // seconds, 0 if unknown
+	paused: boolean
 }
 
 function ModalImageContent({
@@ -239,9 +252,67 @@ function ModalImageContent({
 	return <ModalHalfBlockRows rows={rows} width={image.terminalCols} />
 }
 
+// -- video frame processing (extracted to reduce cognitive complexity) --
+
+interface FrameLoopContext {
+	proc: ReturnType<typeof Bun.spawn>
+	dims: VideoDimensions
+	fps: number
+	duration: number
+	seekOffset: number
+	bgColor: string
+	src: string
+	isStale: () => boolean
+	renderPendingRef: React.RefObject<boolean>
+	setCurrentGrid: (grid: MergedSpan[][]) => void
+	setGridWidth: (w: number) => void
+	setPlaybackState: (s: PlaybackState) => void
+	onVideoInfo: (info: VideoPlaybackInfo | null) => void
+}
+
+async function runFrameLoop(ctx: FrameLoopContext): Promise<void> {
+	ctx.setPlaybackState('playing')
+	ctx.setGridWidth(ctx.dims.termCols)
+	const frameSize = ctx.dims.pixelWidth * ctx.dims.pixelHeight * 4
+	let frameCount = 0
+
+	for await (const rgba of readFrames(ctx.proc.stdout as ReadableStream<Uint8Array>, frameSize)) {
+		if (ctx.isStale()) break
+		frameCount++
+
+		// report elapsed time every ~10 frames
+		if (frameCount % 10 === 1) {
+			const elapsed = ctx.seekOffset + frameCount / ctx.fps
+			ctx.onVideoInfo({ elapsed, duration: ctx.duration, paused: false })
+		}
+
+		if (ctx.renderPendingRef.current) continue // frame skip
+
+		const image: LoadedImage = {
+			rgba,
+			width: ctx.dims.pixelWidth,
+			height: ctx.dims.pixelHeight,
+			terminalCols: ctx.dims.termCols,
+			terminalRows: ctx.dims.termRows,
+			byteSize: rgba.byteLength,
+			source: ctx.src,
+		}
+		const grid = renderHalfBlockMerged(image, ctx.bgColor)
+		ctx.renderPendingRef.current = true
+		ctx.setCurrentGrid(grid)
+	}
+
+	if (!ctx.isStale()) {
+		const exitCode = await ctx.proc.exited
+		ctx.setPlaybackState(exitCode === 0 ? 'ended' : 'error')
+	}
+}
+
 // -- modal video content --
 
 type PlaybackState = 'loading' | 'playing' | 'error' | 'ended'
+
+type VideoDimensions = NonNullable<ReturnType<typeof computeVideoDimensions>>
 
 function ModalVideoContent({
 	src,
@@ -252,6 +323,9 @@ function ModalVideoContent({
 	basePath,
 	bgColor,
 	restartCount,
+	seekOffset,
+	paused,
+	onVideoInfo,
 }: {
 	readonly src: string
 	readonly alt: string
@@ -261,6 +335,9 @@ function ModalVideoContent({
 	readonly basePath: string
 	readonly bgColor: string
 	readonly restartCount: number
+	readonly seekOffset: number
+	readonly paused: boolean
+	readonly onVideoInfo: (info: VideoPlaybackInfo | null) => void
 }): ReactNode {
 	const loadIdRef = useRef(0)
 	const renderPendingRef = useRef(false)
@@ -284,60 +361,33 @@ function ModalVideoContent({
 		const absPath = resolve(basePath, src)
 
 		void (async () => {
-			// 1. probe (uses absPath; sanitizeMediaPath re-validates internally)
 			const result = await probeVideo(absPath, basePath, controller.signal)
 			if (isStale() || !result.ok) {
 				if (!isStale()) setPlaybackState('error')
 				return
 			}
 			const meta = result.value
-
-			// 2. compute dimensions
 			const dims = computeVideoDimensions(meta.width, meta.height, maxCols, maxRows)
 			if (dims == null || isStale()) return
 
-			// 3. start video stream at native fps
 			proc = createVideoStream({
 				filePath: absPath,
 				width: dims.pixelWidth,
 				height: dims.pixelHeight,
 				fps: meta.fps,
+				seekOffset,
 			})
 
-			// 4. start audio (through playAudio, not inline spawn)
 			if (meta.hasAudio) {
-				void playAudio(absPath, basePath)
+				void playAudio(absPath, basePath, seekOffset)
 				audioStarted = true
 			}
 
-			// 5. frame read loop
-			setPlaybackState('playing')
-			setGridWidth(dims.termCols)
-			const frameSize = dims.pixelWidth * dims.pixelHeight * 4
-
-			for await (const rgba of readFrames(proc.stdout as ReadableStream<Uint8Array>, frameSize)) {
-				if (isStale()) break
-				if (renderPendingRef.current) continue // frame skip
-
-				const image: LoadedImage = {
-					rgba,
-					width: dims.pixelWidth,
-					height: dims.pixelHeight,
-					terminalCols: dims.termCols,
-					terminalRows: dims.termRows,
-					byteSize: rgba.byteLength,
-					source: src,
-				}
-				const grid = renderHalfBlockMerged(image, bgColor)
-				renderPendingRef.current = true
-				setCurrentGrid(grid)
-			}
-
-			// 6. check exit code for error vs normal end
-			if (!isStale() && proc != null) {
-				const exitCode = await proc.exited
-				setPlaybackState(exitCode === 0 ? 'ended' : 'error')
-			}
+			await runFrameLoop({
+				proc, dims, fps: meta.fps, duration: meta.duration, seekOffset,
+				bgColor, src, isStale, renderPendingRef, setCurrentGrid,
+				setGridWidth, setPlaybackState, onVideoInfo,
+			})
 		})()
 
 		return () => {
@@ -352,7 +402,18 @@ function ModalVideoContent({
 			}
 			if (audioStarted) void killActiveAudio()
 		}
-	}, [src, basePath, maxCols, maxRows, restartCount])
+	}, [src, basePath, maxCols, maxRows, restartCount, seekOffset])
+
+	// react to external pause/resume toggle
+	useEffect(() => {
+		if (paused) {
+			pauseActiveVideo()
+			pauseActiveAudio()
+		} else {
+			resumeActiveVideo()
+			resumeActiveAudio()
+		}
+	}, [paused])
 
 	if (playbackState === 'loading') {
 		return (
@@ -414,8 +475,10 @@ export interface MediaModalProps {
 	readonly termHeight: number
 	readonly paused: boolean
 	readonly restartCount: number
+	readonly seekOffset: number
 	readonly mediaCapabilities: MediaCapabilities
 	readonly onFrameInfo: (info: FrameInfo | null) => void
+	readonly onVideoInfo: (info: VideoPlaybackInfo | null) => void
 }
 
 export function MediaModal({
@@ -426,8 +489,10 @@ export function MediaModal({
 	termHeight,
 	paused,
 	restartCount,
+	seekOffset,
 	mediaCapabilities,
 	onFrameInfo,
+	onVideoInfo,
 }: MediaModalProps): ReactNode {
 	const entry = mediaNodes[mediaIndex]
 	if (entry == null) return null
@@ -461,6 +526,9 @@ export function MediaModal({
 					basePath={ctx?.basePath ?? process.cwd()}
 					bgColor={ctx?.bgColor ?? ''}
 					restartCount={restartCount}
+					seekOffset={seekOffset}
+					paused={paused}
+					onVideoInfo={onVideoInfo}
 				/>
 			)
 		}
