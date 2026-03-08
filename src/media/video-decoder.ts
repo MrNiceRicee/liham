@@ -3,6 +3,11 @@
 import { sanitizeMediaPath } from './ffplay.ts'
 import type { ImageResult } from './types.ts'
 
+const debug =
+	process.env['LIHAM_DEBUG'] === '1'
+		? (msg: string) => process.stderr.write(`[video-decoder] ${msg}\n`)
+		: () => {}
+
 // -- types --
 
 export interface VideoMetadata {
@@ -277,26 +282,26 @@ let activeVideoProc: ReturnType<typeof Bun.spawn> | null = null
 let videoStopped = false
 
 export function pauseActiveVideo(): void {
-	process.stderr.write(`[DBG] pauseActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}\n`)
+	debug(`pauseActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}`)
 	if (activeVideoProc != null && !videoStopped) {
 		try {
 			process.kill(activeVideoProc.pid, 'SIGSTOP')
+			videoStopped = true
 		} catch {
 			/* already dead */
 		}
-		videoStopped = true
 	}
 }
 
 export function resumeActiveVideo(): void {
-	process.stderr.write(`[DBG] resumeActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}\n`)
+	debug(`resumeActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}`)
 	if (activeVideoProc != null && videoStopped) {
 		try {
 			process.kill(activeVideoProc.pid, 'SIGCONT')
+			videoStopped = false
 		} catch {
 			/* already dead */
 		}
-		videoStopped = false
 	}
 }
 
@@ -320,6 +325,11 @@ export async function killActiveVideo(): Promise<void> {
 
 export function createVideoStream(options: VideoStreamOptions): ReturnType<typeof Bun.spawn> {
 	const { filePath, width, height, fps, seekOffset } = options
+
+	// validate seekOffset
+	if (seekOffset != null && (!Number.isFinite(seekOffset) || seekOffset < 0)) {
+		throw new Error('invalid seek offset')
+	}
 
 	// validate dimensions
 	if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
@@ -360,9 +370,12 @@ export function createVideoStream(options: VideoStreamOptions): ReturnType<typeo
 
 	activeVideoProc = proc
 
-	// clean up reference when process exits
+	// clean up reference when process exits + reset stopped flag
 	void proc.exited.then(() => {
-		if (activeVideoProc === proc) activeVideoProc = null
+		if (activeVideoProc === proc) {
+			activeVideoProc = null
+			videoStopped = false
+		}
 	})
 
 	return proc

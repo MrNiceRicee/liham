@@ -3,6 +3,11 @@
 import { realpathSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+const debug =
+	process.env['LIHAM_DEBUG'] === '1'
+		? (msg: string) => process.stderr.write(`[ffplay] ${msg}\n`)
+		: () => {}
+
 // -- detection --
 
 export function isFfplayAvailable(): boolean {
@@ -63,27 +68,26 @@ let activeAudioProc: ReturnType<typeof Bun.spawn> | null = null
 let audioStopped = false
 
 export function pauseActiveAudio(): void {
-	process.stderr.write(`[DBG] pauseActiveAudio: proc=${String(activeAudioProc != null)}, stopped=${String(audioStopped)}, pid=${String(activeAudioProc?.pid)}\n`)
+	debug(`pauseActiveAudio: proc=${String(activeAudioProc != null)}, stopped=${String(audioStopped)}, pid=${String(activeAudioProc?.pid)}`)
 	if (activeAudioProc != null && !audioStopped) {
-		// use process.kill(pid) — Bun's proc.kill() may not reliably send SIGSTOP
 		try {
 			process.kill(activeAudioProc.pid, 'SIGSTOP')
+			audioStopped = true
 		} catch {
 			/* already dead */
 		}
-		audioStopped = true
 	}
 }
 
 export function resumeActiveAudio(): void {
-	process.stderr.write(`[DBG] resumeActiveAudio: proc=${String(activeAudioProc != null)}, stopped=${String(audioStopped)}, pid=${String(activeAudioProc?.pid)}\n`)
+	debug(`resumeActiveAudio: proc=${String(activeAudioProc != null)}, stopped=${String(audioStopped)}, pid=${String(activeAudioProc?.pid)}`)
 	if (activeAudioProc != null && audioStopped) {
 		try {
 			process.kill(activeAudioProc.pid, 'SIGCONT')
+			audioStopped = false
 		} catch {
 			/* already dead */
 		}
-		audioStopped = false
 	}
 }
 
@@ -115,6 +119,11 @@ export async function playAudio(
 		return { ok: false, error: 'ffplay not found' }
 	}
 
+	// validate seekOffset
+	if (!Number.isFinite(seekOffset) || seekOffset < 0) {
+		return { ok: false, error: 'invalid seek offset' }
+	}
+
 	const sanitized = sanitizeMediaPath(mediaPath, basePath)
 	if (!sanitized.ok) {
 		return { ok: false, error: sanitized.error ?? 'invalid path' }
@@ -135,10 +144,13 @@ export async function playAudio(
 			stderr: 'ignore',
 		})
 
-		// clean up reference when process exits
+		// clean up reference when process exits + reset stopped flag
 		const proc = activeAudioProc
 		void proc.exited.then(() => {
-			if (activeAudioProc === proc) activeAudioProc = null
+			if (activeAudioProc === proc) {
+				activeAudioProc = null
+				audioStopped = false
+			}
 		})
 
 		return { ok: true }
