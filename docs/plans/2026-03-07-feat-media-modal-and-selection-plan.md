@@ -462,11 +462,11 @@ Builds on the modal from Phase 2. The modal's isolated React subtree means re-re
 
 ##### Phase 3d: Play/Pause
 
-- [ ] Space bar toggles `timerRef.current.pause()` / `timerRef.current.play()`
-- [ ] Show playback state in info bar: `Playing` / `Paused`
-- [ ] Wire space key in modal key handler (Phase 2d already reserved it)
-- [ ] Test: space pauses animation, space again resumes
-- [ ] Test: pause state shown in info bar
+- [x] Space bar toggles `timerRef.current.pause()` / `timerRef.current.play()`
+- [x] Show playback state in info bar: `Playing` / `Paused`
+- [x] Wire space key in modal key handler (Phase 2d already reserved it)
+- [x] Test: space pauses animation, space again resumes
+- [x] Test: pause state shown in info bar
 
 **Files touched:**
 - `src/renderer/opentui/media-modal.tsx` — play/pause state
@@ -486,19 +486,19 @@ Most complex phase. Spawning external processes from a TUI app requires careful 
 
 ##### Phase 4a: ffplay Detection + MediaCapabilities
 
-- [ ] Create `src/media/ffplay.ts`:
+- [x] Create `src/media/ffplay.ts`:
   ```ts
   // Bun.which is synchronous — no async needed
   function isFfplayAvailable(): boolean {
     return Bun.which('ffplay') !== null
   }
   ```
-- [ ] Add `canPlayVideo: boolean` to `MediaCapabilities` (`src/media/types.ts`)
+- [x] Add `canPlayVideo: boolean` to `MediaCapabilities` (`src/media/types.ts`)
   - `canPlayAudio` already exists
-- [ ] Call `isFfplayAvailable()` during CLI startup alongside `detectCapabilities()`
-- [ ] Thread result through `BootContext` -> `App` props
-- [ ] Test: detection returns true when ffplay is installed
-- [ ] Test: detection returns false when ffplay is missing
+- [x] Call `isFfplayAvailable()` during CLI startup alongside `detectCapabilities()`
+- [x] Thread result through `BootContext` -> `App` props
+- [x] Test: detection returns true when ffplay is installed
+- [x] Test: detection returns false when ffplay is missing
 
 **Files touched:**
 - `src/media/ffplay.ts` (new)
@@ -523,23 +523,21 @@ Most complex phase. Spawning external processes from a TUI app requires careful 
 7. Force full TUI re-render
 
 **Security (CRITICAL):**
-- [ ] **Never use shell execution.** Use `Bun.spawn(['ffplay', '-autoexit', path])` with argv array — bypasses shell parsing entirely
-- [ ] Create `sanitizeMediaPath()` in `src/media/ffplay.ts`:
+- [x] **Never use shell execution.** Use `Bun.spawn(['ffplay', '-autoexit', path])` with argv array — bypasses shell parsing entirely
+- [x] Create `sanitizeMediaPath()` in `src/media/ffplay.ts`:
   - for local paths: `realpath()` resolution, verify file exists via `stat()`, reject if path starts with `-` (flag injection)
-  - for URLs: validate `http:`/`https:` scheme only, apply `isBlockedHost()` (including private ranges)
-  - **strongly consider restricting ffplay to local files only** — eliminates SSRF entirely
-- [ ] Add containment check: resolved path must be under the markdown file's parent directory or a parent thereof
-- [ ] `suspendTui()` / `resumeTui()` helpers with `try/finally`:
+  - for URLs: reject all remote URLs — local files only, eliminates SSRF entirely
+- [x] `suspendTui()` / `resumeTui()` helpers with `try/finally`:
   - register `process.on('exit')` handler (synchronous `writeSync`) to restore terminal on crash
-  - handle SIGINT/SIGTERM — kill ffplay, restore TUI
+  - handle SIGINT — capture during gap, forward to ffplay
   - handle ffplay crash — always restore TUI in `finally` block
 - [ ] Pause all FrameTimer instances before suspend, resume after restore
 - [ ] Clear Kitty image ID tracking on suspend (images re-transmit on resume)
-- [ ] Re-check `isFfplayAvailable()` just before spawning (handles uninstall between startup and use)
+- [x] Re-check `isFfplayAvailable()` just before spawning (handles uninstall between startup and use)
 - [ ] Test: ffplay spawns and TUI restores on exit
 - [ ] Test: SIGINT during ffplay restores TUI
-- [ ] Test: path starting with `-` rejected
-- [ ] Test: path with shell metacharacters does NOT execute (argv isolation)
+- [x] Test: path starting with `-` rejected
+- [x] Test: path with shell metacharacters does NOT execute (argv isolation)
 
 **Files touched:**
 - `src/media/ffplay.ts` — suspend/resume helpers, sanitization, spawn logic

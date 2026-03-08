@@ -78,7 +78,9 @@ export function renderViewerLayout(
 	const hasPreview = panes.preview != null
 
 	if (hasPreview && !hasSource) {
-		return <PreviewPane content={content} focused={!scrollLocked} theme={theme} scrollRef={previewRef} />
+		return (
+			<PreviewPane content={content} focused={!scrollLocked} theme={theme} scrollRef={previewRef} />
+		)
 	}
 	if (hasSource && !hasPreview) {
 		return <SourcePane content={raw} focused={!scrollLocked} theme={theme} scrollRef={sourceRef} />

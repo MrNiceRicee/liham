@@ -238,7 +238,9 @@ interface ResolvedDetection {
 	mediaCapabilities: MediaCapabilities
 }
 
-function buildMediaCapabilities(result: Awaited<ReturnType<typeof detectCapabilities>>): MediaCapabilities {
+function buildMediaCapabilities(
+	result: Awaited<ReturnType<typeof detectCapabilities>>,
+): MediaCapabilities {
 	return {
 		...result.image,
 		canAnimate: false, // OpenTUI React reconciler causes tearing
@@ -251,22 +253,38 @@ async function resolveDetection(themeName: ThemeName): Promise<ResolvedDetection
 	// explicit theme skips detection for theme but still detects image
 	if (themeName === 'dark') {
 		const result = await detectCapabilities()
-		return { themeName: 'dark', tokens: darkTheme, mediaCapabilities: buildMediaCapabilities(result) }
+		return {
+			themeName: 'dark',
+			tokens: darkTheme,
+			mediaCapabilities: buildMediaCapabilities(result),
+		}
 	}
 	if (themeName === 'light') {
 		const result = await detectCapabilities()
-		return { themeName: 'light', tokens: lightTheme, mediaCapabilities: buildMediaCapabilities(result) }
+		return {
+			themeName: 'light',
+			tokens: lightTheme,
+			mediaCapabilities: buildMediaCapabilities(result),
+		}
 	}
 
 	// auto: flag → env var → combined detection → dark default
 	const envTheme = process.env['LIHAM_THEME']
 	if (envTheme === 'light') {
 		const result = await detectCapabilities()
-		return { themeName: 'light (env)', tokens: lightTheme, mediaCapabilities: buildMediaCapabilities(result) }
+		return {
+			themeName: 'light (env)',
+			tokens: lightTheme,
+			mediaCapabilities: buildMediaCapabilities(result),
+		}
 	}
 	if (envTheme === 'dark') {
 		const result = await detectCapabilities()
-		return { themeName: 'dark (env)', tokens: darkTheme, mediaCapabilities: buildMediaCapabilities(result) }
+		return {
+			themeName: 'dark (env)',
+			tokens: darkTheme,
+			mediaCapabilities: buildMediaCapabilities(result),
+		}
 	}
 
 	const result = await detectCapabilities()

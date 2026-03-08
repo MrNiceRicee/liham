@@ -45,7 +45,6 @@ beforeEach(() => {
 	globalThis.clearTimeout = (id: number) => {
 		pendingTimers = pendingTimers.filter((t) => t.id !== id)
 	}
-	// @ts-expect-error -- replacing performance.now for deterministic timing
 	performance.now = () => mockNow
 })
 

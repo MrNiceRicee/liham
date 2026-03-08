@@ -84,7 +84,12 @@ describe('media modal actions', () => {
 	test('OpenMediaModal opens modal at focused index', () => {
 		const s = stateWith({ mediaFocusIndex: 1 })
 		const next = appReducer(s, { type: 'OpenMediaModal' })
-		expect(next.mediaModal).toEqual({ kind: 'open', mediaIndex: 1, galleryHidden: false, paused: false })
+		expect(next.mediaModal).toEqual({
+			kind: 'open',
+			mediaIndex: 1,
+			galleryHidden: false,
+			paused: false,
+		})
 	})
 
 	test('OpenMediaModal no-op when no focus', () => {
@@ -122,7 +127,12 @@ describe('media modal actions', () => {
 			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: false },
 		})
 		const next = appReducer(s, { type: 'TogglePlayPause' })
-		expect(next.mediaModal).toEqual({ kind: 'open', mediaIndex: 0, galleryHidden: false, paused: true })
+		expect(next.mediaModal).toEqual({
+			kind: 'open',
+			mediaIndex: 0,
+			galleryHidden: false,
+			paused: true,
+		})
 	})
 
 	test('TogglePlayPause resumes when paused', () => {
@@ -131,7 +141,12 @@ describe('media modal actions', () => {
 			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: true },
 		})
 		const next = appReducer(s, { type: 'TogglePlayPause' })
-		expect(next.mediaModal).toEqual({ kind: 'open', mediaIndex: 0, galleryHidden: false, paused: false })
+		expect(next.mediaModal).toEqual({
+			kind: 'open',
+			mediaIndex: 0,
+			galleryHidden: false,
+			paused: false,
+		})
 	})
 
 	test('TogglePlayPause no-op when modal closed', () => {

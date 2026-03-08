@@ -77,9 +77,7 @@ function generateMediaTest(): string {
 	const assets = discoverAssets()
 
 	s.push('# Media Rendering Test\n')
-	s.push(
-		'Exercises images, video, audio, missing files, remote URLs, and mixed content.\n',
-	)
+	s.push('Exercises images, video, audio, missing files, remote URLs, and mixed content.\n')
 
 	// images — one section per discovered image
 	if (assets.images.length > 0) {

@@ -1,6 +1,7 @@
 // video decoder — ffprobe metadata, ffmpeg frame streaming, dimension calculation.
 
 import type { ImageResult } from './types.ts'
+
 import { sanitizeMediaPath } from './ffplay.ts'
 
 // -- types --
@@ -79,20 +80,33 @@ export async function probeVideo(
 		const proc = Bun.spawn(
 			[
 				'ffprobe',
-				'-v', 'quiet',
-				'-print_format', 'json',
-				'-select_streams', 'v:0',
-				'-show_entries', 'stream=width,height,r_frame_rate,avg_frame_rate,duration',
-				'-show_entries', 'format=duration',
+				'-v',
+				'quiet',
+				'-print_format',
+				'json',
+				'-select_streams',
+				'v:0',
+				'-show_entries',
+				'stream=width,height,r_frame_rate,avg_frame_rate,duration',
+				'-show_entries',
+				'format=duration',
 				absPath,
 			],
 			{ stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' },
 		)
 
 		if (signal != null) {
-			signal.addEventListener('abort', () => {
-				try { proc.kill('SIGKILL') } catch { /* already dead */ }
-			}, { once: true })
+			signal.addEventListener(
+				'abort',
+				() => {
+					try {
+						proc.kill('SIGKILL')
+					} catch {
+						/* already dead */
+					}
+				},
+				{ once: true },
+			)
 		}
 
 		const exited = proc.exited
@@ -100,7 +114,11 @@ export async function probeVideo(
 		const race = await Promise.race([exited, timeout])
 
 		if (race === 'timeout') {
-			try { proc.kill('SIGKILL') } catch { /* already dead */ }
+			try {
+				proc.kill('SIGKILL')
+			} catch {
+				/* already dead */
+			}
 			return { ok: false, error: 'ffprobe timed out' }
 		}
 
@@ -140,9 +158,10 @@ export async function probeVideo(
 	}
 
 	// prefer avg_frame_rate for display, fall back to r_frame_rate
-	const fps = parseFps(stream['avg_frame_rate']) !== DEFAULT_FPS
-		? parseFps(stream['avg_frame_rate'])
-		: parseFps(stream['r_frame_rate'])
+	const fps =
+		parseFps(stream['avg_frame_rate']) !== DEFAULT_FPS
+			? parseFps(stream['avg_frame_rate'])
+			: parseFps(stream['r_frame_rate'])
 
 	// prefer stream duration, fall back to format duration
 	const duration = parseDuration(stream['duration']) || parseDuration(format?.['duration'])
@@ -153,27 +172,45 @@ export async function probeVideo(
 		const audioProc = Bun.spawn(
 			[
 				'ffprobe',
-				'-v', 'quiet',
-				'-print_format', 'json',
-				'-select_streams', 'a:0',
-				'-show_entries', 'stream=codec_type',
+				'-v',
+				'quiet',
+				'-print_format',
+				'json',
+				'-select_streams',
+				'a:0',
+				'-show_entries',
+				'stream=codec_type',
 				absPath,
 			],
 			{ stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' },
 		)
 
 		if (signal != null) {
-			signal.addEventListener('abort', () => {
-				try { audioProc.kill('SIGKILL') } catch { /* already dead */ }
-			}, { once: true })
+			signal.addEventListener(
+				'abort',
+				() => {
+					try {
+						audioProc.kill('SIGKILL')
+					} catch {
+						/* already dead */
+					}
+				},
+				{ once: true },
+			)
 		}
 
 		const audioExited = audioProc.exited
-		const audioTimeout = new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), PROBE_TIMEOUT_MS))
+		const audioTimeout = new Promise<'timeout'>((r) =>
+			setTimeout(() => r('timeout'), PROBE_TIMEOUT_MS),
+		)
 		const audioRace = await Promise.race([audioExited, audioTimeout])
 
 		if (audioRace === 'timeout') {
-			try { audioProc.kill('SIGKILL') } catch { /* already dead */ }
+			try {
+				audioProc.kill('SIGKILL')
+			} catch {
+				/* already dead */
+			}
 			// audio detection failed, continue without audio
 		} else if (!signal?.aborted) {
 			const audioStdout = await new Response(audioProc.stdout).text()
@@ -263,7 +300,11 @@ export function createVideoStream(options: VideoStreamOptions): ReturnType<typeo
 
 	// kill any existing video process before starting new
 	if (activeVideoProc != null) {
-		try { activeVideoProc.kill('SIGKILL') } catch { /* already dead */ }
+		try {
+			activeVideoProc.kill('SIGKILL')
+		} catch {
+			/* already dead */
+		}
 		activeVideoProc = null
 	}
 
@@ -271,12 +312,18 @@ export function createVideoStream(options: VideoStreamOptions): ReturnType<typeo
 		[
 			'ffmpeg',
 			'-re',
-			'-readrate_initial_burst', '0.5',
-			'-v', 'quiet',
-			'-i', filePath,
-			'-f', 'rawvideo',
-			'-pix_fmt', 'rgba',
-			'-vf', vf,
+			'-readrate_initial_burst',
+			'0.5',
+			'-v',
+			'quiet',
+			'-i',
+			filePath,
+			'-f',
+			'rawvideo',
+			'-pix_fmt',
+			'rgba',
+			'-vf',
+			vf,
 			'pipe:1',
 		],
 		{ stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' },

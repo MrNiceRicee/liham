@@ -2,7 +2,15 @@
 // absolute positioned sibling of scrollbox content (does not scroll with content).
 // media info (filename, type, frame count) lives in the gallery panel, not here.
 
-import { type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import {
+	type ReactNode,
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react'
 
 import type { MediaIRNode } from '../../ir/types.ts'
 import type { AnimationLimits } from '../../media/decoder.ts'
@@ -10,8 +18,8 @@ import type { LoadedImage, MediaCapabilities } from '../../media/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import type { MediaEntry } from './index.tsx'
 
-import { createFrameTimer, type FrameTimerHandle } from '../../media/frame-timer.ts'
 import { killActiveAudio, playAudio } from '../../media/ffplay.ts'
+import { createFrameTimer, type FrameTimerHandle } from '../../media/frame-timer.ts'
 import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
 import {
 	computeVideoDimensions,
@@ -24,7 +32,10 @@ import { ImageContext } from './image-context.tsx'
 import { useImageLoader } from './use-image-loader.ts'
 
 // modal: no frame cap, 30MB byte budget is the only guard
-const MODAL_ANIMATION_LIMITS: AnimationLimits = { maxFrames: Infinity, maxDecodedBytes: 30 * 1024 * 1024 }
+const MODAL_ANIMATION_LIMITS: AnimationLimits = {
+	maxFrames: Infinity,
+	maxDecodedBytes: 30 * 1024 * 1024,
+}
 
 // -- helpers --
 
@@ -369,7 +380,9 @@ function ModalMediaFallback({
 	return (
 		<box flexDirection="column" alignItems="center" gap={1}>
 			<text>
-				<span fg={theme.image.fallbackColor}>[{label}: {sanitizeForTerminal(node.alt)}]</span>
+				<span fg={theme.image.fallbackColor}>
+					[{label}: {sanitizeForTerminal(node.alt)}]
+				</span>
 			</text>
 			{hint != null && (
 				<text>
@@ -446,7 +459,11 @@ export function MediaModal({
 				<ModalMediaFallback
 					node={node}
 					theme={theme}
-					hint={node.type === 'video' && !mediaCapabilities.canPlayVideo ? 'install ffmpeg to play video' : undefined}
+					hint={
+						node.type === 'video' && !mediaCapabilities.canPlayVideo
+							? 'install ffmpeg to play video'
+							: undefined
+					}
 				/>
 			)}
 		</box>

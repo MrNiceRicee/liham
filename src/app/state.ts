@@ -167,7 +167,16 @@ function returnToBrowser(state: AppState): AppState {
 
 type BrowserAction = Extract<
 	AppAction,
-	{ type: 'ScanComplete' | 'RescanComplete' | 'ScanError' | 'FilterUpdate' | 'CursorMove' | 'OpenFile' | 'ReturnToBrowser' }
+	{
+		type:
+			| 'ScanComplete'
+			| 'RescanComplete'
+			| 'ScanError'
+			| 'FilterUpdate'
+			| 'CursorMove'
+			| 'OpenFile'
+			| 'ReturnToBrowser'
+	}
 >
 
 function browserReducer(state: AppState, action: BrowserAction): AppState {

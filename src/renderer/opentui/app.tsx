@@ -257,7 +257,7 @@ export function App(props: Readonly<AppProps>) {
 		// intercept return on audio — play directly instead of opening modal
 		if (key.name === 'return' && state.mediaFocusIndex != null) {
 			const entry = viewerState.mediaNodes[state.mediaFocusIndex]
-			if (entry != null && entry.node.type === 'audio') {
+			if (entry?.node.type === 'audio') {
 				handleAudioPlay(entry)
 				return
 			}
