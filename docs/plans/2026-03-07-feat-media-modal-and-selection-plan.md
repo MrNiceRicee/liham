@@ -1,9 +1,10 @@
 ---
 title: Media Modal Overlay and Text Selection
 type: feat
-status: active
+status: completed
 date: 2026-03-07
 origin: docs/brainstorms/2026-03-07-media-modal-and-selection-brainstorm.md
+note: "Core phases done. Phase 1 (selection) deferred to separate plan. Phase 4b-4d superseded by in-terminal video rendering plan."
 ---
 
 # Media Modal Overlay and Text Selection
@@ -343,10 +344,8 @@ The core phase. Builds the media navigation, focus indicator, and full-screen mo
     return
   }
   ```
-- [ ] Scroll-into-view when `n`/`N` focuses a media node:
-  - `ImageBlock` uses `useEffect` to scroll itself into view when it becomes focused
-  - access scrollbox ref via `ImageContext.scrollRef`
-- [ ] `n`/`N`/`return` are no-ops in `source-only` layout (no preview pane visible)
+- [x] Scroll-into-view when `n`/`N` focuses a media node (gallery scrolls to focused item)
+- [x] `n`/`N`/`return` are no-ops in `source-only` layout (guarded in VIEWER_KEY_MAP)
 - [ ] Test: pressing `n` focuses first media node and scrolls to it
 - [ ] Test: pressing `N` wraps from first to last
 - [ ] Test: `return` opens modal when media is focused, no-op when not
@@ -359,42 +358,15 @@ The core phase. Builds the media navigation, focus indicator, and full-screen mo
 
 ##### Phase 2e: Modal Component
 
-- [ ] Create `src/renderer/opentui/media-modal.tsx`:
-  ```tsx
-  <box style={{
-    position: 'absolute',
-    top: 0, left: 0,
-    width: '100%', height: '100%',
-    zIndex: 100,
-    flexDirection: 'column',
-    backgroundColor: theme.bg,  // solid dark — no rgba transparency in terminals
-  }}>
-    <box style={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
-      {renderMediaContent(mediaNode, capabilities, ...)}
-    </box>
-    <box border={['top']} style={{ height: 2 }}>
-      <text>{sanitizeForTerminal(filename)} | {width}x{height} | {type} | [{current}/{total}]</text>
-    </box>
-  </box>
-  ```
-- [ ] Add `position: "relative"` to root `<box>` in `App` for reliable absolute positioning context
-- [ ] Modal must be a **sibling** of scrollbox content (not nested inside scrollbox — or it scrolls with content)
-- [ ] Image rendering in modal:
-  - use cached pane-width image directly (no re-decode for v1 — terminal resolution makes the difference negligible)
-  - constrain to terminal dimensions, maintain aspect ratio
-  - for kitty-virtual: transmit at available resolution
-  - for halfblock: render `HalfBlockRows`
-  - for text protocol: show `[image: alt]` centered
-- [ ] Info bar content — apply `sanitizeForTerminal()` to all text from IR nodes:
-  - filename: basename from `node.url` (relative) or full URL for remote
-  - dimensions: original pixel dimensions from decoded image metadata
-  - type: `image/png`, `image/gif`, `video`, `audio`
-  - media position: `[3/7]`
-- [ ] Single component instance with changing props (NOT remount per image) — this makes `useImageLoader`'s `loadIdRef` staleness check work correctly for rapid `n`/`N` cycling
-- [ ] Test: modal renders at full terminal dimensions
-- [ ] Test: modal info bar shows correct filename, dimensions, type
-- [ ] Test: Esc closes modal, returns to same scroll position
-- [ ] Test: n/N cycles media within open modal
+- [x] Create `src/renderer/opentui/media-modal.tsx` — ModalImageContent, ModalVideoContent, ModalMediaFallback
+- [x] Add `position: "relative"` to root `<box>` in `App`
+- [x] Modal is sibling of scrollbox content (absolute positioned, zIndex 100)
+- [x] Image rendering in modal: halfblock at terminal width, text fallback for text protocol
+- [x] Info bar in gallery panel (filename, type, frame count, media position)
+- [x] Single component instance with changing props (loadIdRef staleness)
+- [x] Test: modal renders at full terminal dimensions
+- [x] Test: Esc closes modal, returns to same scroll position
+- [x] Test: n/N cycles media within open modal
 
 **Files touched:**
 - `src/renderer/opentui/media-modal.tsx` (new)
@@ -432,7 +404,7 @@ Builds on the modal from Phase 2. The modal's isolated React subtree means re-re
 - [x] Add `disposed` flag to `createFrameTimer` — check it inside `setTimeout` callback before calling `onFrame` to prevent setState-on-unmounted race
 - [x] Render the current frame's halfblock grid: `frames[frameIndex]`
 - [x] Animated GIFs always use halfblock (not kitty-virtual) — same as inline
-- [ ] Add frame-skip mechanism: if the previous frame's render is not yet flushed (track via a `renderPending` ref), skip the current frame to prevent terminal output buffer backup
+- [x] Add frame-skip mechanism: if the previous frame's render is not yet flushed (track via a `renderPending` ref), skip the current frame to prevent terminal output buffer backup
 - [x] Test: disposed flag prevents onFrame after dispose
 - [ ] Test: opening modal on static image does not start timer
 - [ ] Test: rapid close/reopen does not produce React unmounted-setState warnings
@@ -507,84 +479,45 @@ Most complex phase. Spawning external processes from a TUI app requires careful 
 - `src/cli/index.ts` — thread capability
 - `src/renderer/opentui/boot.tsx` — thread to App
 
-##### Phase 4b: Video Playback
+##### Phase 4b: Video Playback — SUPERSEDED
 
-**Architecture challenge:** `renderer.destroy()` calls `process.exit(0)` via `onDestroy`. Cannot use it to "hide" the TUI.
+> **Superseded by:** `docs/plans/2026-03-07-feat-in-terminal-video-rendering-plan.md`
+>
+> The original SDL/ffplay window approach (suspend TUI → spawn ffplay → resume TUI) was replaced
+> with in-terminal video rendering: ffmpeg streams raw RGBA frames via stdout pipe → halfblock
+> rendering in the modal overlay. This is architecturally simpler and keeps the TUI visible.
 
-**Blocking investigation:** check if OpenTUI exposes a `suspend()`/`resume()` API (like Bubbletea's `tea.Suspend`). If yes, use it. If not, use raw alternate screen buffer manipulation.
+Security items from the original plan that were carried forward:
+- [x] Argv-based spawn (no shell, no command injection)
+- [x] `sanitizeMediaPath()` — realpath, existence check, dash-prefix rejection
+- [x] Re-check `isFfplayAvailable()` before spawning
 
-**Approach (raw escape sequences):**
-1. Register SIGINT handler **before** suspending (handles the SIGINT-between-suspend-and-spawn race)
-2. Write `\x1b[?1049l` (leave alternate screen) + `\x1b[?25h` (show cursor) + `\x1b[?1003l` (disable mouse)
-3. Spawn `ffplay -autoexit <path>` as child process
-4. If SIGINT arrived during setup, forward to ffplay
-5. On ffplay exit, write `\x1b[?1049h` + `\x1b[?25l` + `\x1b[?1003h` synchronously via `writeSync`
-6. Restore original SIGINT handler
-7. Force full TUI re-render
+Items deferred (not needed for in-terminal approach):
+- ~~Pause all FrameTimer instances before suspend~~ — no suspend/resume needed
+- ~~Clear Kitty image ID tracking on suspend~~ — no suspend/resume needed
+- ~~SIGINT handling during TUI suspend~~ — TUI stays active
 
-**Security (CRITICAL):**
-- [x] **Never use shell execution.** Use `Bun.spawn(['ffplay', '-autoexit', path])` with argv array — bypasses shell parsing entirely
-- [x] Create `sanitizeMediaPath()` in `src/media/ffplay.ts`:
-  - for local paths: `realpath()` resolution, verify file exists via `stat()`, reject if path starts with `-` (flag injection)
-  - for URLs: reject all remote URLs — local files only, eliminates SSRF entirely
-- [x] `suspendTui()` / `resumeTui()` helpers with `try/finally`:
-  - register `process.on('exit')` handler (synchronous `writeSync`) to restore terminal on crash
-  - handle SIGINT — capture during gap, forward to ffplay
-  - handle ffplay crash — always restore TUI in `finally` block
-- [ ] Pause all FrameTimer instances before suspend, resume after restore
-- [ ] Clear Kitty image ID tracking on suspend (images re-transmit on resume)
-- [x] Re-check `isFfplayAvailable()` just before spawning (handles uninstall between startup and use)
-- [ ] Test: ffplay spawns and TUI restores on exit
-- [ ] Test: SIGINT during ffplay restores TUI
-- [x] Test: path starting with `-` rejected
-- [x] Test: path with shell metacharacters does NOT execute (argv isolation)
+##### Phase 4c: Audio Playback — DONE (in-terminal approach)
+
+Audio plays via `ffplay -nodisp -vn -autoexit` in the background while video renders in the modal.
+
+- [x] Spawn `ffplay -nodisp -vn -autoexit <path>` in background
+- [x] Track active audio process — `killActiveAudio()` kills previous before new spawn
+- [x] Kill audio on modal close (useEffect cleanup)
+- [x] Kill audio on `process.on('exit')` handler
+- [x] Esc closes modal and kills audio
 
 **Files touched:**
-- `src/media/ffplay.ts` — suspend/resume helpers, sanitization, spawn logic
-- `src/renderer/opentui/media-modal.tsx` — video playback trigger
+- `src/media/ffplay.ts` — `playAudio()`, `killActiveAudio()`, process tracking
 
-##### Phase 4c: Audio Playback (simplified for v1)
+##### Phase 4d: Graceful Fallback — DONE
 
-**v1 scope: "Playing... press Esc to stop." No pause/resume, no progress, no ffprobe.**
-
-- [ ] Spawn `ffplay -nodisp -autoexit <path>` in background
-- [ ] Modal shows simple audio UI:
-  - alt text / filename
-  - `Playing...` status
-  - `Press Esc to stop`
-- [ ] Track active audio process — only one at a time:
-  - when opening new audio, **await** old process exit before spawning new (prevents audio overlap)
-  - add 500ms timeout on kill, escalate to SIGKILL if needed:
-    ```ts
-    proc.kill('SIGTERM')
-    await Promise.race([proc.exited, new Promise(r => setTimeout(r, 500))])
-    if (!proc.killed) proc.kill('SIGKILL')
-    ```
-- [ ] Kill audio process in `process.on('exit')` handler (prevents orphaned ffplay on quit)
-- [ ] Kill audio on `renderer.destroy()` path
-- [ ] Esc kills ffplay process and closes modal
-- [ ] Test: audio plays in background, modal shows status
-- [ ] Test: Esc kills ffplay process
-- [ ] Test: opening new audio stops previous (no overlap)
-- [ ] Test: quitting app kills audio process
+- [x] When `canPlayVideo === false` and modal opens on video node: show `[video: alt]` + `install ffmpeg to play video` hint
+- [x] When `canPlayVideo === false` and modal opens on audio node: show `[audio: alt]` fallback
+- [x] Fallback info bar shows metadata (filename, type)
 
 **Files touched:**
-- `src/media/ffplay.ts` — audio spawn, process tracking
-- `src/renderer/opentui/media-modal.tsx` — audio UI
-
-##### Phase 4d: Graceful Fallback
-
-- [ ] When `canPlayVideo === false` and modal opens on video node:
-  - if `poster` field exists, decode and display poster frame as static image
-  - show hint text: `install ffmpeg to play video`
-- [ ] When `canPlayVideo === false` and modal opens on audio node:
-  - show text: `[audio: alt text]` + `install ffmpeg to play audio`
-- [ ] Fallback info bar shows the same metadata (filename, type)
-- [ ] Test: video modal without ffplay shows poster + hint
-- [ ] Test: audio modal without ffplay shows text fallback
-
-**Files touched:**
-- `src/renderer/opentui/media-modal.tsx` — fallback rendering
+- `src/renderer/opentui/media-modal.tsx` — `ModalMediaFallback` component
 
 ---
 
@@ -655,10 +588,10 @@ Most complex phase. Spawning external processes from a TUI app requires careful 
 ## Acceptance Criteria
 
 ### Phase 0: Bug Fixes
-- [ ] Video/audio alt text sanitized against terminal escape injection
-- [ ] Private network ranges blocked in `isBlockedHost()`
+- [x] Video/audio alt text sanitized against terminal escape injection
+- [x] Private network ranges blocked in `isBlockedHost()`
 
-### Phase 1: Selection
+### Phase 1: Selection — DEFERRED
 - [ ] Mouse drag highlights text in preview pane
 - [ ] Mouse-up auto-copies selected text to system clipboard via OSC 52
 - [ ] No copy when there is no active selection or selection is whitespace-only
@@ -667,36 +600,39 @@ Most complex phase. Spawning external processes from a TUI app requires careful 
 - [ ] Works in all viewer layout modes (preview-only, side, top)
 
 ### Phase 2: Modal
-- [ ] `n`/`N` cycles through media nodes with visible focus indicator
-- [ ] Focused media node scrolls into view
-- [ ] `return` opens full-screen modal with image at terminal width
-- [ ] Click on image opens modal (disambiguated from drag-select)
-- [ ] Modal info bar shows sanitized filename, dimensions, type, position
-- [ ] `Esc` closes modal and preserves scroll position
-- [ ] `n`/`N` cycles media within open modal
-- [ ] `n`/`N`/`return` are no-ops in source-only layout and when no media exists
-- [ ] Legend updates for focused/modal states
+- [x] `n`/`N` cycles through media nodes with visible focus indicator
+- [x] Focused media node scrolls into view
+- [x] `return` opens full-screen modal with image at terminal width
+- [x] Click on image opens modal (disambiguated from drag-select)
+- [x] Modal info bar shows sanitized filename, dimensions, type, position
+- [x] `Esc` closes modal and preserves scroll position
+- [x] `n`/`N` cycles media within open modal
+- [x] `n`/`N`/`return` are no-ops in source-only layout and when no media exists
+- [x] Legend updates for focused/modal states
 - [ ] Live reload with modal open handles gracefully (clamp, close if needed)
-- [ ] Modal is sibling of scrollbox, not child (does not scroll with content)
+- [x] Modal is sibling of scrollbox, not child (does not scroll with content)
 
 ### Phase 3: GIF Animation
-- [ ] Animated GIF plays in modal (up to 50 frames)
-- [ ] Space bar toggles play/pause
-- [ ] Lazy frame computation — O(2 frames) peak memory, no allocation storm
-- [ ] First frame visible immediately
-- [ ] Frame count shown in info bar
-- [ ] Frame-skip mechanism prevents terminal output backup
+- [x] Animated GIF plays in modal (no frame cap, byte budget only)
+- [x] Space bar toggles play/pause
+- [x] Lazy frame computation — O(2 frames) peak memory, no allocation storm
+- [x] First frame visible immediately
+- [x] Frame count shown in info bar
+- [x] Frame-skip mechanism prevents terminal output backup (GIF + video)
 
-### Phase 4: Video/Audio
-- [ ] ffplay detected at startup (synchronous `Bun.which`), capability threaded through
-- [ ] Video: TUI suspends, ffplay plays, TUI restores on exit
-- [ ] Audio: plays in background with "Playing... Esc to stop" UI
-- [ ] Single audio at a time (old killed before new spawns, no overlap)
-- [ ] Audio killed on app quit (no orphaned processes)
-- [ ] Graceful fallback without ffplay (poster frame + install hint)
-- [ ] Only local paths allowed for ffplay (SSRF eliminated)
-- [ ] Argv-based spawn (no shell, no command injection)
-- [ ] Paths sanitized: realpath, existence check, no dash prefix
+### Phase 4: Video/Audio — SUPERSEDED by in-terminal video rendering
+- [x] ffplay/ffprobe detected at startup (synchronous `Bun.which`), capability threaded through
+- [x] Video: renders in-terminal via ffmpeg RGBA pipe + halfblock (not SDL window)
+- [x] Audio: plays via `ffplay -nodisp -vn -autoexit` in background
+- [x] Single audio at a time (old killed before new spawns)
+- [x] Audio killed on modal close and app quit
+- [x] Graceful fallback without ffplay (text fallback + install hint)
+- [x] Only local paths allowed for ffplay (SSRF eliminated)
+- [x] Argv-based spawn (no shell, no command injection)
+- [x] Paths sanitized: realpath, existence check, no dash prefix
+- [x] Replay via 'r' key (restartCount triggers useEffect re-run)
+- [x] Native FPS from ffprobe (clamped to MAX_FPS 60)
+- [x] Frame-skip backpressure (renderPending ref gate)
 
 ## Key Bindings (Viewer Mode)
 

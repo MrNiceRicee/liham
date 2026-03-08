@@ -1,7 +1,7 @@
 ---
 title: "feat: Phase 6 — Kitty Graphics Protocol Images"
 type: feat
-status: active
+status: completed
 date: 2026-03-06
 deepened: 2026-03-06
 origin: docs/plans/2026-03-06-feat-phase-6-kitty-graphics-protocol-design.md

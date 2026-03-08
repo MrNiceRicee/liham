@@ -1,7 +1,7 @@
 ---
 title: "Phase 6 Continued: Quick Wins, Remote Fetch, GIF Animation, Image Links"
 type: feat
-status: active
+status: completed
 date: 2026-03-06
 origin: docs/handoffs/2026-03-06-phase-6-continued.md
 ---

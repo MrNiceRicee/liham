@@ -1,9 +1,10 @@
 ---
 title: "Media Architecture: FrameTimer, MediaPlayer, and Audio/Video IR"
 type: feat
-status: active
+status: completed
 date: 2026-03-06
 origin: docs/brainstorms/2026-03-06-media-rendering-brainstorm.md
+note: "Phases 1-4 complete. Phase 5 (Rezi renderer) on-hold — needs upstream development."
 ---
 
 # Media Architecture: FrameTimer, MediaPlayer, and Audio/Video IR
