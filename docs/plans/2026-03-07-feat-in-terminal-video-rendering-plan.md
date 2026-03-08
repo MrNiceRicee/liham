@@ -1,7 +1,7 @@
 ---
 title: In-Terminal Video Rendering
 type: feat
-status: active
+status: completed
 date: 2026-03-07
 deepened: 2026-03-07
 ---
