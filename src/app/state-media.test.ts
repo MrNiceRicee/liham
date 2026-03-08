@@ -90,6 +90,7 @@ describe('media modal actions', () => {
 			galleryHidden: false,
 			paused: false,
 			restartCount: 0,
+			seekOffset: 0,
 		})
 	})
 
@@ -108,6 +109,7 @@ describe('media modal actions', () => {
 				galleryHidden: false,
 				paused: false,
 				restartCount: 0,
+				seekOffset: 0,
 			},
 		})
 		const next = appReducer(s, { type: 'CloseMediaModal' })
@@ -137,6 +139,7 @@ describe('media modal actions', () => {
 				galleryHidden: false,
 				paused: false,
 				restartCount: 0,
+				seekOffset: 0,
 			},
 		})
 		const next = appReducer(s, { type: 'TogglePlayPause' })
@@ -146,6 +149,7 @@ describe('media modal actions', () => {
 			galleryHidden: false,
 			paused: true,
 			restartCount: 0,
+			seekOffset: 0,
 		})
 	})
 
@@ -158,6 +162,7 @@ describe('media modal actions', () => {
 				galleryHidden: false,
 				paused: true,
 				restartCount: 0,
+				seekOffset: 0,
 			},
 		})
 		const next = appReducer(s, { type: 'TogglePlayPause' })
@@ -167,6 +172,7 @@ describe('media modal actions', () => {
 			galleryHidden: false,
 			paused: false,
 			restartCount: 0,
+			seekOffset: 0,
 		})
 	})
 
@@ -185,6 +191,7 @@ describe('media modal actions', () => {
 				galleryHidden: false,
 				paused: false,
 				restartCount: 0,
+				seekOffset: 0,
 			},
 		})
 		const next = appReducer(s, { type: 'ReplayMedia' })
@@ -194,6 +201,7 @@ describe('media modal actions', () => {
 			galleryHidden: false,
 			paused: false,
 			restartCount: 1,
+			seekOffset: 0,
 		})
 	})
 
@@ -206,6 +214,7 @@ describe('media modal actions', () => {
 				galleryHidden: false,
 				paused: true,
 				restartCount: 2,
+				seekOffset: 10,
 			},
 		})
 		const next = appReducer(s, { type: 'ReplayMedia' })
@@ -215,6 +224,7 @@ describe('media modal actions', () => {
 			galleryHidden: false,
 			paused: false,
 			restartCount: 3,
+			seekOffset: 0,
 		})
 	})
 
@@ -235,6 +245,7 @@ describe('media legend entries', () => {
 				galleryHidden: false,
 				paused: false,
 				restartCount: 0,
+				seekOffset: 0,
 			},
 		})
 		const entries = legendEntries(s)
@@ -254,6 +265,7 @@ describe('media legend entries', () => {
 				galleryHidden: false,
 				paused: true,
 				restartCount: 0,
+				seekOffset: 0,
 			},
 		})
 		const entries = legendEntries(s)
@@ -273,6 +285,148 @@ describe('media legend entries', () => {
 		const entries = legendEntries(s)
 		expect(entries.some((e) => e.key === 'q' && e.label === 'quit')).toBe(true)
 		expect(entries.some((e) => e.key === 'n/N')).toBe(false)
+	})
+})
+
+describe('seekOffset state', () => {
+	test('OpenMediaModal sets seekOffset to 0', () => {
+		const s = stateWith({ mediaFocusIndex: 0 })
+		const next = appReducer(s, { type: 'OpenMediaModal' })
+		expect(next.mediaModal.kind).toBe('open')
+		if (next.mediaModal.kind === 'open') {
+			expect(next.mediaModal.seekOffset).toBe(0)
+		}
+	})
+
+	test('ReplayMedia resets seekOffset to 0', () => {
+		const s = stateWith({
+			mediaFocusIndex: 0,
+			mediaModal: {
+				kind: 'open',
+				mediaIndex: 0,
+				galleryHidden: false,
+				paused: false,
+				restartCount: 1,
+				seekOffset: 30,
+			},
+		})
+		const next = appReducer(s, { type: 'ReplayMedia' })
+		if (next.mediaModal.kind === 'open') {
+			expect(next.mediaModal.seekOffset).toBe(0)
+		}
+	})
+})
+
+describe('SeekMedia action', () => {
+	const openModal = (seekOffset = 0): AppState =>
+		stateWith({
+			mediaFocusIndex: 0,
+			mediaModal: {
+				kind: 'open',
+				mediaIndex: 0,
+				galleryHidden: false,
+				paused: false,
+				restartCount: 0,
+				seekOffset,
+			},
+		})
+
+	test('SeekMedia advances seekOffset by delta', () => {
+		const s = openModal(10)
+		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60 })
+		if (next.mediaModal.kind === 'open') {
+			expect(next.mediaModal.seekOffset).toBe(15)
+		}
+	})
+
+	test('SeekMedia retreats seekOffset by negative delta', () => {
+		const s = openModal(10)
+		const next = appReducer(s, { type: 'SeekMedia', delta: -5, duration: 60 })
+		if (next.mediaModal.kind === 'open') {
+			expect(next.mediaModal.seekOffset).toBe(5)
+		}
+	})
+
+	test('SeekMedia clamps to 0 at lower bound', () => {
+		const s = openModal(3)
+		const next = appReducer(s, { type: 'SeekMedia', delta: -10, duration: 60 })
+		if (next.mediaModal.kind === 'open') {
+			expect(next.mediaModal.seekOffset).toBe(0)
+		}
+	})
+
+	test('SeekMedia clamps to duration at upper bound', () => {
+		const s = openModal(55)
+		const next = appReducer(s, { type: 'SeekMedia', delta: 10, duration: 60 })
+		if (next.mediaModal.kind === 'open') {
+			expect(next.mediaModal.seekOffset).toBe(60)
+		}
+	})
+
+	test('SeekMedia backward at zero replays from beginning', () => {
+		const s = openModal(0)
+		const next = appReducer(s, { type: 'SeekMedia', delta: -5, duration: 60 })
+		expect(next).not.toBe(s)
+		if (next.mediaModal.kind === 'open') {
+			expect(next.mediaModal.seekOffset).toBe(0)
+			expect(next.mediaModal.restartCount).toBe(s.mediaModal.kind === 'open' ? s.mediaModal.restartCount + 1 : 1)
+		}
+	})
+
+	test('SeekMedia at upper boundary is no-op', () => {
+		const s = openModal(60)
+		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60 })
+		expect(next).toBe(s)
+	})
+
+	test('SeekMedia increments restartCount', () => {
+		const s = openModal(10)
+		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60 })
+		if (next.mediaModal.kind === 'open') {
+			expect(next.mediaModal.restartCount).toBe(1)
+		}
+	})
+
+	test('SeekMedia preserves paused state', () => {
+		const s = stateWith({
+			mediaFocusIndex: 0,
+			mediaModal: {
+				kind: 'open',
+				mediaIndex: 0,
+				galleryHidden: false,
+				paused: true,
+				restartCount: 0,
+				seekOffset: 10,
+			},
+		})
+		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60 })
+		if (next.mediaModal.kind === 'open') {
+			expect(next.mediaModal.paused).toBe(true)
+		}
+	})
+
+	test('SeekMedia no-op when modal closed', () => {
+		const s = stateWith({})
+		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60 })
+		expect(next).toBe(s)
+	})
+})
+
+describe('modal legend with seek', () => {
+	test('legend shows seek entry for open modal', () => {
+		const s = stateWith({
+			mediaFocusIndex: 0,
+			mediaModal: {
+				kind: 'open',
+				mediaIndex: 0,
+				galleryHidden: false,
+				paused: false,
+				restartCount: 0,
+				seekOffset: 0,
+			},
+		})
+		const entries = legendEntries(s)
+		expect(entries.some((e) => e.key === '</' && e.label === 'seek')).toBe(true)
 	})
 })
 
@@ -304,6 +458,7 @@ describe('selection actions', () => {
 				galleryHidden: false,
 				paused: false,
 				restartCount: 0,
+				seekOffset: 0,
 			},
 		})
 		const entries = legendEntries(s)

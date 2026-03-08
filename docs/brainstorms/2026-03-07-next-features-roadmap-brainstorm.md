@@ -2,6 +2,7 @@
 title: "Next Features Roadmap"
 type: brainstorm
 date: 2026-03-07
+updated: 2026-03-08
 origin: conversation
 ---
 
@@ -9,74 +10,48 @@ origin: conversation
 
 ## What We're Building
 
-Five features to bring liham from a media-capable previewer to a complete terminal markdown tool. Ordered by priority and dependencies.
+Features to bring liham from a media-capable previewer to a complete terminal markdown tool. Ordered by priority and dependencies.
 
 ## Priority Order
 
-| # | Feature | Priority | Effort | Dependencies |
-|---|---------|----------|--------|-------------|
-| 1 | Selection & Copy | MUST | Small | None |
-| 2 | Video V2 (progress, seek, pause) | High | Medium | None |
-| 3 | Search | High | Medium | None (but benefits from Selection infra) |
-| 4 | Bookmarks/TOC | Medium | Medium | None |
-| 5 | Math/Mermaid | Medium | Large | remark-math, unicode mapping |
+| # | Feature | Priority | Effort | Status |
+|---|---------|----------|--------|--------|
+| 1 | Selection & Copy | MUST | Small | **DONE** |
+| 2 | Video V2 (progress, seek, pause) | High | Medium | **DONE** |
+| 2b | Video Pipeline V2 (ring buffer) | High | Large | **DONE** |
+| 3 | Search | High | Medium | Planned |
+| 4 | TOC | Medium | Medium | Pending |
+| 5 | Math/Mermaid | Medium | Large | Draft |
+
+### Future / Unplanned
+
+| Feature | Priority | Effort | Notes |
+|---------|----------|--------|-------|
+| Smooth Scrubbing | Low | Medium | Keyframe cache for video-only. Audio scrubbing needs mpv. |
+| mpv IPC Backend | Low | Large | Replace ffplay for proper AV sync. JSON protocol over Unix socket. |
+| Rezi Renderer | On-hold | Large | Phase 5 of media architecture. Blocked on scroll + image bugs. |
 
 ---
 
-## 1. Selection & Copy (MUST)
+## 1. Selection & Copy — DONE
 
-### What
-Mouse drag to highlight text in preview/source panes, `y` to copy to system clipboard via OSC 52.
+Merged to main. Mouse drag selection + `y` yank to clipboard via OSC 52.
 
-### Why This Approach
-- **Deliberate copy only** — no auto-copy on mouse-up. User explicitly presses `y` (yank) after selecting. Avoids accidental clipboard overwrites.
-- **OpenTUI has full selection infrastructure** — `Selection` class, `renderer.on('selection')` event, `getSelectedText()`, `copyToClipboardOSC52()`, `selectable` prop. Just needs wiring.
-- **Minimal scope** — ~2-3 files changed. Wire selection event in `app.tsx`, add `y` key binding.
-
-### Key Decisions
-1. **Copy trigger**: `y` (vim-style yank). Not `Ctrl+C` — liham has `exitOnCtrlC: true` and changing that would break expected terminal behavior.
-2. **Selection visual**: OpenTUI handles highlight rendering natively via the Selection class.
-3. **Empty guard**: never copy empty/whitespace-only text to clipboard.
-4. **OSC 52 fallback**: if terminal doesn't support OSC 52, fail silently (fire-and-forget).
-5. **Pane scope**: selection works within a single scrollbox pane (no cross-pane drag).
-6. **`selectable` default**: verified `true` on `TextBufferRenderable` — no explicit prop needed on `<text>` elements.
-
-### Implementation Sketch
-- `y` key binding in viewer mode: check `renderer.hasSelection`, call `copyToClipboardOSC52(sel.getSelectedText())`
-- `Esc` clears active selection (added to the existing Esc priority chain: selection > modal > focus > browser > quit)
-- Selection highlighting is built-in — OpenTUI renders it natively on mouse drag
-- May need `useEffect` subscribing to `renderer.on('selection')` for state tracking (e.g., legend update)
-
-### Resolved Questions
-- **`selectable` default**: YES, defaults to `true` on `TextBufferRenderable`. No explicit prop needed.
-- **`Ctrl+C` interference**: YES, `exitOnCtrlC: true` in boot config. Using `y` for copy instead — no conflict.
-- **Cmd+C on macOS**: handled by the terminal emulator itself (never reaches the app). Liham doesn't need to intercept it.
+Plan: `docs/plans/2026-03-07-feat-selection-and-copy-plan.md`
 
 ---
 
-## 2. Video V2 — Progress, Seek, Pause
+## 2. Video V2 — DONE
 
-### What
-Full video playback controls: progress bar with elapsed/total time, left/right arrow seeking, space bar pause/resume.
+Merged to main. Progress bar, left/right seek, space pause/resume.
 
-### Why This Approach
-- **Full controls** — progress bar + seek + pause. Users expect these from any video player.
-- **Seek via ffmpeg restart** — ffmpeg's pipe output doesn't support seeking. Restart the process with `-ss` offset. Same pattern as replay (restartCount), but with a start offset.
-- **Progress tracking** — count frames in the read loop, multiply by frame duration for elapsed time. Duration already available from ffprobe metadata.
+Plans:
+- `docs/plans/2026-03-07-feat-video-v2-plan.md`
+- `docs/plans/2026-03-08-feat-video-pipeline-ring-buffer-plan.md` (ring buffer rearchitecture)
 
-### Key Decisions
-1. **Progress bar**: text-based in the gallery info bar. Format: `▓▓▓▓▓░░░░░ 1:23 / 3:45`
-2. **Seek**: left/right arrows seek ±5s (or ±10s with shift). Restart ffmpeg with `-ss` offset. Kill audio and restart at same offset.
-3. **Pause**: space bar sends `SIGSTOP` to ffmpeg process, `SIGCONT` to resume. Audio pause via `SIGSTOP`/`SIGCONT` on ffplay process.
-4. **Frame counter**: track frame count in read loop, derive elapsed = `frameCount / fps`.
-5. **Seek state**: add `seekOffset: number` to modal state (seconds). Include in useEffect deps to trigger restart.
+### Known Limitation
 
-### Resolved Questions
-- **SIGSTOP/SIGCONT**: YES, `Bun.spawn` accepts `NodeJS.Signals` including `SIGSTOP`/`SIGCONT`. `proc.kill('SIGSTOP')` works.
-
-### Open Questions
-- Audio sync after seek — restarting both ffmpeg and ffplay at the same offset should stay in sync, but drift over time is possible.
-- VFR (variable frame rate) videos — frame counting assumes constant fps. May need pts-based timing from ffmpeg output.
+Audio sync drifts slightly over time due to two independent clocks (JS setTimeout vs ffplay's audio clock). The plan documents mpv IPC as the recommended future fix.
 
 ---
 
@@ -102,9 +77,11 @@ Full video playback controls: progress bar with elapsed/total time, left/right a
 - Regex support (vim-style) or plain text only?
 - How to highlight matches in the rendered preview — IR-level injection or post-render overlay?
 
+Plan: `docs/plans/2026-03-07-feat-search-plan.md` (status: planned)
+
 ---
 
-## 4. Bookmarks / TOC
+## 4. TOC (Table of Contents)
 
 ### What
 Press `t` to toggle a floating TOC panel. Shows document headings with hierarchy. Arrow keys navigate, Enter jumps to heading.
@@ -126,6 +103,8 @@ Press `t` to toggle a floating TOC panel. Shows document headings with hierarchy
 
 ### Open Questions
 - Should TOC auto-highlight the current heading based on scroll position? (Nice-to-have, complex)
+
+Plan: `docs/plans/2026-03-07-feat-toc-plan.md` (status: pending)
 
 ---
 
@@ -151,30 +130,18 @@ Render LaTeX math blocks as Unicode symbols. Render Mermaid diagrams as images o
 - Mermaid-cli is heavy (~200MB). Is it acceptable as an optional dependency?
 - Should mermaid rendering be cached (same diagram = same image)?
 
+Plan: `docs/plans/2026-03-07-feat-math-mermaid-plan.md` (status: draft)
+
 ---
 
 ## Dependencies Between Features
 
 ```
-Selection & Copy ──→ (none, ship first)
-                        │
-Video V2 ──────────→ (none, independent)
-                        │
-Search ────────────→ (benefits from Selection's selectable verification,
-                      but no hard dependency)
-                        │
-TOC ───────────────→ (benefits from Search's scroll-to-element pattern,
-                      but no hard dependency)
-                        │
-Math/Mermaid ──────→ (extends pipeline, independent of UI features)
+Selection & Copy ──→ DONE
+Video V2 ──────────→ DONE
+Search ────────────→ next up (benefits from Selection's selectable verification)
+TOC ───────────────→ after Search (benefits from scroll-to-element pattern)
+Math/Mermaid ──────→ independent (extends pipeline)
 ```
 
 No hard dependencies — features can be built in any order. Recommended order follows priority table above.
-
-## Implementation Timeline
-
-1. **Selection & Copy** — small scope, ship on this branch or next
-2. **Video V2** — medium scope, own branch
-3. **Search** — medium scope, own branch
-4. **TOC** — medium scope, own branch (can parallel with Search)
-5. **Math/Mermaid** — large scope, own branch, lower priority

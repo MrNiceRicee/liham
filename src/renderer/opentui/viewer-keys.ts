@@ -56,12 +56,14 @@ export const VIEWER_SHIFT_KEY_MAP: Record<
 	},
 }
 
+
 // modal key handler — called when modal is open, swallows all non-modal keys
 export function handleModalKey(
 	key: KeyEvent,
 	_state: AppState,
 	dispatch: React.Dispatch<AppAction>,
 	mediaCount: number,
+	videoDuration = 0,
 ): AppAction | null {
 	switch (key.name) {
 		case 'escape':
@@ -84,6 +86,12 @@ export function handleModalKey(
 			return { type: 'ToggleGallery' }
 		case 'space':
 			return { type: 'TogglePlayPause' }
+		case 'left':
+			if (videoDuration <= 0) return null
+			return { type: 'SeekMedia', delta: key.shift ? -5 : -1, duration: videoDuration }
+		case 'right':
+			if (videoDuration <= 0) return null
+			return { type: 'SeekMedia', delta: key.shift ? 5 : 1, duration: videoDuration }
 		case 'q':
 			return { type: 'Quit' }
 		default:

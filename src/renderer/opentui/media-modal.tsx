@@ -3,39 +3,35 @@
 // media info (filename, type, frame count) lives in the gallery panel, not here.
 
 import { resolve } from 'node:path'
-import {
-	type ReactNode,
-	useCallback,
-	useContext,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react'
+import { type ReactNode, useContext, useEffect, useRef, useState } from 'react'
 
 import type { MediaIRNode } from '../../ir/types.ts'
-import type { AnimationLimits } from '../../media/decoder.ts'
+import { checkBufferEnd, fillRingBuffer } from '../../media/fill-ring-buffer.ts'
 import { killActiveAudio, playAudio } from '../../media/ffplay.ts'
 import { createFrameTimer, type FrameTimerHandle } from '../../media/frame-timer.ts'
 import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
+import { createRingBuffer, type RingBuffer } from '../../media/ring-buffer.ts'
 import type { LoadedImage, MediaCapabilities } from '../../media/types.ts'
 import {
+	type VideoMetadata,
 	computeVideoDimensions,
 	createVideoStream,
+	pauseActiveVideo,
 	probeVideo,
-	readFrames,
+	resumeActiveVideo,
 } from '../../media/video-decoder.ts'
 import { sanitizeForTerminal } from '../../pipeline/sanitize.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import { ImageContext } from './image-context.tsx'
 import type { MediaEntry } from './index.tsx'
-import { useImageLoader } from './use-image-loader.ts'
+import { type FrameInfo, ModalHalfBlockRows, ModalImageContent } from './modal-image.tsx'
 
-// modal: no frame cap, 30MB byte budget is the only guard
-const MODAL_ANIMATION_LIMITS: AnimationLimits = {
-	maxFrames: Infinity,
-	maxDecodedBytes: 30 * 1024 * 1024,
-}
+export type { FrameInfo }
+
+const debug =
+	process.env['LIHAM_DEBUG'] === '1'
+		? (msg: string) => process.stderr.write(`[media-modal] ${msg}\n`)
+		: () => {}
 
 // -- helpers --
 
@@ -44,204 +40,35 @@ function mediaUrl(node: MediaIRNode): string | undefined {
 	return node.src
 }
 
-// -- half-block rows for modal (reused from image.tsx pattern) --
-
-function ModalHalfBlockRows({
-	rows,
-	width,
-}: {
-	readonly rows: MergedSpan[][]
-	readonly width: number
-}): ReactNode {
-	return (
-		<box style={{ height: rows.length, width, justifyContent: 'center' }}>
-			{rows.map((spans, rowIdx) => (
-				<text key={`mhb-${String(rowIdx)}`}>
-					{spans.map((s, sIdx) => {
-						const props: Record<string, unknown> = {}
-						if (s.bg.length > 0) props['bg'] = s.bg
-						if (s.fg.length > 0) props['fg'] = s.fg
-						return (
-							<span key={`ms-${String(rowIdx)}-${String(sIdx)}`} {...props}>
-								{s.text}
-							</span>
-						)
-					})}
-				</text>
-			))}
-		</box>
-	)
+export interface VideoPlaybackInfo {
+	elapsed: number // seconds
+	duration: number // seconds, 0 if unknown
+	paused: boolean
 }
 
-// -- lazy pre-computed halfblock grids for animation --
+// -- render a single RGBA frame to a half-block grid --
 
-function computeGrid(image: LoadedImage, frameIndex: number, bgColor: string): MergedSpan[][] {
-	const frame = image.frames?.[frameIndex]
-	if (frame == null) return renderHalfBlockMerged(image, bgColor)
-	// build a single-frame LoadedImage view for renderHalfBlockMerged
-	const frameView: LoadedImage = { ...image, rgba: frame }
-	return renderHalfBlockMerged(frameView, bgColor)
-}
-
-function useFrameGridCache(image: LoadedImage | null, bgColor: string) {
-	const cacheRef = useRef(new Map<number, MergedSpan[][]>())
-
-	// reset cache when image changes
-	useEffect(() => {
-		cacheRef.current = new Map()
-	}, [image])
-
-	const getGrid = useCallback(
-		(frameIndex: number): MergedSpan[][] => {
-			if (image == null) return []
-			const cached = cacheRef.current.get(frameIndex)
-			if (cached != null) return cached
-			const grid = computeGrid(image, frameIndex, bgColor)
-			cacheRef.current.set(frameIndex, grid)
-			return grid
-		},
-		[image, bgColor],
-	)
-
-	// pre-compute the next frame in a microtask
-	const precomputeNext = useCallback(
-		(currentIndex: number) => {
-			if (image?.frames == null) return
-			const next = (currentIndex + 1) % image.frames.length
-			if (!cacheRef.current.has(next)) {
-				setTimeout(() => {
-					if (image.frames == null) return
-					const grid = computeGrid(image, next, bgColor)
-					cacheRef.current.set(next, grid)
-				}, 0)
-			}
-		},
-		[image, bgColor],
-	)
-
-	return { getGrid, precomputeNext }
-}
-
-// -- modal image content --
-
-export interface FrameInfo {
-	frameCount: number
-	capped: boolean
-}
-
-function ModalImageContent({
-	url,
-	alt,
-	theme,
-	maxCols,
-	maxRows,
-	paused,
-	onFrameInfo,
-}: {
-	readonly url: string | undefined
-	readonly alt: string
-	readonly theme: ThemeTokens
-	readonly maxCols: number
-	readonly maxRows: number
-	readonly paused: boolean
-	readonly onFrameInfo: (info: FrameInfo | null) => void
-}): ReactNode {
-	const ctx = useContext(ImageContext)
-	const modalCtx = useMemo(
-		() =>
-			ctx != null ? { ...ctx, maxCols, maxRows, animationLimits: MODAL_ANIMATION_LIMITS } : null,
-		[ctx, maxCols, maxRows],
-	)
-	const { state, image } = useImageLoader(url, modalCtx, true)
-
-	// animation state
-	const [frameIndex, setFrameIndex] = useState(0)
-	const timerRef = useRef<FrameTimerHandle | null>(null)
-	const renderPendingRef = useRef(false)
-	const { getGrid, precomputeNext } = useFrameGridCache(image, ctx?.bgColor ?? '')
-
-	const isAnimated = image?.frames != null && image.frames.length > 1
-
-	// clear renderPending after React commits (frame-skip backpressure)
-	useEffect(() => {
-		renderPendingRef.current = false
-	})
-
-	// report frame info to parent for info bar
-	useEffect(() => {
-		if (isAnimated) {
-			onFrameInfo({ frameCount: image.frames!.length, capped: false })
-		} else {
-			onFrameInfo(null)
-		}
-	}, [image, isAnimated])
-
-	// start/stop frame timer
-	useEffect(() => {
-		if (!isAnimated || image?.delays == null) return
-		setFrameIndex(0)
-
-		const timer = createFrameTimer({
-			delays: image.delays,
-			onFrame: (idx) => {
-				if (renderPendingRef.current) return // frame-skip: previous render not flushed
-				renderPendingRef.current = true
-				setFrameIndex(idx)
-				precomputeNext(idx)
-			},
-			loop: true,
-		})
-		timerRef.current = timer
-		// pre-compute first two frames eagerly
-		getGrid(0)
-		precomputeNext(0)
-		timer.play()
-
-		return () => {
-			timer.dispose()
-			timerRef.current = null
-		}
-	}, [image])
-
-	// react to external play/pause toggle
-	useEffect(() => {
-		const timer = timerRef.current
-		if (timer == null) return
-		if (paused && timer.state === 'playing') timer.pause()
-		if (!paused && timer.state === 'paused') timer.play()
-	}, [paused])
-
-	if (ctx == null || url == null || ctx.capabilities.protocol === 'text') {
-		return (
-			<text>
-				<span fg={theme.image.fallbackColor}>[image: {sanitizeForTerminal(alt)}]</span>
-			</text>
-		)
+function renderFrame(rgba: Uint8Array, dims: VideoDimensions, src: string, bgColor: string): MergedSpan[][] {
+	const image: LoadedImage = {
+		rgba,
+		width: dims.pixelWidth,
+		height: dims.pixelHeight,
+		terminalCols: dims.termCols,
+		terminalRows: dims.termRows,
+		byteSize: rgba.byteLength,
+		source: src,
 	}
-
-	if (state === 'loading' || state === 'idle') {
-		return (
-			<text>
-				<span fg={theme.image.fallbackColor}>[loading: {sanitizeForTerminal(alt)}]</span>
-			</text>
-		)
-	}
-
-	if (state === 'error' || image == null) {
-		return (
-			<text>
-				<span fg={theme.image.fallbackColor}>[image: {sanitizeForTerminal(alt)}]</span>
-			</text>
-		)
-	}
-
-	const rows = isAnimated ? getGrid(frameIndex) : renderHalfBlockMerged(image, ctx.bgColor)
-	return <ModalHalfBlockRows rows={rows} width={image.terminalCols} />
+	return renderHalfBlockMerged(image, bgColor)
 }
 
 // -- modal video content --
 
 type PlaybackState = 'loading' | 'playing' | 'error' | 'ended'
+
+type VideoDimensions = NonNullable<ReturnType<typeof computeVideoDimensions>>
+
+// ring buffer capacity — capped by 30MB memory budget in createRingBuffer
+const RING_BUFFER_CAPACITY = 30
 
 function ModalVideoContent({
 	src,
@@ -252,6 +79,9 @@ function ModalVideoContent({
 	basePath,
 	bgColor,
 	restartCount,
+	seekOffset,
+	paused,
+	onVideoInfo,
 }: {
 	readonly src: string
 	readonly alt: string
@@ -261,6 +91,9 @@ function ModalVideoContent({
 	readonly basePath: string
 	readonly bgColor: string
 	readonly restartCount: number
+	readonly seekOffset: number
+	readonly paused: boolean
+	readonly onVideoInfo: (info: VideoPlaybackInfo | null) => void
 }): ReactNode {
 	const loadIdRef = useRef(0)
 	const renderPendingRef = useRef(false)
@@ -268,91 +101,179 @@ function ModalVideoContent({
 	const [gridWidth, setGridWidth] = useState(0)
 	const [playbackState, setPlaybackState] = useState<PlaybackState>('loading')
 
+	// cached probe result — survives across seek/resize, only re-probed on src change
+	const [probeCache, setProbeCache] = useState<{ meta: VideoMetadata; absPath: string } | null>(null)
+
+	// refs for timer and buffer — needed for pause/resume effect
+	const timerRef = useRef<FrameTimerHandle | null>(null)
+	const bufferRef = useRef<RingBuffer | null>(null)
+
+	// audio resync context — ref avoids adding deps to pause effect
+	const audioCtxRef = useRef<{ absPath: string; basePath: string; fps: number; hasAudio: boolean; seekOffset: number } | null>(null)
+
 	// clear renderPending after React commits (NOT queueMicrotask)
 	useEffect(() => {
 		renderPendingRef.current = false
 	})
 
+	// probe effect — runs once per video source, caches metadata
 	useEffect(() => {
-		const thisLoadId = ++loadIdRef.current
-		const isStale = () => loadIdRef.current !== thisLoadId
+		setProbeCache(null)
+		setPlaybackState('loading')
 		const controller = new AbortController()
-		let proc: ReturnType<typeof Bun.spawn> | null = null
-		let audioStarted = false
-
-		// resolve path once — both ffprobe and ffmpeg need the absolute path
 		const absPath = resolve(basePath, src)
 
 		void (async () => {
-			// 1. probe (uses absPath; sanitizeMediaPath re-validates internally)
 			const result = await probeVideo(absPath, basePath, controller.signal)
-			if (isStale() || !result.ok) {
-				if (!isStale()) setPlaybackState('error')
+			if (controller.signal.aborted) return
+			if (!result.ok) {
+				setPlaybackState('error')
 				return
 			}
-			const meta = result.value
+			setProbeCache({ meta: result.value, absPath })
+		})()
 
-			// 2. compute dimensions
-			const dims = computeVideoDimensions(meta.width, meta.height, maxCols, maxRows)
-			if (dims == null || isStale()) return
+		return () => {
+			controller.abort()
+		}
+	}, [src, basePath])
 
-			// 3. start video stream at native fps
-			proc = createVideoStream({
-				filePath: absPath,
-				width: dims.pixelWidth,
-				height: dims.pixelHeight,
-				fps: meta.fps,
-			})
+	// stream effect — ring buffer producer + timer-driven consumer
+	useEffect(() => {
+		if (probeCache == null) return
 
-			// 4. start audio (through playAudio, not inline spawn)
-			if (meta.hasAudio) {
-				void playAudio(absPath, basePath)
-				audioStarted = true
-			}
+		const { meta, absPath } = probeCache
+		const dims = computeVideoDimensions(meta.width, meta.height, maxCols, maxRows)
+		if (dims == null) return
 
-			// 5. frame read loop
-			setPlaybackState('playing')
-			setGridWidth(dims.termCols)
-			const frameSize = dims.pixelWidth * dims.pixelHeight * 4
+		const thisLoadId = ++loadIdRef.current
+		const isStale = () => loadIdRef.current !== thisLoadId
+		const frameSize = dims.pixelWidth * dims.pixelHeight * 4
+		let audioStarted = false
 
-			for await (const rgba of readFrames(proc.stdout as ReadableStream<Uint8Array>, frameSize)) {
-				if (isStale()) break
-				if (renderPendingRef.current) continue // frame skip
+		// create ring buffer + timer
+		const buffer = createRingBuffer(RING_BUFFER_CAPACITY, frameSize)
+		bufferRef.current = buffer
 
-				const image: LoadedImage = {
-					rgba,
-					width: dims.pixelWidth,
-					height: dims.pixelHeight,
-					terminalCols: dims.termCols,
-					terminalRows: dims.termRows,
-					byteSize: rgba.byteLength,
-					source: src,
+		setGridWidth(dims.termCols)
+		setPlaybackState('playing')
+		audioCtxRef.current = { absPath, basePath, fps: meta.fps, hasAudio: meta.hasAudio, seekOffset }
+
+		const proc = createVideoStream({
+			filePath: absPath,
+			width: dims.pixelWidth,
+			height: dims.pixelHeight,
+			fps: meta.fps,
+			seekOffset,
+		})
+
+		// consumer: timer-driven rendering from ring buffer
+		const timer = createFrameTimer({
+			delays: [1000 / meta.fps],
+			onFrame: () => {
+				if (renderPendingRef.current) return // backpressure: skip if React hasn't committed
+
+				const frame = buffer.read()
+				if (frame == null) {
+					// underrun — check if stream has ended
+					const status = checkBufferEnd(buffer)
+					if (status !== 'playing') setPlaybackState(status)
+					return
 				}
-				const grid = renderHalfBlockMerged(image, bgColor)
+
+				const grid = renderFrame(frame, dims, src, bgColor)
 				renderPendingRef.current = true
+				setCurrentGrid(grid)
+
+				// report elapsed time
+				const elapsed = seekOffset + timer.tickCount / meta.fps
+				onVideoInfo({ elapsed, duration: meta.duration, paused: false })
+			},
+			loop: true,
+		})
+		timerRef.current = timer
+
+		// start producer — fills ring buffer from ffmpeg stdout
+		void fillRingBuffer({
+			stdout: proc.stdout as ReadableStream<Uint8Array>,
+			buffer,
+			frameSize,
+			fps: meta.fps,
+			isStale,
+			onEvent: (event) => {
+				if (isStale()) return
+				if (event.type === 'ended' || event.type === 'error') {
+					debug(`producer ${event.type}`)
+				}
+			},
+		})
+
+		// render first frame as soon as it arrives, then start timer
+		void (async () => {
+			// wait for first frame — poll briefly
+			for (let i = 0; i < 100 && !isStale(); i++) {
+				if (!buffer.empty) break
+				await new Promise((r) => setTimeout(r, 10))
+			}
+			if (isStale()) return
+
+			const firstFrame = buffer.read()
+			if (firstFrame != null) {
+				const grid = renderFrame(firstFrame, dims, src, bgColor)
 				setCurrentGrid(grid)
 			}
 
-			// 6. check exit code for error vs normal end
-			if (!isStale() && proc != null) {
-				const exitCode = await proc.exited
-				setPlaybackState(exitCode === 0 ? 'ended' : 'error')
+			// start audio then timer — await spawn so they begin together
+			if (meta.hasAudio) {
+				const result = await playAudio(absPath, basePath, seekOffset)
+				if (isStale()) return
+				if (result.ok) audioStarted = true
 			}
+			timer.play()
 		})()
 
 		return () => {
 			loadIdRef.current++ // mark stale
-			controller.abort() // cancel in-flight probeVideo
-			if (proc != null) {
-				try {
-					proc.kill('SIGKILL')
-				} catch {
-					/* already dead */
-				}
+			timer.dispose()
+			timerRef.current = null
+			buffer.flush()
+			bufferRef.current = null
+			// force-close pipe reader to prevent stale producer from draining
+			void (proc.stdout as ReadableStream<Uint8Array>).cancel().catch(() => {
+				/* already closed */
+			})
+			try {
+				proc.kill('SIGKILL')
+			} catch {
+				/* already dead */
 			}
 			if (audioStarted) void killActiveAudio()
 		}
-	}, [src, basePath, maxCols, maxRows, restartCount])
+	}, [probeCache, maxCols, maxRows, restartCount, seekOffset])
+
+	// react to external pause/resume toggle
+	useEffect(() => {
+		debug(`pause effect: paused=${String(paused)}`)
+		const timer = timerRef.current
+		if (timer != null) {
+			if (paused && timer.state === 'playing') timer.pause()
+			if (!paused && timer.state === 'paused') timer.play()
+		}
+		if (paused) {
+			pauseActiveVideo()
+			// kill audio immediately — SIGSTOP leaves OS audio buffers playing
+			void killActiveAudio()
+		} else {
+			resumeActiveVideo()
+			// start fresh audio at current video position (playAudio handles kill internally)
+			const ctx = audioCtxRef.current
+			if (ctx?.hasAudio && timer != null) {
+				const elapsed = ctx.seekOffset + timer.tickCount / ctx.fps
+				debug(`audio resync: elapsed=${String(elapsed.toFixed(2))}s`)
+				void playAudio(ctx.absPath, ctx.basePath, elapsed)
+			}
+		}
+	}, [paused])
 
 	if (playbackState === 'loading') {
 		return (
@@ -414,8 +335,10 @@ export interface MediaModalProps {
 	readonly termHeight: number
 	readonly paused: boolean
 	readonly restartCount: number
+	readonly seekOffset: number
 	readonly mediaCapabilities: MediaCapabilities
 	readonly onFrameInfo: (info: FrameInfo | null) => void
+	readonly onVideoInfo: (info: VideoPlaybackInfo | null) => void
 }
 
 export function MediaModal({
@@ -426,8 +349,10 @@ export function MediaModal({
 	termHeight,
 	paused,
 	restartCount,
+	seekOffset,
 	mediaCapabilities,
 	onFrameInfo,
+	onVideoInfo,
 }: MediaModalProps): ReactNode {
 	const entry = mediaNodes[mediaIndex]
 	if (entry == null) return null
@@ -461,6 +386,9 @@ export function MediaModal({
 					basePath={ctx?.basePath ?? process.cwd()}
 					bgColor={ctx?.bgColor ?? ''}
 					restartCount={restartCount}
+					seekOffset={seekOffset}
+					paused={paused}
+					onVideoInfo={onVideoInfo}
 				/>
 			)
 		}

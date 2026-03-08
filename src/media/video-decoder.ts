@@ -3,6 +3,11 @@
 import { sanitizeMediaPath } from './ffplay.ts'
 import type { ImageResult } from './types.ts'
 
+const debug =
+	process.env['LIHAM_DEBUG'] === '1'
+		? (msg: string) => process.stderr.write(`[video-decoder] ${msg}\n`)
+		: () => {}
+
 // -- types --
 
 export interface VideoMetadata {
@@ -18,6 +23,7 @@ export interface VideoStreamOptions {
 	width: number // target pixel width (= terminal cols), max 2048
 	height: number // target pixel height (= terminal rows * 2, must be even), max 2048
 	fps: number // target fps (default 10)
+	seekOffset?: number // -ss value in seconds (input-level seek)
 }
 
 export interface VideoDimensions {
@@ -273,11 +279,41 @@ export function computeVideoDimensions(
 // -- frame streaming --
 
 let activeVideoProc: ReturnType<typeof Bun.spawn> | null = null
+let videoStopped = false
+
+export function pauseActiveVideo(): void {
+	debug(`pauseActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}`)
+	if (activeVideoProc != null && !videoStopped) {
+		try {
+			process.kill(activeVideoProc.pid, 'SIGSTOP')
+			videoStopped = true
+		} catch {
+			/* already dead */
+		}
+	}
+}
+
+export function resumeActiveVideo(): void {
+	debug(`resumeActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}`)
+	if (activeVideoProc != null && videoStopped) {
+		try {
+			process.kill(activeVideoProc.pid, 'SIGCONT')
+			videoStopped = false
+		} catch {
+			/* already dead */
+		}
+	}
+}
 
 export async function killActiveVideo(): Promise<void> {
 	if (activeVideoProc == null) return
 	const proc = activeVideoProc
 	activeVideoProc = null
+	// must resume stopped process before SIGTERM (stopped processes can't handle signals)
+	if (videoStopped) {
+		proc.kill('SIGCONT')
+		videoStopped = false
+	}
 	proc.kill('SIGTERM')
 	await Promise.race([proc.exited, new Promise((r) => setTimeout(r, 500))])
 	try {
@@ -288,7 +324,12 @@ export async function killActiveVideo(): Promise<void> {
 }
 
 export function createVideoStream(options: VideoStreamOptions): ReturnType<typeof Bun.spawn> {
-	const { filePath, width, height, fps } = options
+	const { filePath, width, height, fps, seekOffset } = options
+
+	// validate seekOffset
+	if (seekOffset != null && (!Number.isFinite(seekOffset) || seekOffset < 0)) {
+		throw new Error('invalid seek offset')
+	}
 
 	// validate dimensions
 	if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
@@ -307,39 +348,34 @@ export function createVideoStream(options: VideoStreamOptions): ReturnType<typeo
 	// kill any existing video process before starting new
 	if (activeVideoProc != null) {
 		try {
+			if (videoStopped) activeVideoProc.kill('SIGCONT')
 			activeVideoProc.kill('SIGKILL')
 		} catch {
 			/* already dead */
 		}
 		activeVideoProc = null
+		videoStopped = false
 	}
 
-	const proc = Bun.spawn(
-		[
-			'ffmpeg',
-			'-re',
-			'-readrate_initial_burst',
-			'0.5',
-			'-v',
-			'quiet',
-			'-i',
-			filePath,
-			'-f',
-			'rawvideo',
-			'-pix_fmt',
-			'rgba',
-			'-vf',
-			vf,
-			'pipe:1',
-		],
-		{ stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' },
-	)
+	// build args — prepend -ss before -i for input-level seek (fast keyframe seeking)
+	// no -re: pacing is application-controlled via frame-interval sleep in runFrameLoop.
+	// -re uses wall clock, which breaks SIGSTOP pause (ffmpeg catches up on resume).
+	const args = ['ffmpeg', '-v', 'quiet']
+	if (seekOffset != null && seekOffset > 0) {
+		args.push('-ss', String(seekOffset))
+	}
+	args.push('-i', filePath, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-vf', vf, 'pipe:1')
+
+	const proc = Bun.spawn(args, { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' })
 
 	activeVideoProc = proc
 
-	// clean up reference when process exits
+	// clean up reference when process exits + reset stopped flag
 	void proc.exited.then(() => {
-		if (activeVideoProc === proc) activeVideoProc = null
+		if (activeVideoProc === proc) {
+			activeVideoProc = null
+			videoStopped = false
+		}
 	})
 
 	return proc

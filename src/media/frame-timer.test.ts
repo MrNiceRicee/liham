@@ -231,4 +231,88 @@ describe('createFrameTimer', () => {
 		flushTimers(200)
 		expect(frames).toEqual([0])
 	})
+
+	test('tickCount starts at 0 and increments on each frame callback', () => {
+		const timer = createFrameTimer({ delays: [100, 100], onFrame: () => {} })
+		expect(timer.tickCount).toBe(0)
+
+		timer.play() // fires onFrame(0) — play doesn't increment tickCount
+		expect(timer.tickCount).toBe(0)
+
+		flushNextTimer() // frame 1
+		expect(timer.tickCount).toBe(1)
+
+		flushNextTimer() // frame 0 (loop)
+		expect(timer.tickCount).toBe(2)
+
+		timer.dispose()
+	})
+
+	test('tickCount resets on play after ended', () => {
+		const timer = createFrameTimer({
+			delays: [100, 100],
+			onFrame: () => {},
+			loop: false,
+		})
+		timer.play()
+		flushNextTimer() // frame 1
+		flushNextTimer() // ended
+		expect(timer.tickCount).toBe(1)
+
+		timer.play() // restart
+		expect(timer.tickCount).toBe(0)
+
+		timer.dispose()
+	})
+
+	test('constant-interval mode uses Pattern B (single delay)', () => {
+		const frames: number[] = []
+		const timer = createFrameTimer({ delays: [33], onFrame: (i) => frames.push(i) })
+		timer.play()
+		expect(frames).toEqual([0])
+
+		flushNextTimer() // +33ms
+		expect(frames).toEqual([0, 0])
+
+		flushNextTimer() // +33ms
+		expect(frames).toEqual([0, 0, 0])
+
+		expect(timer.tickCount).toBe(2)
+		timer.dispose()
+	})
+
+	test('Pattern B catches up after overload to maintain AV sync', () => {
+		// simulate a 33ms interval where render falls behind
+		const frames: number[] = []
+		const timer = createFrameTimer({ delays: [33], onFrame: (i) => frames.push(i) })
+		timer.play() // fires frame 0 at t=0
+		expect(frames.length).toBe(1)
+
+		// advance to t=33, timer fires normally
+		flushNextTimer()
+		expect(frames.length).toBe(2)
+
+		// advance to t=66, fires normally again
+		flushNextTimer()
+		expect(frames.length).toBe(3)
+		expect(timer.tickCount).toBe(2)
+
+		timer.dispose()
+	})
+
+	test('Pattern B skips forward after long suspension', () => {
+		// simulate process suspended for many frames
+		const frames: number[] = []
+		const timer = createFrameTimer({ delays: [33], onFrame: (i) => frames.push(i) })
+		timer.play() // fires frame 0 at t=0
+
+		// jump far into the future (simulating process suspension)
+		mockNow = 500
+		flushTimers(0) // fire the pending 33ms timer at the new time
+
+		// should not cascade hundreds of catch-up ticks
+		expect(frames.length).toBeLessThanOrEqual(5)
+
+		timer.dispose()
+	})
 })

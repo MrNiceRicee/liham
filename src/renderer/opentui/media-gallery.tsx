@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
 import type { MediaIRNode } from '../../ir/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import type { MediaEntry } from './index.tsx'
-import type { FrameInfo } from './media-modal.tsx'
+import type { FrameInfo, VideoPlaybackInfo } from './media-modal.tsx'
 
 // -- helpers --
 
@@ -51,6 +51,28 @@ function mediaTypeLabel(node: MediaIRNode): string {
 	return node.type === 'video' ? 'video' : 'audio'
 }
 
+export function formatTimestamp(seconds: number): string {
+	const total = Math.floor(Math.max(0, seconds))
+	const h = Math.floor(total / 3600)
+	const m = Math.floor((total % 3600) / 60)
+	const s = total % 60
+	if (h > 0) return `${String(h)}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+	return `${String(m)}:${String(s).padStart(2, '0')}`
+}
+
+export function formatProgressBar(elapsed: number, duration: number, barWidth: number): string {
+	const elapsedStr = formatTimestamp(elapsed)
+	if (duration <= 0) return elapsedStr
+	const durationStr = formatTimestamp(duration)
+	const timeText = ` ${elapsedStr} / ${durationStr}`
+	const availableBar = barWidth - timeText.length
+	if (availableBar < 3) return `${elapsedStr} / ${durationStr}`
+	const ratio = Math.min(1, Math.max(0, elapsed / duration))
+	const filled = Math.round(ratio * availableBar)
+	const empty = availableBar - filled
+	return `${'~'.repeat(filled)}${'o'.repeat(empty)}${timeText}`
+}
+
 function formatMediaInfo(node: MediaIRNode, frameInfo: FrameInfo | null, paused: boolean): string {
 	const parts = [mediaTypeLabel(node)]
 	if (frameInfo != null) {
@@ -65,12 +87,13 @@ export function galleryDimensions(
 	mediaCount: number,
 	termWidth: number,
 	hasInfo = false,
+	hasProgress = false,
 ): { width: number; height: number } {
 	if (mediaCount === 0) return { width: 0, height: 0 }
 	const maxVisible = Math.min(mediaCount, 8)
 	return {
 		width: Math.min(40, Math.floor(termWidth * 0.4)),
-		height: maxVisible + 3 + (hasInfo ? 1 : 0),
+		height: maxVisible + 3 + (hasInfo ? 1 : 0) + (hasProgress ? 1 : 0),
 	}
 }
 
@@ -84,6 +107,7 @@ export interface MediaGalleryProps {
 	readonly termHeight: number
 	readonly frameInfo?: FrameInfo | null
 	readonly paused?: boolean
+	readonly videoInfo?: VideoPlaybackInfo | null
 }
 
 export function MediaGallery({
@@ -94,13 +118,15 @@ export function MediaGallery({
 	termHeight: _termHeight,
 	frameInfo,
 	paused = false,
+	videoInfo,
 }: MediaGalleryProps): ReactNode {
 	if (mediaNodes.length === 0) return null
 
 	const hasInfo = frameInfo != null
+	const hasProgress = videoInfo != null
 	const maxVisible = Math.min(mediaNodes.length, 8)
-	// +2 for top border + title row, +1 for bottom border, +1 if showing info
-	const galleryHeight = maxVisible + 3 + (hasInfo ? 1 : 0)
+	// +2 for top border + title row, +1 for bottom border, +1 if showing info, +1 if progress
+	const galleryHeight = maxVisible + 3 + (hasInfo ? 1 : 0) + (hasProgress ? 1 : 0)
 	const galleryWidth = Math.min(40, Math.floor(termWidth * 0.4))
 	const labelWidth = galleryWidth - 4 // border + padding
 
@@ -162,6 +188,13 @@ export function MediaGallery({
 				<text>
 					<span fg={theme.pane.focusedBorderColor}>
 						{` ${truncate(formatMediaInfo(mediaNodes[focusedIndex]!.node, frameInfo, paused), labelWidth)}`}
+					</span>
+				</text>
+			)}
+			{hasProgress && (
+				<text>
+					<span fg={theme.pane.focusedBorderColor}>
+						{` ${formatProgressBar(videoInfo.elapsed, videoInfo.duration, labelWidth)}`}
 					</span>
 				</text>
 			)}

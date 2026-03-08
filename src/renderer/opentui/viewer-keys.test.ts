@@ -59,6 +59,7 @@ describe('escape selection priority', () => {
 				galleryHidden: false,
 				paused: false,
 				restartCount: 0,
+				seekOffset: 0,
 			},
 		})
 		const dispatched: string[] = []
