@@ -4,12 +4,11 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 import type { ReactNode, RefObject } from 'react'
 
 import type { AppAction, AppState } from '../../app/state.ts'
-import type { FuzzyMatch } from '../../browser/fuzzy.ts'
-import type { ThemeTokens } from '../../theme/types.ts'
-
 import { paneDimensions } from '../../app/state.ts'
+import type { FuzzyMatch } from '../../browser/fuzzy.ts'
 import { scanDirectory } from '../../browser/scanner.ts'
 import { processMarkdown } from '../../pipeline/processor.ts'
+import type { ThemeTokens } from '../../theme/types.ts'
 import { createDirectoryWatcher, createFileWatcher } from '../../watcher/watcher.ts'
 import { type MediaEntry, renderToOpenTUI, renderToOpenTUIWithMedia } from './index.tsx'
 

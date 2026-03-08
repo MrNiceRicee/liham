@@ -3,9 +3,8 @@
 // renderer-agnostic: decodes all frames for animated GIFs.
 // renderers choose whether to animate or show static first frame.
 
-import type { ImageResult, LoadedImage } from './types.ts'
-
 import { createSemaphore } from './semaphore.ts'
+import type { ImageResult, LoadedImage } from './types.ts'
 
 const MAX_DECODED_PIXELS = 25_000_000
 const MIN_FRAME_DELAY_MS = 100 // browser convention for delay <= 10ms
@@ -191,12 +190,10 @@ async function decodeInternal(
 		}
 
 		const targetWidth = purpose === 'halfblock' ? targetCols : targetCols * cellPixelWidth
-		const targetHeight =
-			maxRows != null
-				? purpose === 'halfblock'
-					? maxRows * 2
-					: maxRows * cellPixelHeight
-				: undefined
+		let targetHeight: number | undefined
+		if (maxRows != null) {
+			targetHeight = purpose === 'halfblock' ? maxRows * 2 : maxRows * cellPixelHeight
+		}
 		const pageCount = typeof meta.pages === 'number' ? meta.pages : 1
 
 		if (pageCount > 1) {

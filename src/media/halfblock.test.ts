@@ -1,8 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-
-import type { LoadedImage } from './types.ts'
-
 import { renderHalfBlock } from './halfblock.ts'
+import type { LoadedImage } from './types.ts'
 
 function makeImage(width: number, height: number, rgba: number[]): LoadedImage {
 	return {

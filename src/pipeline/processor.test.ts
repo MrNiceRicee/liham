@@ -2,11 +2,9 @@ import { describe, expect, it } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Children, isValidElement, type ReactElement, type ReactNode } from 'react'
-
-import type { PipelineResult, PipelineSuccess } from '../types/pipeline.ts'
-
 import { renderToOpenTUI } from '../renderer/opentui/index.tsx'
 import { darkTheme } from '../theme/dark.ts'
+import type { PipelineResult, PipelineSuccess } from '../types/pipeline.ts'
 import { processMarkdown } from './processor.ts'
 
 // -- tree walking helpers --

@@ -4,10 +4,6 @@
 import type { BoxRenderable, ScrollBoxRenderable } from '@opentui/core'
 
 import { type RefObject, useEffect, useRef, useState } from 'react'
-
-import type { ImageResult, LoadedFile, LoadedImage, RemoteFile } from '../../media/types.ts'
-import type { ImageContextValue } from './image-context.tsx'
-
 import {
 	createImageCache,
 	type ImageCache,
@@ -18,6 +14,8 @@ import { type AnimationLimits, decodeImage } from '../../media/decoder.ts'
 import { fetchRemoteImage } from '../../media/fetcher.ts'
 import { loadImageFile } from '../../media/loader.ts'
 import { createSemaphore, type Semaphore } from '../../media/semaphore.ts'
+import type { ImageResult, LoadedFile, LoadedImage, RemoteFile } from '../../media/types.ts'
+import type { ImageContextValue } from './image-context.tsx'
 
 export type ImageState = 'idle' | 'loading' | 'loaded' | 'error'
 

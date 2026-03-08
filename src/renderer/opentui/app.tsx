@@ -1,9 +1,8 @@
 // opentui app shell — state machine + layout composition + status bar.
 
-import type { KeyEvent, ScrollBoxRenderable } from '@opentui/core'
-
-import { useKeyboard, useOnResize, useRenderer, useTerminalDimensions } from '@opentui/react'
 import { dirname } from 'node:path'
+import type { KeyEvent, ScrollBoxRenderable } from '@opentui/core'
+import { useKeyboard, useOnResize, useRenderer, useTerminalDimensions } from '@opentui/react'
 import {
 	type ReactNode,
 	useCallback,
@@ -13,11 +12,6 @@ import {
 	useRef,
 	useState,
 } from 'react'
-
-import type { MediaCapabilities } from '../../media/types.ts'
-import type { ThemeTokens } from '../../theme/types.ts'
-import type { MediaEntry } from './index.tsx'
-
 import {
 	type AppAction,
 	appReducer,
@@ -31,6 +25,8 @@ import {
 } from '../../app/state.ts'
 import { fuzzyFilter } from '../../browser/fuzzy.ts'
 import { killActiveAudio, playAudio } from '../../media/ffplay.ts'
+import type { MediaCapabilities } from '../../media/types.ts'
+import type { ThemeTokens } from '../../theme/types.ts'
 import { browserKeyHandler } from './browser-keys.ts'
 import {
 	openFileFromBrowser,
@@ -41,8 +37,9 @@ import {
 	startFileWatcher,
 	updateBrowserPreview,
 } from './browser-preview.tsx'
-import { ImageContext, type ImageContextValue } from './image-context.tsx'
 import { clearImageCache } from './image.tsx'
+import { ImageContext, type ImageContextValue } from './image-context.tsx'
+import type { MediaEntry } from './index.tsx'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-context.tsx'
 import { MediaGallery } from './media-gallery.tsx'

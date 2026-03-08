@@ -16,7 +16,8 @@ export default tseslint.config(
 		},
 		rules: {
 			// --- imports ---
-			'perfectionist/sort-imports': ['error', { type: 'natural' }],
+			// NOTE: Biome handles import sorting via organizeImports
+			'perfectionist/sort-imports': 'off',
 
 			// --- file size ---
 			'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }],

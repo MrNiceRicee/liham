@@ -14,13 +14,10 @@ import {
 
 import type { MediaIRNode } from '../../ir/types.ts'
 import type { AnimationLimits } from '../../media/decoder.ts'
-import type { LoadedImage, MediaCapabilities } from '../../media/types.ts'
-import type { ThemeTokens } from '../../theme/types.ts'
-import type { MediaEntry } from './index.tsx'
-
 import { killActiveAudio, playAudio } from '../../media/ffplay.ts'
 import { createFrameTimer, type FrameTimerHandle } from '../../media/frame-timer.ts'
 import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
+import type { LoadedImage, MediaCapabilities } from '../../media/types.ts'
 import {
 	computeVideoDimensions,
 	createVideoStream,
@@ -28,7 +25,9 @@ import {
 	readFrames,
 } from '../../media/video-decoder.ts'
 import { sanitizeForTerminal } from '../../pipeline/sanitize.ts'
+import type { ThemeTokens } from '../../theme/types.ts'
 import { ImageContext } from './image-context.tsx'
+import type { MediaEntry } from './index.tsx'
 import { useImageLoader } from './use-image-loader.ts'
 
 // modal: no frame cap, 30MB byte budget is the only guard
@@ -421,6 +420,40 @@ export function MediaModal({
 	const url = mediaUrl(node)
 	const ctx = useContext(ImageContext)
 
+	const renderContent = () => {
+		if (node.type === 'image') {
+			return (
+				<ModalImageContent
+					url={url}
+					alt={node.alt}
+					theme={theme}
+					maxCols={termWidth}
+					maxRows={termHeight}
+					paused={paused}
+					onFrameInfo={onFrameInfo}
+				/>
+			)
+		}
+		if (node.type === 'video' && mediaCapabilities.canPlayVideo) {
+			return (
+				<ModalVideoContent
+					src={url ?? ''}
+					alt={node.alt}
+					theme={theme}
+					maxCols={termWidth}
+					maxRows={termHeight}
+					basePath={ctx?.basePath ?? process.cwd()}
+					bgColor={ctx?.bgColor ?? ''}
+				/>
+			)
+		}
+		const hint =
+			node.type === 'video' && !mediaCapabilities.canPlayVideo
+				? 'install ffmpeg to play video'
+				: undefined
+		return <ModalMediaFallback node={node} theme={theme} hint={hint} />
+	}
+
 	return (
 		<box
 			style={{
@@ -435,37 +468,7 @@ export function MediaModal({
 				backgroundColor: theme.codeBlock.backgroundColor,
 			}}
 		>
-			{node.type === 'image' ? (
-				<ModalImageContent
-					url={url}
-					alt={node.alt}
-					theme={theme}
-					maxCols={termWidth}
-					maxRows={termHeight}
-					paused={paused}
-					onFrameInfo={onFrameInfo}
-				/>
-			) : node.type === 'video' && mediaCapabilities.canPlayVideo ? (
-				<ModalVideoContent
-					src={url ?? ''}
-					alt={node.alt}
-					theme={theme}
-					maxCols={termWidth}
-					maxRows={termHeight}
-					basePath={ctx?.basePath ?? process.cwd()}
-					bgColor={ctx?.bgColor ?? ''}
-				/>
-			) : (
-				<ModalMediaFallback
-					node={node}
-					theme={theme}
-					hint={
-						node.type === 'video' && !mediaCapabilities.canPlayVideo
-							? 'install ffmpeg to play video'
-							: undefined
-					}
-				/>
-			)}
+			{renderContent()}
 		</box>
 	)
 }

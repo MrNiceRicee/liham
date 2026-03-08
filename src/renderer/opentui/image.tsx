@@ -1,14 +1,12 @@
 // image renderer component — Kitty virtual placements, half-block fallback, text fallback.
 // thin rendering shell — loading logic lives in use-image-loader.ts.
 
+import { writeSync } from 'node:fs'
 import { type BoxRenderable, resolveRenderLib } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
-import { writeSync } from 'node:fs'
 import { memo, type ReactNode, useContext, useEffect, useRef } from 'react'
 
 import type { ImageNode } from '../../ir/types.ts'
-import type { LoadedImage } from '../../media/types.ts'
-
 import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
 import {
 	buildCleanupCommand,
@@ -16,6 +14,7 @@ import {
 	buildVirtualPlacement,
 	generateImageId,
 } from '../../media/kitty.ts'
+import type { LoadedImage } from '../../media/types.ts'
 import { ImageContext } from './image-context.tsx'
 import { MediaFocusContext } from './media-focus-context.tsx'
 import { useImageLoader, useViewportVisibility } from './use-image-loader.ts'

@@ -3,12 +3,10 @@
 
 import { createCliRenderer } from '@opentui/core'
 import { createRoot } from '@opentui/react'
-
+import { type LayoutMode, paneDimensions } from '../../app/state.ts'
 import type { IRNode } from '../../ir/types.ts'
 import type { MediaCapabilities } from '../../media/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
-
-import { type LayoutMode, paneDimensions } from '../../app/state.ts'
 import { App } from './app.tsx'
 import { renderToOpenTUIWithMedia } from './index.tsx'
 

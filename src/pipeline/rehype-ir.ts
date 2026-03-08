@@ -10,8 +10,8 @@ import type { ThemeTokens } from '../theme/types.ts'
 
 import { compileAudio, compileImg, compileVideo } from './compile-media.ts'
 import { getHighlightColor } from './hljs-colors.ts'
-import { sanitizeUrl } from './sanitize-url.ts'
 import { sanitizeForTerminal } from './sanitize.ts'
+import { sanitizeUrl } from './sanitize-url.ts'
 
 declare module 'unified' {
 	interface CompileResultMap {

@@ -4,16 +4,15 @@ import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
 import type { LayoutMode } from '../app/state.ts'
-import type { MediaCapabilities } from '../media/types.ts'
-import type { ThemeTokens } from '../theme/types.ts'
-
 import { isSharpAvailable } from '../media/decoder.ts'
 import { detectCapabilities } from '../media/detect.ts'
 import { isFfmpegAvailable, isFfplayAvailable } from '../media/ffplay.ts'
+import type { MediaCapabilities } from '../media/types.ts'
 import { processMarkdown } from '../pipeline/processor.ts'
 import { boot } from '../renderer/opentui/boot.tsx'
 import { darkTheme } from '../theme/dark.ts'
 import { lightTheme } from '../theme/light.ts'
+import type { ThemeTokens } from '../theme/types.ts'
 import { generateBashCompletion, generateZshCompletion } from './completions.ts'
 
 // -- renderer name union — add entries as renderers are implemented --

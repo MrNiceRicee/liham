@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 
 import type { AudioNode, CoreIRNode, ImageNode, IRNode, RootNode, VideoNode } from '../ir/types.ts'
-import type { PipelineSuccess } from '../types/pipeline.ts'
-
 import { isBlockNode } from '../ir/types.ts'
 import { darkTheme } from '../theme/dark.ts'
+import type { PipelineSuccess } from '../types/pipeline.ts'
 import { processMarkdown } from './processor.ts'
 
 // cast to CoreIRNode for type-safe property access in tests

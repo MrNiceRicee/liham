@@ -1,10 +1,9 @@
 import type { Root } from 'hast'
-import type { Plugin } from 'unified'
-
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
+import type { Plugin } from 'unified'
 import { unified } from 'unified'
 
 import type { IRNode } from '../ir/types.ts'

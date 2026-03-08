@@ -5,9 +5,8 @@ import type { Element } from 'hast'
 
 import type { AudioNode, ImageNode, IRNode, VideoNode } from '../ir/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
-
-import { sanitizeImageSrc } from './sanitize-image-src.ts'
 import { sanitizeForTerminal } from './sanitize.ts'
+import { sanitizeImageSrc } from './sanitize-image-src.ts'
 
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.mov', '.avi', '.mkv'])
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a'])

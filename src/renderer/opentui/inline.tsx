@@ -1,9 +1,8 @@
 // inline IR node rendering + text wrapping for OpenTUI.
 // handles grouping inline nodes and rendering semantic inline types.
 
-import type { ReactNode } from 'react'
-
 import { TextAttributes } from '@opentui/core'
+import type { ReactNode } from 'react'
 
 import type { CoreIRNode, ImageNode, InlineStyle, IRNode, LinkNode } from '../../ir/types.ts'
 

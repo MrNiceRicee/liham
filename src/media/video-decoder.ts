@@ -1,8 +1,7 @@
 // video decoder — ffprobe metadata, ffmpeg frame streaming, dimension calculation.
 
-import type { ImageResult } from './types.ts'
-
 import { sanitizeMediaPath } from './ffplay.ts'
+import type { ImageResult } from './types.ts'
 
 // -- types --
 
@@ -60,6 +59,66 @@ function parseDuration(raw: unknown): number {
 	const value = Number(raw)
 	if (!Number.isFinite(value) || value < 0) return 0
 	return value
+}
+
+async function probeAudioStream(absPath: string, signal?: AbortSignal): Promise<boolean> {
+	try {
+		const audioProc = Bun.spawn(
+			[
+				'ffprobe',
+				'-v',
+				'quiet',
+				'-print_format',
+				'json',
+				'-select_streams',
+				'a:0',
+				'-show_entries',
+				'stream=codec_type',
+				absPath,
+			],
+			{ stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' },
+		)
+
+		if (signal != null) {
+			signal.addEventListener(
+				'abort',
+				() => {
+					try {
+						audioProc.kill('SIGKILL')
+					} catch {
+						/* already dead */
+					}
+				},
+				{ once: true },
+			)
+		}
+
+		const audioExited = audioProc.exited
+		const audioTimeout = new Promise<'timeout'>((r) =>
+			setTimeout(() => r('timeout'), PROBE_TIMEOUT_MS),
+		)
+		const audioRace = await Promise.race([audioExited, audioTimeout])
+
+		if (audioRace === 'timeout') {
+			try {
+				audioProc.kill('SIGKILL')
+			} catch {
+				/* already dead */
+			}
+			return false
+		}
+
+		if (signal?.aborted) {
+			return false
+		}
+
+		const audioStdout = await new Response(audioProc.stdout).text()
+		const audioJson = JSON.parse(audioStdout) as Record<string, unknown>
+		const audioStreams = audioJson['streams'] as Array<Record<string, unknown>> | undefined
+		return audioStreams != null && audioStreams.length > 0
+	} catch {
+		return false
+	}
 }
 
 export async function probeVideo(
@@ -167,60 +226,7 @@ export async function probeVideo(
 	const duration = parseDuration(stream['duration']) || parseDuration(format?.['duration'])
 
 	// probe for audio stream
-	let hasAudio = false
-	try {
-		const audioProc = Bun.spawn(
-			[
-				'ffprobe',
-				'-v',
-				'quiet',
-				'-print_format',
-				'json',
-				'-select_streams',
-				'a:0',
-				'-show_entries',
-				'stream=codec_type',
-				absPath,
-			],
-			{ stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' },
-		)
-
-		if (signal != null) {
-			signal.addEventListener(
-				'abort',
-				() => {
-					try {
-						audioProc.kill('SIGKILL')
-					} catch {
-						/* already dead */
-					}
-				},
-				{ once: true },
-			)
-		}
-
-		const audioExited = audioProc.exited
-		const audioTimeout = new Promise<'timeout'>((r) =>
-			setTimeout(() => r('timeout'), PROBE_TIMEOUT_MS),
-		)
-		const audioRace = await Promise.race([audioExited, audioTimeout])
-
-		if (audioRace === 'timeout') {
-			try {
-				audioProc.kill('SIGKILL')
-			} catch {
-				/* already dead */
-			}
-			// audio detection failed, continue without audio
-		} else if (!signal?.aborted) {
-			const audioStdout = await new Response(audioProc.stdout).text()
-			const audioJson = JSON.parse(audioStdout) as Record<string, unknown>
-			const audioStreams = audioJson['streams'] as Array<Record<string, unknown>> | undefined
-			hasAudio = audioStreams != null && audioStreams.length > 0
-		}
-	} catch {
-		// audio detection failed — continue without audio
-	}
+	const hasAudio = await probeAudioStream(absPath, signal)
 
 	return {
 		ok: true,
@@ -347,20 +353,28 @@ export async function* readFrames(
 	const buffer = new Uint8Array(frameSize)
 	let offset = 0
 
-	for await (const chunk of stdout) {
-		let chunkOffset = 0
-		while (chunkOffset < chunk.length) {
-			const remaining = frameSize - offset
-			const toCopy = Math.min(remaining, chunk.length - chunkOffset)
-			buffer.set(chunk.subarray(chunkOffset, chunkOffset + toCopy), offset)
-			offset += toCopy
-			chunkOffset += toCopy
+	const reader = stdout.getReader()
+	try {
+		for (;;) {
+			const { done, value: chunk } = await reader.read()
+			if (done) break
 
-			if (offset === frameSize) {
-				yield new Uint8Array(buffer) // copy out so caller can hold reference
-				offset = 0
+			let chunkOffset = 0
+			while (chunkOffset < chunk.length) {
+				const remaining = frameSize - offset
+				const toCopy = Math.min(remaining, chunk.length - chunkOffset)
+				buffer.set(chunk.subarray(chunkOffset, chunkOffset + toCopy), offset)
+				offset += toCopy
+				chunkOffset += toCopy
+
+				if (offset === frameSize) {
+					yield new Uint8Array(buffer) // copy out so caller can hold reference
+					offset = 0
+				}
 			}
 		}
+	} finally {
+		reader.releaseLock()
 	}
 	// partial frame at end deliberately discarded
 }

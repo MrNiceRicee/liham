@@ -1,8 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-
-import type { LoadedImage } from './types.ts'
-
 import { createImageCache, localCacheKey, remoteCacheKey } from './cache.ts'
+import type { LoadedImage } from './types.ts'
 
 function makeImage(source: string, byteSize: number): LoadedImage {
 	return {
