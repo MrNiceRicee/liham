@@ -1,5 +1,12 @@
 // frame timer — drift-correcting frame cycling for animated media.
-// pure utility, no renderer dependencies. used by GIF animation and future video playback.
+// pure utility, no renderer dependencies. used by GIF animation and video playback.
+//
+// two drift correction modes:
+// - Pattern A (epoch-anchored): for variable delays (GIF). anchors to start time,
+//   catches up on delays. used when delays array has multiple distinct values.
+// - Pattern B (rolling expected): for constant interval (video). resets baseline to
+//   "now" when overloaded, gracefully dropping missed frames instead of cascading
+//   catch-up ticks. used when delays array has a single value.
 
 export type PlaybackState = 'idle' | 'playing' | 'paused' | 'ended'
 
@@ -10,6 +17,7 @@ export interface FrameTimerHandle {
 	dispose(): void
 	readonly state: PlaybackState
 	readonly currentFrame: number
+	readonly tickCount: number
 }
 
 export interface FrameTimerOptions {
@@ -26,11 +34,20 @@ export function createFrameTimer({
 	let state: PlaybackState = 'idle'
 	let frameIndex = 0
 	let timerId: ReturnType<typeof setTimeout> | null = null
+	let disposed = false
+	let tickCount = 0
+
+	// detect constant-interval mode (single unique delay = Pattern B)
+	const isConstantInterval = delays.length === 1 || new Set(delays).size === 1
+
+	// Pattern A state (epoch-anchored, for variable delays)
 	let epochMs = 0
 	let accumulated = 0
-	let disposed = false
 
-	function scheduleNext() {
+	// Pattern B state (rolling expected, for constant interval)
+	let nextTickAt = 0
+
+	function scheduleNextA() {
 		if (state !== 'playing' || disposed) return
 		const delay = delays[frameIndex] ?? 100
 		const now = performance.now()
@@ -48,10 +65,38 @@ export function createFrameTimer({
 			}
 
 			frameIndex = loop ? nextIndex % delays.length : nextIndex
+			tickCount++
 			onFrame(frameIndex)
-			scheduleNext()
+			scheduleNextA()
 		}, adjusted)
 	}
+
+	function scheduleNextB() {
+		if (state !== 'playing' || disposed) return
+		const intervalMs = delays[0] ?? 100
+		const now = performance.now()
+		// Pattern B: next tick relative to expected, but never in the past
+		const adjusted = Math.max(0, nextTickAt - now)
+
+		timerId = setTimeout(() => {
+			if (disposed) return
+			const nextIndex = frameIndex + 1
+
+			if (!loop && nextIndex >= delays.length) {
+				state = 'ended'
+				return
+			}
+
+			frameIndex = loop ? nextIndex % delays.length : nextIndex
+			tickCount++
+			// rolling expected: reset baseline to now if we fell behind
+			nextTickAt = Math.max(performance.now(), nextTickAt) + intervalMs
+			onFrame(frameIndex)
+			scheduleNextB()
+		}, adjusted)
+	}
+
+	const scheduleNext = isConstantInterval ? scheduleNextB : scheduleNextA
 
 	return {
 		play() {
@@ -59,8 +104,11 @@ export function createFrameTimer({
 			if (state === 'idle' || state === 'ended') {
 				accumulated = 0
 				frameIndex = 0
+				tickCount = 0
 			}
-			epochMs = performance.now() - accumulated
+			const now = performance.now()
+			epochMs = now - accumulated
+			nextTickAt = now + (delays[0] ?? 100)
 			state = 'playing'
 			onFrame(frameIndex)
 			scheduleNext()
@@ -76,7 +124,9 @@ export function createFrameTimer({
 		seek(index: number) {
 			frameIndex = Math.max(0, Math.min(index, delays.length - 1))
 			accumulated = delays.slice(0, frameIndex).reduce((a, b) => a + b, 0)
-			epochMs = performance.now() - accumulated
+			const now = performance.now()
+			epochMs = now - accumulated
+			nextTickAt = now + (delays[frameIndex] ?? 100)
 			onFrame(frameIndex)
 			if (state === 'playing') {
 				if (timerId != null) {
@@ -99,6 +149,9 @@ export function createFrameTimer({
 		},
 		get currentFrame() {
 			return frameIndex
+		},
+		get tickCount() {
+			return tickCount
 		},
 	}
 }

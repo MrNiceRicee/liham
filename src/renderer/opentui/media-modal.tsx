@@ -6,13 +6,16 @@ import { resolve } from 'node:path'
 import { type ReactNode, useContext, useEffect, useRef, useState } from 'react'
 
 import type { MediaIRNode } from '../../ir/types.ts'
+import { checkBufferEnd, fillRingBuffer } from '../../media/fill-ring-buffer.ts'
 import {
 	killActiveAudio,
 	pauseActiveAudio,
 	playAudio,
 	resumeActiveAudio,
 } from '../../media/ffplay.ts'
+import { createFrameTimer, type FrameTimerHandle } from '../../media/frame-timer.ts'
 import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
+import { createRingBuffer, type RingBuffer } from '../../media/ring-buffer.ts'
 import type { LoadedImage, MediaCapabilities } from '../../media/types.ts'
 import {
 	type VideoMetadata,
@@ -20,7 +23,6 @@ import {
 	createVideoStream,
 	pauseActiveVideo,
 	probeVideo,
-	readFrames,
 	resumeActiveVideo,
 } from '../../media/video-decoder.ts'
 import { sanitizeForTerminal } from '../../pipeline/sanitize.ts'
@@ -49,81 +51,19 @@ export interface VideoPlaybackInfo {
 	paused: boolean
 }
 
-// -- video frame processing (extracted to reduce cognitive complexity) --
+// -- render a single RGBA frame to a half-block grid --
 
-interface FrameLoopContext {
-	proc: ReturnType<typeof Bun.spawn>
-	dims: VideoDimensions
-	fps: number
-	duration: number
-	seekOffset: number
-	bgColor: string
-	src: string
-	isStale: () => boolean
-	isPaused: () => boolean
-	renderPendingRef: React.RefObject<boolean>
-	setCurrentGrid: (grid: MergedSpan[][]) => void
-	setGridWidth: (w: number) => void
-	setPlaybackState: (s: PlaybackState) => void
-	onVideoInfo: (info: VideoPlaybackInfo | null) => void
-}
-
-async function runFrameLoop(ctx: FrameLoopContext): Promise<void> {
-	ctx.setPlaybackState('playing')
-	ctx.setGridWidth(ctx.dims.termCols)
-	const frameSize = ctx.dims.pixelWidth * ctx.dims.pixelHeight * 4
-	let frameCount = 0
-	const frameIntervalMs = 1000 / ctx.fps
-	let nextFrameAt = Date.now()
-
-	for await (const rgba of readFrames(ctx.proc.stdout as ReadableStream<Uint8Array>, frameSize)) {
-		if (ctx.isStale()) break
-
-		// spin-wait while paused — stops consumption → pipe fills → ffmpeg blocks on write.
-		// SIGSTOP also sent for CPU savings, but backpressure is the primary mechanism.
-		if (ctx.isPaused()) {
-			while (ctx.isPaused() && !ctx.isStale()) {
-				await new Promise((r) => setTimeout(r, 50))
-			}
-			if (ctx.isStale()) break
-			nextFrameAt = Date.now() + frameIntervalMs // reset pacing after resume
-			continue
-		}
-
-		// application-level frame pacing (replaces ffmpeg -re which breaks SIGSTOP)
-		const now = Date.now()
-		const delay = nextFrameAt - now
-		if (delay > 0) await new Promise((r) => setTimeout(r, delay))
-		nextFrameAt = Math.max(Date.now(), nextFrameAt) + frameIntervalMs
-
-		frameCount++
-
-		// report elapsed time every ~10 frames
-		if (frameCount % 10 === 1) {
-			const elapsed = ctx.seekOffset + frameCount / ctx.fps
-			ctx.onVideoInfo({ elapsed, duration: ctx.duration, paused: false })
-		}
-
-		if (ctx.renderPendingRef.current) continue // frame skip
-
-		const image: LoadedImage = {
-			rgba,
-			width: ctx.dims.pixelWidth,
-			height: ctx.dims.pixelHeight,
-			terminalCols: ctx.dims.termCols,
-			terminalRows: ctx.dims.termRows,
-			byteSize: rgba.byteLength,
-			source: ctx.src,
-		}
-		const grid = renderHalfBlockMerged(image, ctx.bgColor)
-		ctx.renderPendingRef.current = true
-		ctx.setCurrentGrid(grid)
+function renderFrame(rgba: Uint8Array, dims: VideoDimensions, src: string, bgColor: string): MergedSpan[][] {
+	const image: LoadedImage = {
+		rgba,
+		width: dims.pixelWidth,
+		height: dims.pixelHeight,
+		terminalCols: dims.termCols,
+		terminalRows: dims.termRows,
+		byteSize: rgba.byteLength,
+		source: src,
 	}
-
-	if (!ctx.isStale()) {
-		const exitCode = await ctx.proc.exited
-		ctx.setPlaybackState(exitCode === 0 ? 'ended' : 'error')
-	}
+	return renderHalfBlockMerged(image, bgColor)
 }
 
 // -- modal video content --
@@ -131,6 +71,9 @@ async function runFrameLoop(ctx: FrameLoopContext): Promise<void> {
 type PlaybackState = 'loading' | 'playing' | 'error' | 'ended'
 
 type VideoDimensions = NonNullable<ReturnType<typeof computeVideoDimensions>>
+
+// ring buffer capacity — capped by 30MB memory budget in createRingBuffer
+const RING_BUFFER_CAPACITY = 30
 
 function ModalVideoContent({
 	src,
@@ -158,8 +101,6 @@ function ModalVideoContent({
 	readonly onVideoInfo: (info: VideoPlaybackInfo | null) => void
 }): ReactNode {
 	const loadIdRef = useRef(0)
-	const pausedRef = useRef(paused)
-	pausedRef.current = paused
 	const renderPendingRef = useRef(false)
 	const [currentGrid, setCurrentGrid] = useState<MergedSpan[][] | null>(null)
 	const [gridWidth, setGridWidth] = useState(0)
@@ -167,6 +108,10 @@ function ModalVideoContent({
 
 	// cached probe result — survives across seek/resize, only re-probed on src change
 	const [probeCache, setProbeCache] = useState<{ meta: VideoMetadata; absPath: string } | null>(null)
+
+	// refs for timer and buffer — needed for pause/resume effect
+	const timerRef = useRef<FrameTimerHandle | null>(null)
+	const bufferRef = useRef<RingBuffer | null>(null)
 
 	// clear renderPending after React commits (NOT queueMicrotask)
 	useEffect(() => {
@@ -195,10 +140,9 @@ function ModalVideoContent({
 		}
 	}, [src, basePath])
 
-	// stream effect — starts ffmpeg + audio, runs frame loop.
-	// depends on probe cache + dimensions + seek position.
+	// stream effect — ring buffer producer + timer-driven consumer
 	useEffect(() => {
-		if (probeCache == null) return // probe not ready yet
+		if (probeCache == null) return
 
 		const { meta, absPath } = probeCache
 		const dims = computeVideoDimensions(meta.width, meta.height, maxCols, maxRows)
@@ -206,44 +150,106 @@ function ModalVideoContent({
 
 		const thisLoadId = ++loadIdRef.current
 		const isStale = () => loadIdRef.current !== thisLoadId
-		let proc: ReturnType<typeof Bun.spawn> | null = null
+		const frameSize = dims.pixelWidth * dims.pixelHeight * 4
 		let audioStarted = false
 
+		// create ring buffer + timer
+		const buffer = createRingBuffer(RING_BUFFER_CAPACITY, frameSize)
+		bufferRef.current = buffer
+
+		setGridWidth(dims.termCols)
+		setPlaybackState('playing')
+
+		const proc = createVideoStream({
+			filePath: absPath,
+			width: dims.pixelWidth,
+			height: dims.pixelHeight,
+			fps: meta.fps,
+			seekOffset,
+		})
+
+		// consumer: timer-driven rendering from ring buffer
+		const timer = createFrameTimer({
+			delays: [1000 / meta.fps],
+			onFrame: () => {
+				if (renderPendingRef.current) return // backpressure: skip if React hasn't committed
+
+				const frame = buffer.read()
+				if (frame == null) {
+					// underrun — check if stream has ended
+					const status = checkBufferEnd(buffer)
+					if (status !== 'playing') setPlaybackState(status)
+					return
+				}
+
+				const grid = renderFrame(frame, dims, src, bgColor)
+				renderPendingRef.current = true
+				setCurrentGrid(grid)
+
+				// report elapsed time
+				const elapsed = seekOffset + timer.tickCount / meta.fps
+				onVideoInfo({ elapsed, duration: meta.duration, paused: false })
+			},
+			loop: true,
+		})
+		timerRef.current = timer
+
+		// start audio in parallel (don't block video on audio startup)
+		if (meta.hasAudio) {
+			void playAudio(absPath, basePath, seekOffset).then((result) => {
+				if (result.ok) audioStarted = true
+			})
+		}
+
+		// start producer — fills ring buffer from ffmpeg stdout
+		void fillRingBuffer({
+			stdout: proc.stdout as ReadableStream<Uint8Array>,
+			buffer,
+			frameSize,
+			fps: meta.fps,
+			pid: proc.pid,
+			isStale,
+			onEvent: (event) => {
+				if (isStale()) return
+				if (event.type === 'ended' || event.type === 'error') {
+					debug(`producer ${event.type}`)
+				}
+			},
+		})
+
+		// render first frame as soon as it arrives, then start timer
 		void (async () => {
-			proc = createVideoStream({
-				filePath: absPath,
-				width: dims.pixelWidth,
-				height: dims.pixelHeight,
-				fps: meta.fps,
-				seekOffset,
-			})
+			// wait for first frame — poll briefly
+			for (let i = 0; i < 100 && !isStale(); i++) {
+				if (!buffer.empty) break
+				await new Promise((r) => setTimeout(r, 10))
+			}
+			if (isStale()) return
 
-			if (meta.hasAudio) {
-				await playAudio(absPath, basePath, seekOffset)
-				audioStarted = true
+			const firstFrame = buffer.read()
+			if (firstFrame != null) {
+				const grid = renderFrame(firstFrame, dims, src, bgColor)
+				setCurrentGrid(grid)
 			}
 
-			debug(`after createVideoStream: pausedRef=${String(pausedRef.current)}`)
-			if (pausedRef.current) {
-				pauseActiveVideo()
-				pauseActiveAudio()
-			}
-			await runFrameLoop({
-				proc, dims, fps: meta.fps, duration: meta.duration, seekOffset,
-				bgColor, src, isStale, isPaused: () => pausedRef.current,
-				renderPendingRef, setCurrentGrid,
-				setGridWidth, setPlaybackState, onVideoInfo,
-			})
+			// start timer (paused state handled by pause effect)
+			timer.play()
 		})()
 
 		return () => {
 			loadIdRef.current++ // mark stale
-			if (proc != null) {
-				try {
-					proc.kill('SIGKILL')
-				} catch {
-					/* already dead */
-				}
+			timer.dispose()
+			timerRef.current = null
+			buffer.flush()
+			bufferRef.current = null
+			// force-close pipe reader to prevent stale producer from draining
+			void (proc.stdout as ReadableStream<Uint8Array>).cancel().catch(() => {
+				/* already closed */
+			})
+			try {
+				proc.kill('SIGKILL')
+			} catch {
+				/* already dead */
 			}
 			if (audioStarted) void killActiveAudio()
 		}
@@ -252,6 +258,11 @@ function ModalVideoContent({
 	// react to external pause/resume toggle
 	useEffect(() => {
 		debug(`pause effect: paused=${String(paused)}`)
+		const timer = timerRef.current
+		if (timer != null) {
+			if (paused && timer.state === 'playing') timer.pause()
+			if (!paused && timer.state === 'paused') timer.play()
+		}
 		if (paused) {
 			pauseActiveVideo()
 			pauseActiveAudio()

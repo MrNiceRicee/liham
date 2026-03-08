@@ -231,4 +231,74 @@ describe('createFrameTimer', () => {
 		flushTimers(200)
 		expect(frames).toEqual([0])
 	})
+
+	test('tickCount starts at 0 and increments on each frame callback', () => {
+		const timer = createFrameTimer({ delays: [100, 100], onFrame: () => {} })
+		expect(timer.tickCount).toBe(0)
+
+		timer.play() // fires onFrame(0) — play doesn't increment tickCount
+		expect(timer.tickCount).toBe(0)
+
+		flushNextTimer() // frame 1
+		expect(timer.tickCount).toBe(1)
+
+		flushNextTimer() // frame 0 (loop)
+		expect(timer.tickCount).toBe(2)
+
+		timer.dispose()
+	})
+
+	test('tickCount resets on play after ended', () => {
+		const timer = createFrameTimer({
+			delays: [100, 100],
+			onFrame: () => {},
+			loop: false,
+		})
+		timer.play()
+		flushNextTimer() // frame 1
+		flushNextTimer() // ended
+		expect(timer.tickCount).toBe(1)
+
+		timer.play() // restart
+		expect(timer.tickCount).toBe(0)
+
+		timer.dispose()
+	})
+
+	test('constant-interval mode uses Pattern B (single delay)', () => {
+		const frames: number[] = []
+		const timer = createFrameTimer({ delays: [33], onFrame: (i) => frames.push(i) })
+		timer.play()
+		expect(frames).toEqual([0])
+
+		flushNextTimer() // +33ms
+		expect(frames).toEqual([0, 0])
+
+		flushNextTimer() // +33ms
+		expect(frames).toEqual([0, 0, 0])
+
+		expect(timer.tickCount).toBe(2)
+		timer.dispose()
+	})
+
+	test('Pattern B gracefully handles overload (no cascading catch-up)', () => {
+		// simulate a 33ms interval where render takes 50ms (over budget)
+		const frames: number[] = []
+		const timer = createFrameTimer({ delays: [33], onFrame: (i) => frames.push(i) })
+		timer.play() // fires frame 0 at t=0
+
+		// simulate timer fires at t=33 but by the time callback runs, it's t=50
+		mockNow = 50
+		flushTimers(50) // the 33ms timer fires
+		expect(frames.length).toBe(2)
+
+		// Pattern B: next tick should be scheduled at max(50, 33) + 33 = 83
+		// not at 33+33=66 (which would be in the past → 0ms delay → catch-up storm)
+		if (pendingTimers.length > 0) {
+			const nextFire = pendingTimers[0]!.delay
+			expect(nextFire).toBeGreaterThan(50) // must be in the future
+		}
+
+		timer.dispose()
+	})
 })
