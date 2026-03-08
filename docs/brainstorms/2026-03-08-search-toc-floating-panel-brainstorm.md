@@ -68,7 +68,7 @@ interface FloatingPanelProps {
 
 **What Search uses**: search bar is different — it replaces the status bar, not a floating panel. It's a bottom bar, not an overlay. So Search Bar might NOT use FloatingPanel. It's more of a conditional render: `{searchActive ? <SearchBar /> : <StatusBar />}`.
 
-**Decision needed**: is the FloatingPanel worth extracting if only gallery and TOC use it? Two consumers might not justify the abstraction. Consider: would the panel also be useful for future features (help overlay, command palette)?
+**Decision**: FloatingPanel handles positioning, border, background, zIndex, sliding window, AND built-in keyboard nav (j/k, Enter, Esc). Two consumers (gallery, TOC) justify the extraction, and future features (help overlay, command palette) will also reuse it.
 
 ### 2. ScrollToPosition Utility
 
@@ -89,7 +89,7 @@ A utility that computes the pixel offset for a given content position and calls 
 - Option (c) is simplest: heading index / total headings ≈ scroll percentage. Rough but usable.
 - Option (b) is most accurate but requires React refs on heading elements and post-layout measurement.
 
-**Decision needed**: start with simple line-based scroll for search (exact), percentage-based for TOC (approximate), refine TOC later?
+**Decision**: line-based scroll for search (exact), IR node height estimation for TOC (pure `estimateHeight()` function, testable, accurate).
 
 ## Proposed Implementation Order
 
@@ -110,20 +110,20 @@ A utility that computes the pixel offset for a given content position and calls 
 - Heading extraction from IR (during renderToOpenTUI traversal)
 - TOC panel using FloatingPanel (position='right')
 - Arrow key navigation within TOC
-- Jump-to-heading via scroll-to-position (percentage-based initially)
+- Jump-to-heading via IR node height estimation (pure estimateHeight function)
 - `t` toggle key binding
 
-## Key Questions for Brainstorm
+## Resolved Questions
 
-1. **FloatingPanel scope**: should it handle keyboard navigation (up/down/enter) internally, or should each consumer handle its own keys? Gallery has n/N, TOC would have j/k or arrows, search has its own input mode.
+1. **FloatingPanel keyboard nav → built-in.** FloatingPanel handles j/k cursor movement, Enter select, Esc close internally. Consumers pass `items[]`, `onSelect`, `onClose` callbacks. Gallery and TOC both get navigation for free. DRYest approach.
 
-2. **Search bar vs FloatingPanel**: the search bar replaces the status bar at the bottom — it's not a floating overlay. Should it use FloatingPanel or stay as a separate component? Leaning toward separate (it's structurally different).
+2. **Search bar → separate component.** SearchBar is structurally different (replaces status bar, has text input). Not a floating overlay. Conditional render: `{searchActive ? <SearchBar /> : <StatusBar />}`.
 
-3. **TOC heading positions**: how accurate does jump-to-heading need to be? Percentage-based is easy but imprecise. Line-counting through IR nodes is more work but more accurate. Yoga layout measurement is most accurate but adds complexity.
+3. **TOC scroll → IR node height estimation.** Pure `estimateHeight(node)` function that walks IR nodes summing estimated row heights. Testable, no render coupling, accurate from day one. Better long-term maintainability than percentage-based.
 
-4. **TOC + search interaction**: can both be active simultaneously? TOC panel visible while search is active? Probably yes — they don't conflict (TOC is side panel, search is bottom bar). But key routing gets complex.
+4. **TOC + search → both active simultaneously.** They occupy different screen areas (TOC = right panel, search = bottom bar). Key routing: search input phase locks keys; search active phase allows `t` to toggle TOC.
 
-5. **Gallery refactor scope**: how much of MediaGallery should move into FloatingPanel? Just the positioning/border/background? Or also the sliding window logic (useful for TOC with many headings)?
+5. **Gallery refactor → position + border + sliding window.** FloatingPanel handles positioning, border, background, zIndex, AND the sliding window for long lists. Gallery and TOC both benefit from built-in windowing.
 
 ## References
 
