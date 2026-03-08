@@ -53,51 +53,9 @@ export function sanitizeMediaPath(rawPath: string, basePath: string): SanitizeRe
 	return { ok: true, path: real }
 }
 
-// -- video playback --
+// -- types --
 
 export type PlayResult = { ok: true } | { ok: false; error: string }
-
-export interface TuiSuspendResume {
-	suspend(): void
-	resume(): void
-}
-
-export async function playVideo(
-	mediaPath: string,
-	basePath: string,
-	tui?: TuiSuspendResume,
-): Promise<PlayResult> {
-	// re-check ffplay availability (may have been uninstalled)
-	if (!isFfplayAvailable()) {
-		return { ok: false, error: 'ffplay not found' }
-	}
-
-	const sanitized = sanitizeMediaPath(mediaPath, basePath)
-	if (!sanitized.ok) {
-		return { ok: false, error: sanitized.error ?? 'invalid path' }
-	}
-
-	const filePath = sanitized.path!
-
-	try {
-		tui?.suspend()
-
-		const proc = Bun.spawn(['ffplay', '-autoexit', filePath], {
-			stdin: 'inherit',
-			stdout: 'inherit',
-			stderr: 'inherit',
-		})
-
-		await proc.exited
-
-		return { ok: true }
-	} catch (err) {
-		const message = err instanceof Error ? err.message : 'ffplay spawn failed'
-		return { ok: false, error: message }
-	} finally {
-		tui?.resume()
-	}
-}
 
 // -- audio playback --
 

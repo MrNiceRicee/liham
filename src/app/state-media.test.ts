@@ -84,7 +84,7 @@ describe('media modal actions', () => {
 	test('OpenMediaModal opens modal at focused index', () => {
 		const s = stateWith({ mediaFocusIndex: 1 })
 		const next = appReducer(s, { type: 'OpenMediaModal' })
-		expect(next.mediaModal).toEqual({ kind: 'image', mediaIndex: 1, galleryHidden: false })
+		expect(next.mediaModal).toEqual({ kind: 'open', mediaIndex: 1, galleryHidden: false, paused: false })
 	})
 
 	test('OpenMediaModal no-op when no focus', () => {
@@ -96,7 +96,7 @@ describe('media modal actions', () => {
 	test('CloseMediaModal closes open modal, preserves focus', () => {
 		const s = stateWith({
 			mediaFocusIndex: 1,
-			mediaModal: { kind: 'image', mediaIndex: 1 },
+			mediaModal: { kind: 'open', mediaIndex: 1, galleryHidden: false, paused: false },
 		})
 		const next = appReducer(s, { type: 'CloseMediaModal' })
 		expect(next.mediaModal).toEqual({ kind: 'closed' })
@@ -115,18 +115,52 @@ describe('media modal actions', () => {
 		const next = appReducer(s, { type: 'CloseMediaModal' })
 		expect(next).toBe(s)
 	})
+
+	test('TogglePlayPause pauses when playing', () => {
+		const s = stateWith({
+			mediaFocusIndex: 0,
+			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: false },
+		})
+		const next = appReducer(s, { type: 'TogglePlayPause' })
+		expect(next.mediaModal).toEqual({ kind: 'open', mediaIndex: 0, galleryHidden: false, paused: true })
+	})
+
+	test('TogglePlayPause resumes when paused', () => {
+		const s = stateWith({
+			mediaFocusIndex: 0,
+			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: true },
+		})
+		const next = appReducer(s, { type: 'TogglePlayPause' })
+		expect(next.mediaModal).toEqual({ kind: 'open', mediaIndex: 0, galleryHidden: false, paused: false })
+	})
+
+	test('TogglePlayPause no-op when modal closed', () => {
+		const s = stateWith({})
+		const next = appReducer(s, { type: 'TogglePlayPause' })
+		expect(next).toBe(s)
+	})
 })
 
 describe('media legend entries', () => {
-	test('modal open shows modal legend', () => {
+	test('modal open shows modal legend with pause', () => {
 		const s = stateWith({
 			mediaFocusIndex: 0,
-			mediaModal: { kind: 'image', mediaIndex: 0, galleryHidden: false },
+			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: false },
 		})
 		const entries = legendEntries(s)
 		expect(entries.some((e) => e.key === 'esc' && e.label === 'close')).toBe(true)
 		expect(entries.some((e) => e.key === 'n/N')).toBe(true)
 		expect(entries.some((e) => e.key === 'g' && e.label === 'gallery')).toBe(true)
+		expect(entries.some((e) => e.key === 'space' && e.label === 'pause')).toBe(true)
+	})
+
+	test('modal paused shows play in legend', () => {
+		const s = stateWith({
+			mediaFocusIndex: 0,
+			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: true },
+		})
+		const entries = legendEntries(s)
+		expect(entries.some((e) => e.key === 'space' && e.label === 'play')).toBe(true)
 	})
 
 	test('media focused shows focus legend', () => {

@@ -24,7 +24,7 @@ export interface BrowserState {
 
 export type MediaModalState =
 	| { kind: 'closed' }
-	| { kind: 'image'; mediaIndex: number; galleryHidden: boolean }
+	| { kind: 'open'; mediaIndex: number; galleryHidden: boolean; paused: boolean }
 
 export interface AppState {
 	mode: AppMode
@@ -81,6 +81,7 @@ export type AppAction =
 	| { type: 'OpenMediaModal' }
 	| { type: 'CloseMediaModal' }
 	| { type: 'ToggleGallery' }
+	| { type: 'TogglePlayPause' }
 
 // -- layout helpers --
 
@@ -162,48 +163,20 @@ function returnToBrowser(state: AppState): AppState {
 	}
 }
 
-export function appReducer(state: AppState, action: AppAction): AppState {
+// -- sub-reducers --
+
+type BrowserAction = Extract<
+	AppAction,
+	{ type: 'ScanComplete' | 'RescanComplete' | 'ScanError' | 'FilterUpdate' | 'CursorMove' | 'OpenFile' | 'ReturnToBrowser' }
+>
+
+function browserReducer(state: AppState, action: BrowserAction): AppState {
 	switch (action.type) {
-		case 'Resize':
-			if (state.dimensions.width === action.width && state.dimensions.height === action.height) {
-				return state
-			}
-			return { ...state, dimensions: { width: action.width, height: action.height } }
-
-		case 'FocusPane': {
-			if (!isSplitLayout(state.layout)) return state
-			if (state.focus === action.target) return state
-			return { ...state, focus: action.target }
-		}
-
-		case 'ToggleSync':
-			return { ...state, scrollSync: !state.scrollSync }
-
-		case 'CycleLegend':
-			return { ...state, legendPage: nextLegendPage(state.legendPage) }
-
-		case 'CycleLayout': {
-			// disabled in browser mode
-			if (state.mode === 'browser') return state
-			const next = nextLayout(state.layout)
-			const focus = autoFocus(next, state.focus)
-			return { ...state, layout: next, focus }
-		}
-
-		case 'Scroll':
-			return state
-
-		case 'Quit':
-			return state
-
-		// -- browser actions --
-
 		case 'ScanComplete':
 			return {
 				...state,
 				browser: { ...state.browser, files: action.files, scanStatus: 'complete', cursorIndex: 0 },
 			}
-
 		case 'RescanComplete':
 			return {
 				...state,
@@ -215,20 +188,17 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 					scanVersion: state.browser.scanVersion + 1,
 				},
 			}
-
 		case 'ScanError':
 			return {
 				...state,
 				browser: { ...state.browser, scanStatus: 'error', scanError: action.error },
 			}
-
 		case 'FilterUpdate':
 			if (state.browser.filter === action.text) return state
 			return {
 				...state,
 				browser: { ...state.browser, filter: action.text, cursorIndex: 0 },
 			}
-
 		case 'CursorMove': {
 			const next = moveCursor(state.browser.cursorIndex, action.direction, action.filteredLength)
 			if (next === state.browser.cursorIndex) return state
@@ -237,7 +207,6 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 				browser: { ...state.browser, cursorIndex: next },
 			}
 		}
-
 		case 'OpenFile':
 			return {
 				...state,
@@ -247,49 +216,67 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 				fileDeleted: false,
 				focus: autoFocus(state.layout, 'preview'),
 			}
-
 		case 'ReturnToBrowser':
 			return returnToBrowser(state)
+	}
+}
 
-		// -- watcher actions --
+type MediaFocusAction = Extract<
+	AppAction,
+	{ type: 'FocusNextMedia' | 'FocusPrevMedia' | 'FocusMedia' }
+>
 
-		case 'FileDeleted':
-			return { ...state, fileDeleted: true }
-
-		// -- media actions --
-
+function mediaFocusReducer(state: AppState, action: MediaFocusAction): AppState {
+	switch (action.type) {
 		case 'FocusNextMedia': {
 			if (action.mediaCount === 0) return state
 			const next = ((state.mediaFocusIndex ?? -1) + 1) % action.mediaCount
 			return { ...state, mediaFocusIndex: next }
 		}
-
 		case 'FocusPrevMedia': {
 			if (action.mediaCount === 0) return state
 			const prev = ((state.mediaFocusIndex ?? 0) - 1 + action.mediaCount) % action.mediaCount
 			return { ...state, mediaFocusIndex: prev }
 		}
-
 		case 'FocusMedia':
 			return { ...state, mediaFocusIndex: action.index }
+	}
+}
 
+type MediaModalAction = Extract<
+	AppAction,
+	{ type: 'OpenMediaModal' | 'CloseMediaModal' | 'ToggleGallery' | 'TogglePlayPause' }
+>
+
+function mediaModalReducer(state: AppState, action: MediaModalAction): AppState {
+	switch (action.type) {
 		case 'OpenMediaModal': {
 			if (state.mediaFocusIndex == null) return state
-			const prevHidden = state.mediaModal.kind === 'image' ? state.mediaModal.galleryHidden : false
+			const prevHidden = state.mediaModal.kind === 'open' ? state.mediaModal.galleryHidden : false
 			return {
 				...state,
-				mediaModal: { kind: 'image', mediaIndex: state.mediaFocusIndex, galleryHidden: prevHidden },
+				mediaModal: {
+					kind: 'open',
+					mediaIndex: state.mediaFocusIndex,
+					galleryHidden: prevHidden,
+					paused: false,
+				},
 			}
 		}
-
 		case 'ToggleGallery': {
-			if (state.mediaModal.kind !== 'image') return state
+			if (state.mediaModal.kind !== 'open') return state
 			return {
 				...state,
 				mediaModal: { ...state.mediaModal, galleryHidden: !state.mediaModal.galleryHidden },
 			}
 		}
-
+		case 'TogglePlayPause': {
+			if (state.mediaModal.kind !== 'open') return state
+			return {
+				...state,
+				mediaModal: { ...state.mediaModal, paused: !state.mediaModal.paused },
+			}
+		}
 		case 'CloseMediaModal': {
 			if (state.mediaModal.kind !== 'closed') {
 				return { ...state, mediaModal: { kind: 'closed' } }
@@ -299,6 +286,55 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 			}
 			return state
 		}
+	}
+}
+
+// -- main reducer --
+
+export function appReducer(state: AppState, action: AppAction): AppState {
+	switch (action.type) {
+		case 'Resize':
+			if (state.dimensions.width === action.width && state.dimensions.height === action.height) {
+				return state
+			}
+			return { ...state, dimensions: { width: action.width, height: action.height } }
+		case 'FocusPane': {
+			if (!isSplitLayout(state.layout)) return state
+			if (state.focus === action.target) return state
+			return { ...state, focus: action.target }
+		}
+		case 'ToggleSync':
+			return { ...state, scrollSync: !state.scrollSync }
+		case 'CycleLegend':
+			return { ...state, legendPage: nextLegendPage(state.legendPage) }
+		case 'CycleLayout': {
+			if (state.mode === 'browser') return state
+			const next = nextLayout(state.layout)
+			const focus = autoFocus(next, state.focus)
+			return { ...state, layout: next, focus }
+		}
+		case 'Scroll':
+		case 'Quit':
+			return state
+		case 'FileDeleted':
+			return { ...state, fileDeleted: true }
+		case 'ScanComplete':
+		case 'RescanComplete':
+		case 'ScanError':
+		case 'FilterUpdate':
+		case 'CursorMove':
+		case 'OpenFile':
+		case 'ReturnToBrowser':
+			return browserReducer(state, action)
+		case 'FocusNextMedia':
+		case 'FocusPrevMedia':
+		case 'FocusMedia':
+			return mediaFocusReducer(state, action)
+		case 'OpenMediaModal':
+		case 'CloseMediaModal':
+		case 'ToggleGallery':
+		case 'TogglePlayPause':
+			return mediaModalReducer(state, action)
 	}
 }
 
@@ -435,6 +471,27 @@ export interface LegendEntry {
 	label: string
 }
 
+function modalLegend(modal: MediaModalState, legendPage: LegendPage): LegendEntry[] {
+	if (legendPage === 'off') return [{ key: '?', label: 'help' }]
+	return [
+		{ key: '?', label: 'more' },
+		{ key: 'n/N', label: 'next/prev' },
+		{ key: 'space', label: modal.kind === 'open' && modal.paused ? 'play' : 'pause' },
+		{ key: 'g', label: 'gallery' },
+		{ key: 'esc', label: 'close' },
+	]
+}
+
+function mediaFocusLegend(legendPage: LegendPage): LegendEntry[] {
+	if (legendPage === 'off') return [{ key: '?', label: 'help' }]
+	return [
+		{ key: '?', label: 'more' },
+		{ key: 'n/N', label: 'next/prev media' },
+		{ key: 'enter', label: 'view' },
+		{ key: 'esc', label: 'unfocus' },
+	]
+}
+
 export function legendEntries(state: AppState): LegendEntry[] {
 	// browser mode has its own legend
 	if (state.mode === 'browser') {
@@ -450,27 +507,8 @@ export function legendEntries(state: AppState): LegendEntry[] {
 		]
 	}
 
-	// viewer mode — modal open legend
-	if (state.mediaModal.kind !== 'closed') {
-		if (state.legendPage === 'off') return [{ key: '?', label: 'help' }]
-		return [
-			{ key: '?', label: 'more' },
-			{ key: 'n/N', label: 'next/prev' },
-			{ key: 'g', label: 'gallery' },
-			{ key: 'esc', label: 'close' },
-		]
-	}
-
-	// viewer mode — media focused legend
-	if (state.mediaFocusIndex != null) {
-		if (state.legendPage === 'off') return [{ key: '?', label: 'help' }]
-		return [
-			{ key: '?', label: 'more' },
-			{ key: 'n/N', label: 'next/prev media' },
-			{ key: 'enter', label: 'view' },
-			{ key: 'esc', label: 'unfocus' },
-		]
-	}
+	if (state.mediaModal.kind !== 'closed') return modalLegend(state.mediaModal, state.legendPage)
+	if (state.mediaFocusIndex != null) return mediaFocusLegend(state.legendPage)
 
 	// viewer mode — normal
 	if (state.legendPage === 'off') {

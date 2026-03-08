@@ -30,7 +30,7 @@ import {
 	type ScrollDirection,
 } from '../../app/state.ts'
 import { fuzzyFilter } from '../../browser/fuzzy.ts'
-import { killActiveAudio, playAudio, playVideo } from '../../media/ffplay.ts'
+import { killActiveAudio, playAudio } from '../../media/ffplay.ts'
 import { browserKeyHandler } from './browser-keys.ts'
 import {
 	openFileFromBrowser,
@@ -57,7 +57,7 @@ import {
 } from './viewer-keys.ts'
 
 function isModalPaused(modal: MediaModalState): boolean {
-	return modal.kind === 'image' && modal.paused
+	return modal.kind === 'open' && modal.paused
 }
 
 type AppProps =
@@ -232,29 +232,17 @@ export function App(props: Readonly<AppProps>) {
 		[props.theme, state.dimensions, state.layout],
 	)
 
-	// -- media playback (video/audio via ffplay) --
-	const playingRef = useRef(false)
+	// -- audio playback (audio-only nodes play directly via ffplay) --
 
-	const handleMediaPlay = useCallback(
+	const handleAudioPlay = useCallback(
 		(entry: MediaEntry) => {
-			if (playingRef.current) return
+			if (entry.node.type !== 'audio' || !props.mediaCapabilities.canPlayAudio) return
 			const basePath = currentFile != null ? dirname(currentFile) : process.cwd()
-			const src = entry.node.type === 'image' ? entry.node.url : entry.node.src
+			const src = entry.node.src
 			if (src == null) return
-
-			if (entry.node.type === 'video') {
-				if (!props.mediaCapabilities.canPlayVideo) return
-				playingRef.current = true
-				const tui = renderer != null ? { suspend: () => renderer.suspend(), resume: () => renderer.resume() } : undefined
-				void playVideo(src, basePath, tui).finally(() => {
-					playingRef.current = false
-				})
-			} else if (entry.node.type === 'audio') {
-				if (!props.mediaCapabilities.canPlayAudio) return
-				void playAudio(src, basePath)
-			}
+			void playAudio(src, basePath)
 		},
-		[currentFile, props.mediaCapabilities.canPlayVideo, props.mediaCapabilities.canPlayAudio, renderer],
+		[currentFile, props.mediaCapabilities.canPlayAudio],
 	)
 
 	// -- keyboard handler --
@@ -266,20 +254,11 @@ export function App(props: Readonly<AppProps>) {
 			return
 		}
 
-		// intercept return on video/audio — play instead of opening modal
+		// intercept return on audio — play directly instead of opening modal
 		if (key.name === 'return' && state.mediaFocusIndex != null) {
 			const entry = viewerState.mediaNodes[state.mediaFocusIndex]
-			if (entry != null && entry.node.type !== 'image') {
-				handleMediaPlay(entry)
-				return
-			}
-		}
-
-		// intercept return in modal on video/audio
-		if (key.name === 'return' && state.mediaModal.kind === 'image') {
-			const entry = viewerState.mediaNodes[state.mediaModal.mediaIndex]
-			if (entry != null && entry.node.type !== 'image') {
-				handleMediaPlay(entry)
+			if (entry != null && entry.node.type === 'audio') {
+				handleAudioPlay(entry)
 				return
 			}
 		}
@@ -358,8 +337,8 @@ export function App(props: Readonly<AppProps>) {
 		: null
 
 	const showModal = isViewer && state.mediaModal.kind !== 'closed'
-	const modalMediaIndex = state.mediaModal.kind === 'image' ? state.mediaModal.mediaIndex : 0
-	const galleryHidden = state.mediaModal.kind === 'image' && state.mediaModal.galleryHidden
+	const modalMediaIndex = state.mediaModal.kind === 'open' ? state.mediaModal.mediaIndex : 0
+	const galleryHidden = state.mediaModal.kind === 'open' && state.mediaModal.galleryHidden
 	const galleryFocusIndex = showModal ? modalMediaIndex : state.mediaFocusIndex
 	const showGallery = isViewer && galleryFocusIndex != null && !galleryHidden
 
@@ -373,6 +352,7 @@ export function App(props: Readonly<AppProps>) {
 			termWidth={state.dimensions.width}
 			termHeight={contentHeight}
 			paused={modalPaused}
+			mediaCapabilities={props.mediaCapabilities}
 			onFrameInfo={setModalFrameInfo}
 		/>
 	) : null
