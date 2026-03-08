@@ -348,7 +348,7 @@ Wire the streaming decoder into the modal overlay. Includes process lifecycle, c
   }): ReactNode
   ```
 - [x] State: `'loading' | 'playing' | 'error' | 'ended'`
-- [ ] **Single useEffect** for video + audio (not separate effects — avoids cleanup ordering issues):
+- [x] **Single useEffect** for video + audio (not separate effects — avoids cleanup ordering issues):
   ```ts
   const loadIdRef = useRef(0)
   const renderPendingRef = useRef(false)
@@ -425,9 +425,9 @@ Wire the streaming decoder into the modal overlay. Includes process lifecycle, c
     }
   }, [src, basePath, maxCols, maxRows])
   ```
-- [ ] Loading state: show `[loading video: alt]` text
-- [ ] Error state: show `[video: alt]` with error message
-- [ ] Ended state: show last rendered frame (natural — grid state persists)
+- [x] Loading state: show `[loading video: alt]` text
+- [x] Error state: show `[video: alt]` with error message
+- [x] Ended state: show last rendered frame (natural — grid state persists)
 - [ ] Test: component renders loading state initially
 - [ ] Test: component renders halfblock grid during playback
 
@@ -457,7 +457,7 @@ Wire the streaming decoder into the modal overlay. Includes process lifecycle, c
 
 ##### Phase 2b: Wire Into MediaModal + State
 
-- [ ] In `MediaModal`, replace `ModalMediaFallback` for video nodes:
+- [x] In `MediaModal`, replace `ModalMediaFallback` for video nodes:
   ```tsx
   {node.type === 'image' ? (
     <ModalImageContent ... />
@@ -467,37 +467,37 @@ Wire the streaming decoder into the modal overlay. Includes process lifecycle, c
     <ModalMediaFallback ... />  // audio-only stays as text
   )}
   ```
-- [ ] Rename `MediaModalState` `kind: 'image'` to `kind: 'open'`:
+- [x] Rename `MediaModalState` `kind: 'image'` to `kind: 'open'`:
   ```ts
   export type MediaModalState =
     | { kind: 'closed' }
     | { kind: 'open'; mediaIndex: number; galleryHidden: boolean; paused: boolean }
   ```
-- [ ] Update all `kind === 'image'` checks to `kind === 'open'`
-- [ ] Gate `TogglePlayPause` (spacebar): no-op when focused media node is a `VideoNode` (video has no pause in v1)
+- [x] Update all `kind === 'image'` checks to `kind === 'open'`
+- [x] Gate `TogglePlayPause` (spacebar): no-op when focused media node is a `VideoNode` (video has no pause in v1)
 - [ ] Update legend to hide "pause" label when viewing video
-- [ ] `ModalVideoContent` gets basePath from `ImageContext` (already provided by parent)
+- [x] `ModalVideoContent` gets basePath from `ImageContext` (already provided by parent)
 - [ ] Test: opening modal on video node shows video content, not text fallback
 
 **Files:** `src/renderer/opentui/media-modal.tsx`, `src/app/state.ts`, `src/renderer/opentui/viewer-keys.ts`
 
 ##### Phase 2c: Remove Old SDL Approach + Cleanup
 
-- [ ] Remove `playVideo()` function from `src/media/ffplay.ts`
-- [ ] Remove `TuiSuspendResume` interface
-- [ ] Remove **both** video playback intercepts from `app.tsx`:
+- [x] Remove `playVideo()` function from `src/media/ffplay.ts`
+- [x] Remove `TuiSuspendResume` interface
+- [x] Remove **both** video playback intercepts from `app.tsx`:
   - Pre-modal Enter intercept (~line 269): calls `handleMediaPlay` for non-image focused nodes
   - In-modal Enter intercept (~line 278): calls `handleMediaPlay` for non-image in modal
   - Audio playback intercept stays (Enter on audio node → `playAudio()`)
-- [ ] Video nodes now open the modal (same as images) — modal handles playback
-- [ ] Remove `renderer.suspend()`/`renderer.resume()` calls for video
+- [x] Video nodes now open the modal (same as images) — modal handles playback
+- [x] Remove `renderer.suspend()`/`renderer.resume()` calls for video
 - [ ] Test: Enter on video node opens modal (not SDL window)
 
 **Files:** `src/media/ffplay.ts`, `src/renderer/opentui/app.tsx`
 
 ##### Phase 2d: Graceful Fallback
 
-- [ ] When `canPlayVideo === false` (no ffmpeg) and modal opens on video node:
+- [x] When `canPlayVideo === false` (no ffmpeg) and modal opens on video node:
   - Show `[video: alt]` text
   - Info bar: `install ffmpeg to play video`
 - [ ] Test: video modal without ffmpeg shows fallback + hint
@@ -506,10 +506,10 @@ Wire the streaming decoder into the modal overlay. Includes process lifecycle, c
 
 ##### Phase 2e: Error Handling
 
-- [ ] ffprobe fails (timeout, parse error): show text fallback with error
-- [ ] ffmpeg crashes mid-playback: check exit code, show error state, keep last frame if available
-- [ ] ffmpeg exits with non-zero code: transition to `'error'` state (not `'ended'`)
-- [ ] Pipe read error (EPIPE): treat as end-of-stream, show last frame
+- [x] ffprobe fails (timeout, parse error): show text fallback with error
+- [x] ffmpeg crashes mid-playback: check exit code, show error state, keep last frame if available
+- [x] ffmpeg exits with non-zero code: transition to `'error'` state (not `'ended'`)
+- [x] Pipe read error (EPIPE): treat as end-of-stream, show last frame
 - [ ] Test: corrupt video shows error state gracefully
 
 > **Research: Max playback duration timeout.** Add a ceiling: `probeMetadata.duration + 30` seconds, or hard cap of 30 minutes. Prevents indefinitely-running ffmpeg from crafted videos.
@@ -609,13 +609,13 @@ Most modern terminals (iTerm2, WezTerm, Kitty, Alacritty) handle 2-5 MB/s. Termi
 
 ### Quality Gates
 
-- [ ] All new code has unit tests
-- [ ] ffprobe/ffmpeg spawns use argv arrays (no shell, no injection)
-- [ ] All paths use `sanitizeMediaPath()` for path validation
-- [ ] `probeVideo()` returns `ImageResult<T>`, never throws
-- [ ] ffprobe output values validated with `Number.isFinite()` before use in `-vf` filter
-- [ ] Dimensions capped at 2048 for ffmpeg output
-- [ ] Existing tests continue to pass (416+)
+- [x] All new code has unit tests
+- [x] ffprobe/ffmpeg spawns use argv arrays (no shell, no injection)
+- [x] All paths use `sanitizeMediaPath()` for path validation
+- [x] `probeVideo()` returns `ImageResult<T>`, never throws
+- [x] ffprobe output values validated with `Number.isFinite()` before use in `-vf` filter
+- [x] Dimensions capped at 2048 for ffmpeg output
+- [x] Existing tests continue to pass (416+)
 
 ## Dependencies & Risks
 
