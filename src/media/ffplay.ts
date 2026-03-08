@@ -135,7 +135,7 @@ export async function playAudio(
 	const filePath = sanitized.path!
 
 	try {
-		const args = ['ffplay', '-nodisp', '-vn', '-autoexit']
+		const args = ['ffplay', '-nodisp', '-vn', '-autoexit', '-fflags', '+nobuffer', '-analyzeduration', '0']
 		if (seekOffset > 0) args.push('-ss', String(seekOffset))
 		args.push(filePath)
 		activeAudioProc = Bun.spawn(args, {
