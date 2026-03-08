@@ -103,6 +103,15 @@ function dispatchAction(
 		renderer?.destroy()
 		return
 	}
+	if (action.type === 'CopySelection') {
+		const sel = renderer?.getSelection()
+		if (sel == null) return
+		const text = sel.getSelectedText()
+		if (text.trim().length === 0) return
+		renderer?.copyToClipboardOSC52(text)
+		renderer?.clearSelection()
+		return
+	}
 	dispatch(action)
 	if (action.type === 'Scroll') handleScroll(action.direction)
 }
@@ -123,6 +132,7 @@ function dispatchViewerKey(
 	mediaNodes: MediaEntry[],
 	onAudioPlay: (entry: MediaEntry) => void,
 	onAction: (action: AppAction) => void,
+	renderer?: ReturnType<typeof useRenderer> | null,
 ) {
 	// intercept return on audio — play directly instead of opening modal
 	if (key.name === 'return' && state.mediaFocusIndex != null) {
@@ -136,7 +146,7 @@ function dispatchViewerKey(
 	const action =
 		state.mediaModal.kind !== 'closed'
 			? handleModalKey(key, state, dispatch, mediaCount)
-			: handleViewerKey(key, state, dispatch, mediaCount)
+			: handleViewerKey(key, state, dispatch, mediaCount, renderer)
 	if (action == null) return
 	if (action.type === 'ReturnToBrowser') clearImageCache()
 	onAction(action)
@@ -236,7 +246,13 @@ export function App(props: Readonly<AppProps>) {
 	// -- directory watcher for browser live rescan --
 	const noWatch = props.noWatch
 	useEffect(() => {
-		if (browserDir == null || noWatch || state.mode !== 'browser' || state.browser.scanStatus !== 'complete') return
+		if (
+			browserDir == null ||
+			noWatch ||
+			state.mode !== 'browser' ||
+			state.browser.scanStatus !== 'complete'
+		)
+			return
 		return startDirectoryWatcher(browserDir, previewCacheRef, setBrowserPreviewContent, dispatch)
 	}, [state.mode, state.browser.scanStatus])
 
@@ -318,7 +334,16 @@ export function App(props: Readonly<AppProps>) {
 			browserKeyHandler(key, state, dispatch, filteredMatches.length, handleOpenFile, renderer)
 			return
 		}
-		dispatchViewerKey(key, state, dispatch, mediaCount, viewerState.mediaNodes, handleAudioPlay, handleAction)
+		dispatchViewerKey(
+			key,
+			state,
+			dispatch,
+			mediaCount,
+			viewerState.mediaNodes,
+			handleAudioPlay,
+			handleAction,
+			renderer,
+		)
 	})
 
 	const panes = paneDimensions(

@@ -102,7 +102,13 @@ describe('media modal actions', () => {
 	test('CloseMediaModal closes open modal, preserves focus', () => {
 		const s = stateWith({
 			mediaFocusIndex: 1,
-			mediaModal: { kind: 'open', mediaIndex: 1, galleryHidden: false, paused: false, restartCount: 0 },
+			mediaModal: {
+				kind: 'open',
+				mediaIndex: 1,
+				galleryHidden: false,
+				paused: false,
+				restartCount: 0,
+			},
 		})
 		const next = appReducer(s, { type: 'CloseMediaModal' })
 		expect(next.mediaModal).toEqual({ kind: 'closed' })
@@ -125,7 +131,13 @@ describe('media modal actions', () => {
 	test('TogglePlayPause pauses when playing', () => {
 		const s = stateWith({
 			mediaFocusIndex: 0,
-			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: false, restartCount: 0 },
+			mediaModal: {
+				kind: 'open',
+				mediaIndex: 0,
+				galleryHidden: false,
+				paused: false,
+				restartCount: 0,
+			},
 		})
 		const next = appReducer(s, { type: 'TogglePlayPause' })
 		expect(next.mediaModal).toEqual({
@@ -140,7 +152,13 @@ describe('media modal actions', () => {
 	test('TogglePlayPause resumes when paused', () => {
 		const s = stateWith({
 			mediaFocusIndex: 0,
-			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: true, restartCount: 0 },
+			mediaModal: {
+				kind: 'open',
+				mediaIndex: 0,
+				galleryHidden: false,
+				paused: true,
+				restartCount: 0,
+			},
 		})
 		const next = appReducer(s, { type: 'TogglePlayPause' })
 		expect(next.mediaModal).toEqual({
@@ -161,7 +179,13 @@ describe('media modal actions', () => {
 	test('ReplayMedia increments restartCount', () => {
 		const s = stateWith({
 			mediaFocusIndex: 0,
-			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: false, restartCount: 0 },
+			mediaModal: {
+				kind: 'open',
+				mediaIndex: 0,
+				galleryHidden: false,
+				paused: false,
+				restartCount: 0,
+			},
 		})
 		const next = appReducer(s, { type: 'ReplayMedia' })
 		expect(next.mediaModal).toEqual({
@@ -176,7 +200,13 @@ describe('media modal actions', () => {
 	test('ReplayMedia resets paused to false', () => {
 		const s = stateWith({
 			mediaFocusIndex: 0,
-			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: true, restartCount: 2 },
+			mediaModal: {
+				kind: 'open',
+				mediaIndex: 0,
+				galleryHidden: false,
+				paused: true,
+				restartCount: 2,
+			},
 		})
 		const next = appReducer(s, { type: 'ReplayMedia' })
 		expect(next.mediaModal).toEqual({
@@ -199,7 +229,13 @@ describe('media legend entries', () => {
 	test('modal open shows modal legend with pause', () => {
 		const s = stateWith({
 			mediaFocusIndex: 0,
-			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: false, restartCount: 0 },
+			mediaModal: {
+				kind: 'open',
+				mediaIndex: 0,
+				galleryHidden: false,
+				paused: false,
+				restartCount: 0,
+			},
 		})
 		const entries = legendEntries(s)
 		expect(entries.some((e) => e.key === 'esc' && e.label === 'close')).toBe(true)
@@ -212,7 +248,13 @@ describe('media legend entries', () => {
 	test('modal paused shows play in legend', () => {
 		const s = stateWith({
 			mediaFocusIndex: 0,
-			mediaModal: { kind: 'open', mediaIndex: 0, galleryHidden: false, paused: true, restartCount: 0 },
+			mediaModal: {
+				kind: 'open',
+				mediaIndex: 0,
+				galleryHidden: false,
+				paused: true,
+				restartCount: 0,
+			},
 		})
 		const entries = legendEntries(s)
 		expect(entries.some((e) => e.key === 'space' && e.label === 'play')).toBe(true)
@@ -231,5 +273,40 @@ describe('media legend entries', () => {
 		const entries = legendEntries(s)
 		expect(entries.some((e) => e.key === 'q' && e.label === 'quit')).toBe(true)
 		expect(entries.some((e) => e.key === 'n/N')).toBe(false)
+	})
+})
+
+describe('selection actions', () => {
+	test('CopySelection is a passthrough in appReducer (state unchanged)', () => {
+		const s = stateWith({})
+		const next = appReducer(s, { type: 'CopySelection' })
+		expect(next).toBe(s)
+	})
+
+	test('legend includes y: copy entry on nav page', () => {
+		const s = stateWith({})
+		const entries = legendEntries(s)
+		expect(entries.some((e) => e.key === 'y' && e.label === 'copy')).toBe(true)
+	})
+
+	test('legend does not show y: copy in media focus mode', () => {
+		const s = stateWith({ mediaFocusIndex: 0 })
+		const entries = legendEntries(s)
+		expect(entries.some((e) => e.key === 'y')).toBe(false)
+	})
+
+	test('legend does not show y: copy in modal mode', () => {
+		const s = stateWith({
+			mediaFocusIndex: 0,
+			mediaModal: {
+				kind: 'open',
+				mediaIndex: 0,
+				galleryHidden: false,
+				paused: false,
+				restartCount: 0,
+			},
+		})
+		const entries = legendEntries(s)
+		expect(entries.some((e) => e.key === 'y')).toBe(false)
 	})
 })

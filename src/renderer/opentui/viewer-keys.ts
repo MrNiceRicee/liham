@@ -1,6 +1,6 @@
 // viewer mode key handlers — extracted from app.tsx for file size.
 
-import type { KeyEvent, ScrollBoxRenderable } from '@opentui/core'
+import type { CliRenderer, KeyEvent, ScrollBoxRenderable } from '@opentui/core'
 
 import type { AppAction, AppState, ScrollDirection } from '../../app/state.ts'
 
@@ -31,6 +31,7 @@ export const VIEWER_KEY_MAP: Record<
 	end: () => ({ type: 'Scroll', direction: 'bottom' }),
 	d: (key) => (key.ctrl ? { type: 'Scroll', direction: 'halfDown' } : null),
 	u: (key) => (key.ctrl ? { type: 'Scroll', direction: 'halfUp' } : null),
+	y: () => ({ type: 'CopySelection' }),
 	// media navigation — no-op in source-only (no preview pane)
 	n: (_, state, mediaCount) => {
 		if (state.layout === 'source-only' || mediaCount === 0) return null
@@ -101,9 +102,14 @@ export function handleViewerKey(
 	state: AppState,
 	dispatch: React.Dispatch<AppAction>,
 	mediaCount: number,
+	renderer?: CliRenderer | null,
 ): AppAction | null {
-	// escape chain: (1) modal/focus, (2) browser, (3) quit
+	// escape chain: (1) selection, (2) modal/focus, (3) browser, (4) quit
 	if (key.name === 'escape') {
+		if (renderer?.hasSelection) {
+			renderer.clearSelection()
+			return null
+		}
 		if (state.mediaModal.kind !== 'closed' || state.mediaFocusIndex != null) {
 			dispatch({ type: 'CloseMediaModal' })
 			return null

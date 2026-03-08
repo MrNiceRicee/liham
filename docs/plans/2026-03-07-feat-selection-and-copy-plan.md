@@ -1,7 +1,8 @@
 ---
 title: Selection and Copy
 type: feat
-status: active
+status: completed
+note: Phase 1 implemented. Phase 2 (verify native selection) is manual testing.
 date: 2026-03-07
 origin: docs/brainstorms/2026-03-07-media-modal-and-selection-brainstorm.md
 ---
@@ -53,9 +54,9 @@ The original plan proposed a `useSelection` hook. That is unnecessary because:
 
 ### Phase 1: `y` Key Yank + Esc Clear
 
-- [ ] Add `y` to `VIEWER_KEY_MAP` in `viewer-keys.ts` — returns a new `CopySelection` action
-- [ ] Add `CopySelection` to `AppAction` union in `state.ts` (passthrough, no state change — handled by side-effect in `app.tsx`)
-- [ ] In `dispatchAction()` in `app.tsx`, handle `CopySelection`:
+- [x] Add `y` to `VIEWER_KEY_MAP` in `viewer-keys.ts` — returns a new `CopySelection` action
+- [x] Add `CopySelection` to `AppAction` union in `state.ts` (passthrough, no state change — handled by side-effect in `app.tsx`)
+- [x] In `dispatchAction()` in `app.tsx`, handle `CopySelection`:
   ```ts
   if (action.type === 'CopySelection') {
     const sel = renderer?.getSelection()
@@ -67,7 +68,7 @@ The original plan proposed a `useSelection` hook. That is unnecessary because:
     return
   }
   ```
-- [ ] Extend Esc handler in `handleViewerKey()` — insert selection clear before modal/focus check:
+- [x] Extend Esc handler in `handleViewerKey()` — insert selection clear before modal/focus check:
   ```ts
   if (key.name === 'escape') {
     if (renderer?.hasSelection) {
@@ -78,13 +79,13 @@ The original plan proposed a `useSelection` hook. That is unnecessary because:
   }
   ```
   This means the new Esc priority chain is: selection > modal > focus > browser > quit
-- [ ] Pass `renderer` to `handleViewerKey()` (it already receives `dispatch` — add renderer as parameter)
-- [ ] Add legend entry for `y` in the nav legend page (`legendEntries()` in `state.ts`):
+- [x] Pass `renderer` to `handleViewerKey()` (it already receives `dispatch` — add renderer as parameter)
+- [x] Add legend entry for `y` in the nav legend page (`legendEntries()` in `state.ts`):
   ```ts
   entries.push({ key: 'y', label: 'copy' })
   ```
   Only shown when not in media focus mode (media focus legend is separate)
-- [ ] Guard: `y` is a no-op when `renderer.hasSelection` is false (no selection to copy)
+- [x] Guard: `y` is a no-op when `renderer.hasSelection` is false (no selection to copy)
 
 ### Phase 2: Verify Native Selection Works
 

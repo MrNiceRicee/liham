@@ -24,7 +24,13 @@ export interface BrowserState {
 
 export type MediaModalState =
 	| { kind: 'closed' }
-	| { kind: 'open'; mediaIndex: number; galleryHidden: boolean; paused: boolean; restartCount: number }
+	| {
+			kind: 'open'
+			mediaIndex: number
+			galleryHidden: boolean
+			paused: boolean
+			restartCount: number
+	  }
 
 export interface AppState {
 	mode: AppMode
@@ -83,6 +89,7 @@ export type AppAction =
 	| { type: 'ToggleGallery' }
 	| { type: 'TogglePlayPause' }
 	| { type: 'ReplayMedia' }
+	| { type: 'CopySelection' }
 
 // -- layout helpers --
 
@@ -255,7 +262,9 @@ function mediaFocusReducer(state: AppState, action: MediaFocusAction): AppState 
 
 type MediaModalAction = Extract<
 	AppAction,
-	{ type: 'OpenMediaModal' | 'CloseMediaModal' | 'ToggleGallery' | 'TogglePlayPause' | 'ReplayMedia' }
+	{
+		type: 'OpenMediaModal' | 'CloseMediaModal' | 'ToggleGallery' | 'TogglePlayPause' | 'ReplayMedia'
+	}
 >
 
 function mediaModalReducer(state: AppState, action: MediaModalAction): AppState {
@@ -292,7 +301,11 @@ function mediaModalReducer(state: AppState, action: MediaModalAction): AppState 
 			if (state.mediaModal.kind !== 'open') return state
 			return {
 				...state,
-				mediaModal: { ...state.mediaModal, paused: false, restartCount: state.mediaModal.restartCount + 1 },
+				mediaModal: {
+					...state.mediaModal,
+					paused: false,
+					restartCount: state.mediaModal.restartCount + 1,
+				},
 			}
 		}
 		case 'CloseMediaModal': {
@@ -331,8 +344,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 			const focus = autoFocus(next, state.focus)
 			return { ...state, layout: next, focus }
 		}
-		case 'Scroll':
-		case 'Quit':
+		case 'Scroll': case 'Quit': case 'CopySelection':
 			return state
 		case 'FileDeleted':
 			return { ...state, fileDeleted: true }
@@ -554,6 +566,8 @@ export function legendEntries(state: AppState): LegendEntry[] {
 		entries.push({ key: 'Tab', label: other })
 		entries.push({ key: 's', label: state.scrollSync ? 'sync on' : 'sync off' })
 	}
+
+	entries.push({ key: 'y', label: 'copy' })
 
 	if (state.fromBrowser) {
 		entries.push({ key: 'esc', label: 'back' })

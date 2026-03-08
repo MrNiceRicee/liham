@@ -11,13 +11,25 @@ function makeImage(alt: string, url?: string): ImageNode {
 }
 
 function makeVideo(alt: string, src?: string): VideoNode {
-	const node: VideoNode = { type: 'video', alt, autoplay: false, loop: false, style: { fg: '#888888' } }
+	const node: VideoNode = {
+		type: 'video',
+		alt,
+		autoplay: false,
+		loop: false,
+		style: { fg: '#888888' },
+	}
 	if (src != null) node.src = src
 	return node
 }
 
 function makeAudio(alt: string, src?: string): AudioNode {
-	const node: AudioNode = { type: 'audio', alt, autoplay: false, loop: false, style: { fg: '#888888' } }
+	const node: AudioNode = {
+		type: 'audio',
+		alt,
+		autoplay: false,
+		loop: false,
+		style: { fg: '#888888' },
+	}
 	if (src != null) node.src = src
 	return node
 }

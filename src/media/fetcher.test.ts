@@ -36,7 +36,10 @@ afterEach(() => {
 function stubFetch(body: Uint8Array | null, status = 200, headers?: Record<string, string>): void {
 	const opts: ResponseInit = { status }
 	if (headers != null) opts.headers = headers
-	globalThis.fetch = (() => Promise.resolve(new Response(body as unknown as BodyInit | null, opts))) as unknown as typeof fetch
+	globalThis.fetch = (() =>
+		Promise.resolve(
+			new Response(body as unknown as BodyInit | null, opts),
+		)) as unknown as typeof fetch
 }
 
 function stubFetchRedirect(location: string, then: Uint8Array): void {

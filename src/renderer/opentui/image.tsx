@@ -159,19 +159,15 @@ function ImageBlock({
 			? buildFocusLabel(node, mediaIndex, focusCtx.mediaCount, focusCtx.focusBorderColor)
 			: null
 
-	const focusProps = isFocused && focusCtx != null
-		? { border: true as const, borderColor: focusCtx.focusBorderColor }
-		: {}
+	const focusProps =
+		isFocused && focusCtx != null
+			? { border: true as const, borderColor: focusCtx.focusBorderColor }
+			: {}
 
 	// wrap all states in a ref'd box for viewport position tracking
 	if (state === 'idle' || state === 'loading') {
 		return (
-			<box
-				ref={boxRef}
-				key={nodeKey}
-				{...focusProps}
-				onMouseDown={handleMouseDown}
-			>
+			<box ref={boxRef} key={nodeKey} {...focusProps} onMouseDown={handleMouseDown}>
 				<text>
 					<span {...fgProps}>{`[loading: ${node.alt}]`}</span>
 				</text>
@@ -183,12 +179,7 @@ function ImageBlock({
 	if (state === 'error') {
 		const suffix = errorMsg.length > 0 ? ` (${errorMsg})` : ''
 		return (
-			<box
-				ref={boxRef}
-				key={nodeKey}
-				{...focusProps}
-				onMouseDown={handleMouseDown}
-			>
+			<box ref={boxRef} key={nodeKey} {...focusProps} onMouseDown={handleMouseDown}>
 				<text>
 					<span {...fgProps}>{`[image: ${node.alt}${suffix}]`}</span>
 				</text>
@@ -199,12 +190,7 @@ function ImageBlock({
 
 	if (state === 'loaded' && image != null) {
 		return (
-			<box
-				ref={boxRef}
-				key={nodeKey}
-				{...focusProps}
-				onMouseDown={handleMouseDown}
-			>
+			<box ref={boxRef} key={nodeKey} {...focusProps} onMouseDown={handleMouseDown}>
 				{renderLoadedImage(image, node, nodeKey, ctx)}
 				{focusLabel}
 			</box>
