@@ -38,7 +38,7 @@ const EXCLUDED_DIR_PREFIXES = new Set([
 ])
 
 // shared debounce helper — avoids duplicate clearDebounce functions
-function createDebouncer(delayMs: number) {
+export function createDebouncer(delayMs: number) {
 	let timer: ReturnType<typeof setTimeout> | null = null
 
 	return {

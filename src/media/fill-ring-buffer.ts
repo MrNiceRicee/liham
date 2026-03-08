@@ -13,8 +13,6 @@ const debug =
 const SIGSTOP_THRESHOLD = 0.9
 const SIGCONT_THRESHOLD = 0.5
 
-// hard cap: 30 minutes of video — prevents resource exhaustion from crafted media
-const MAX_PLAYBACK_FRAMES = 30 * 60 * 60 // 30min at 60fps upper bound
 
 export type ProducerEvent =
 	| { type: 'progress'; elapsed: number }
@@ -85,18 +83,9 @@ export async function fillRingBuffer({
 	let framesWritten = 0
 	const throttle = createSignalThrottle(pid, buffer)
 
-	function shouldStop(): boolean {
-		if (isStale()) return true
-		if (framesWritten >= MAX_PLAYBACK_FRAMES) {
-			debug('max playback duration reached')
-			return true
-		}
-		return false
-	}
-
 	try {
 		for await (const rgba of readFrames(stdout, frameSize)) {
-			if (shouldStop()) break
+			if (isStale()) break
 
 			throttle.maybePause()
 			const ok = await buffer.write(rgba)
