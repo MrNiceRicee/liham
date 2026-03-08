@@ -9,7 +9,7 @@ import type { ThemeTokens } from '../theme/types.ts'
 
 import { isSharpAvailable } from '../media/decoder.ts'
 import { detectCapabilities } from '../media/detect.ts'
-import { isFfplayAvailable } from '../media/ffplay.ts'
+import { isFfmpegAvailable, isFfplayAvailable } from '../media/ffplay.ts'
 import { processMarkdown } from '../pipeline/processor.ts'
 import { boot } from '../renderer/opentui/boot.tsx'
 import { darkTheme } from '../theme/dark.ts'
@@ -239,12 +239,11 @@ interface ResolvedDetection {
 }
 
 function buildMediaCapabilities(result: Awaited<ReturnType<typeof detectCapabilities>>): MediaCapabilities {
-	const ffplay = isFfplayAvailable()
 	return {
 		...result.image,
 		canAnimate: false, // OpenTUI React reconciler causes tearing
-		canPlayVideo: ffplay,
-		canPlayAudio: ffplay,
+		canPlayVideo: isFfmpegAvailable(), // video rendering needs ffmpeg for frame extraction
+		canPlayAudio: isFfplayAvailable(), // audio-only still uses ffplay
 	}
 }
 
@@ -319,7 +318,8 @@ async function main() {
 			`cell pixels: ${String(detection.mediaCapabilities.cellPixelWidth)}x${String(detection.mediaCapabilities.cellPixelHeight)}`,
 		)
 		console.log(`sharp: ${String(isSharpAvailable())}`)
-		console.log(`ffplay: ${String(detection.mediaCapabilities.canPlayVideo)}`)
+		console.log(`ffmpeg: ${String(detection.mediaCapabilities.canPlayVideo)}`)
+		console.log(`ffplay: ${String(detection.mediaCapabilities.canPlayAudio)}`)
 		console.log(`TERM: ${process.env['TERM'] ?? '(unset)'}`)
 		console.log(`TERM_PROGRAM: ${process.env['TERM_PROGRAM'] ?? '(unset)'}`)
 		console.log(`LIHAM_THEME: ${process.env['LIHAM_THEME'] ?? '(unset)'}`)

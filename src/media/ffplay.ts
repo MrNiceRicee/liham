@@ -9,6 +9,10 @@ export function isFfplayAvailable(): boolean {
 	return Bun.which('ffplay') != null
 }
 
+export function isFfmpegAvailable(): boolean {
+	return Bun.which('ffmpeg') != null
+}
+
 // -- path sanitization --
 
 export interface SanitizeResult {

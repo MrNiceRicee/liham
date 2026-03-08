@@ -52,7 +52,8 @@ export interface ImageCapabilities {
 
 // extends image capabilities with animation and media playback support.
 // canAnimate: false for OpenTUI (React reconciler tearing), true for Rezi.
-// canPlayVideo/canPlayAudio: true when ffplay detected at startup.
+// canPlayVideo: true when ffmpeg detected (frame extraction).
+// canPlayAudio: true when ffplay detected (audio playback).
 export interface MediaCapabilities extends ImageCapabilities {
 	canAnimate: boolean
 	canPlayVideo: boolean

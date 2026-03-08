@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { isFfplayAvailable, sanitizeMediaPath } from './ffplay.ts'
+import { isFfmpegAvailable, isFfplayAvailable, sanitizeMediaPath } from './ffplay.ts'
 
 describe('isFfplayAvailable', () => {
 	test('returns a boolean', () => {
@@ -14,13 +14,25 @@ describe('isFfplayAvailable', () => {
 	})
 })
 
+describe('isFfmpegAvailable', () => {
+	test('returns a boolean', () => {
+		const result = isFfmpegAvailable()
+		expect(typeof result).toBe('boolean')
+	})
+
+	test('matches Bun.which result', () => {
+		const expected = Bun.which('ffmpeg') != null
+		expect(isFfmpegAvailable()).toBe(expected)
+	})
+})
+
 describe('sanitizeMediaPath', () => {
 	const base = `${import.meta.dir}/../../test/assets`
 
 	test('resolves valid local file', () => {
-		const result = sanitizeMediaPath('profile.png', base)
+		const result = sanitizeMediaPath('fixture.txt', base)
 		expect(result.ok).toBe(true)
-		expect(result.path).toContain('profile.png')
+		expect(result.path).toContain('fixture.txt')
 	})
 
 	test('rejects empty path', () => {
@@ -56,9 +68,9 @@ describe('sanitizeMediaPath', () => {
 	})
 
 	test('resolves relative path from basePath', () => {
-		const result = sanitizeMediaPath('../assets/profile.png', `${base}/../fixtures`)
+		const result = sanitizeMediaPath('../assets/fixture.txt', `${base}/../fixtures`)
 		expect(result.ok).toBe(true)
-		expect(result.path).toContain('profile.png')
+		expect(result.path).toContain('fixture.txt')
 	})
 
 	test('path with shell metacharacters is treated as literal filename', () => {

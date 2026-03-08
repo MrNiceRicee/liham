@@ -238,22 +238,23 @@ export function App(props: Readonly<AppProps>) {
 	const handleMediaPlay = useCallback(
 		(entry: MediaEntry) => {
 			if (playingRef.current) return
-			if (!props.mediaCapabilities.canPlayVideo) return
 			const basePath = currentFile != null ? dirname(currentFile) : process.cwd()
 			const src = entry.node.type === 'image' ? entry.node.url : entry.node.src
 			if (src == null) return
 
 			if (entry.node.type === 'video') {
+				if (!props.mediaCapabilities.canPlayVideo) return
 				playingRef.current = true
 				const tui = renderer != null ? { suspend: () => renderer.suspend(), resume: () => renderer.resume() } : undefined
 				void playVideo(src, basePath, tui).finally(() => {
 					playingRef.current = false
 				})
 			} else if (entry.node.type === 'audio') {
+				if (!props.mediaCapabilities.canPlayAudio) return
 				void playAudio(src, basePath)
 			}
 		},
-		[currentFile, props.mediaCapabilities.canPlayVideo, renderer],
+		[currentFile, props.mediaCapabilities.canPlayVideo, props.mediaCapabilities.canPlayAudio, renderer],
 	)
 
 	// -- keyboard handler --
