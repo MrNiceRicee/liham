@@ -7,12 +7,7 @@ import { type ReactNode, useContext, useEffect, useRef, useState } from 'react'
 
 import type { MediaIRNode } from '../../ir/types.ts'
 import { checkBufferEnd, fillRingBuffer } from '../../media/fill-ring-buffer.ts'
-import {
-	killActiveAudio,
-	pauseActiveAudio,
-	playAudio,
-	resumeActiveAudio,
-} from '../../media/ffplay.ts'
+import { killActiveAudio, playAudio } from '../../media/ffplay.ts'
 import { createFrameTimer, type FrameTimerHandle } from '../../media/frame-timer.ts'
 import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
 import { createRingBuffer, type RingBuffer } from '../../media/ring-buffer.ts'
@@ -113,6 +108,9 @@ function ModalVideoContent({
 	const timerRef = useRef<FrameTimerHandle | null>(null)
 	const bufferRef = useRef<RingBuffer | null>(null)
 
+	// audio resync context — ref avoids adding deps to pause effect
+	const audioCtxRef = useRef<{ absPath: string; basePath: string; fps: number; hasAudio: boolean; seekOffset: number } | null>(null)
+
 	// clear renderPending after React commits (NOT queueMicrotask)
 	useEffect(() => {
 		renderPendingRef.current = false
@@ -159,6 +157,7 @@ function ModalVideoContent({
 
 		setGridWidth(dims.termCols)
 		setPlaybackState('playing')
+		audioCtxRef.current = { absPath, basePath, fps: meta.fps, hasAudio: meta.hasAudio, seekOffset }
 
 		const proc = createVideoStream({
 			filePath: absPath,
@@ -194,20 +193,12 @@ function ModalVideoContent({
 		})
 		timerRef.current = timer
 
-		// start audio in parallel (don't block video on audio startup)
-		if (meta.hasAudio) {
-			void playAudio(absPath, basePath, seekOffset).then((result) => {
-				if (result.ok) audioStarted = true
-			})
-		}
-
 		// start producer — fills ring buffer from ffmpeg stdout
 		void fillRingBuffer({
 			stdout: proc.stdout as ReadableStream<Uint8Array>,
 			buffer,
 			frameSize,
 			fps: meta.fps,
-			pid: proc.pid,
 			isStale,
 			onEvent: (event) => {
 				if (isStale()) return
@@ -232,7 +223,12 @@ function ModalVideoContent({
 				setCurrentGrid(grid)
 			}
 
-			// start timer (paused state handled by pause effect)
+			// start audio then timer — await spawn so they begin together
+			if (meta.hasAudio) {
+				const result = await playAudio(absPath, basePath, seekOffset)
+				if (isStale()) return
+				if (result.ok) audioStarted = true
+			}
 			timer.play()
 		})()
 
@@ -265,10 +261,17 @@ function ModalVideoContent({
 		}
 		if (paused) {
 			pauseActiveVideo()
-			pauseActiveAudio()
+			// kill audio immediately — SIGSTOP leaves OS audio buffers playing
+			void killActiveAudio()
 		} else {
 			resumeActiveVideo()
-			resumeActiveAudio()
+			// start fresh audio at current video position (playAudio handles kill internally)
+			const ctx = audioCtxRef.current
+			if (ctx?.hasAudio && timer != null) {
+				const elapsed = ctx.seekOffset + timer.tickCount / ctx.fps
+				debug(`audio resync: elapsed=${String(elapsed.toFixed(2))}s`)
+				void playAudio(ctx.absPath, ctx.basePath, elapsed)
+			}
 		}
 	}, [paused])
 

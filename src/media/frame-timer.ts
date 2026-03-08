@@ -89,8 +89,13 @@ export function createFrameTimer({
 
 			frameIndex = loop ? nextIndex % delays.length : nextIndex
 			tickCount++
-			// rolling expected: reset baseline to now if we fell behind
-			nextTickAt = Math.max(performance.now(), nextTickAt) + intervalMs
+			// epoch-anchored: advance by one interval to maintain correct average rate
+			nextTickAt += intervalMs
+			// if more than 3 frames behind (e.g. process suspended), skip forward
+			const now = performance.now()
+			if (nextTickAt < now - 3 * intervalMs) {
+				nextTickAt = now
+			}
 			onFrame(frameIndex)
 			scheduleNextB()
 		}, adjusted)

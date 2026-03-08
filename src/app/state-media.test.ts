@@ -363,10 +363,14 @@ describe('SeekMedia action', () => {
 		}
 	})
 
-	test('SeekMedia at boundary is no-op', () => {
+	test('SeekMedia backward at zero replays from beginning', () => {
 		const s = openModal(0)
 		const next = appReducer(s, { type: 'SeekMedia', delta: -5, duration: 60 })
-		expect(next).toBe(s)
+		expect(next).not.toBe(s)
+		if (next.mediaModal.kind === 'open') {
+			expect(next.mediaModal.seekOffset).toBe(0)
+			expect(next.mediaModal.restartCount).toBe(s.mediaModal.kind === 'open' ? s.mediaModal.restartCount + 1 : 1)
+		}
 	})
 
 	test('SeekMedia at upper boundary is no-op', () => {

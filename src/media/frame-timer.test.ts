@@ -281,23 +281,37 @@ describe('createFrameTimer', () => {
 		timer.dispose()
 	})
 
-	test('Pattern B gracefully handles overload (no cascading catch-up)', () => {
-		// simulate a 33ms interval where render takes 50ms (over budget)
+	test('Pattern B catches up after overload to maintain AV sync', () => {
+		// simulate a 33ms interval where render falls behind
+		const frames: number[] = []
+		const timer = createFrameTimer({ delays: [33], onFrame: (i) => frames.push(i) })
+		timer.play() // fires frame 0 at t=0
+		expect(frames.length).toBe(1)
+
+		// advance to t=33, timer fires normally
+		flushNextTimer()
+		expect(frames.length).toBe(2)
+
+		// advance to t=66, fires normally again
+		flushNextTimer()
+		expect(frames.length).toBe(3)
+		expect(timer.tickCount).toBe(2)
+
+		timer.dispose()
+	})
+
+	test('Pattern B skips forward after long suspension', () => {
+		// simulate process suspended for many frames
 		const frames: number[] = []
 		const timer = createFrameTimer({ delays: [33], onFrame: (i) => frames.push(i) })
 		timer.play() // fires frame 0 at t=0
 
-		// simulate timer fires at t=33 but by the time callback runs, it's t=50
-		mockNow = 50
-		flushTimers(50) // the 33ms timer fires
-		expect(frames.length).toBe(2)
+		// jump far into the future (simulating process suspension)
+		mockNow = 500
+		flushTimers(0) // fire the pending 33ms timer at the new time
 
-		// Pattern B: next tick should be scheduled at max(50, 33) + 33 = 83
-		// not at 33+33=66 (which would be in the past → 0ms delay → catch-up storm)
-		if (pendingTimers.length > 0) {
-			const nextFire = pendingTimers[0]!.delay
-			expect(nextFire).toBeGreaterThan(50) // must be in the future
-		}
+		// should not cascade hundreds of catch-up ticks
+		expect(frames.length).toBeLessThanOrEqual(5)
 
 		timer.dispose()
 	})

@@ -65,49 +65,25 @@ export type PlayResult = { ok: true } | { ok: false; error: string }
 // -- audio playback --
 
 let activeAudioProc: ReturnType<typeof Bun.spawn> | null = null
-let audioStopped = false
-
-export function pauseActiveAudio(): void {
-	debug(`pauseActiveAudio: proc=${String(activeAudioProc != null)}, stopped=${String(audioStopped)}, pid=${String(activeAudioProc?.pid)}`)
-	if (activeAudioProc != null && !audioStopped) {
-		try {
-			process.kill(activeAudioProc.pid, 'SIGSTOP')
-			audioStopped = true
-		} catch {
-			/* already dead */
-		}
-	}
-}
-
-export function resumeActiveAudio(): void {
-	debug(`resumeActiveAudio: proc=${String(activeAudioProc != null)}, stopped=${String(audioStopped)}, pid=${String(activeAudioProc?.pid)}`)
-	if (activeAudioProc != null && audioStopped) {
-		try {
-			process.kill(activeAudioProc.pid, 'SIGCONT')
-			audioStopped = false
-		} catch {
-			/* already dead */
-		}
-	}
-}
+let pendingKill: Promise<void> | null = null
 
 export async function killActiveAudio(): Promise<void> {
+	// wait for any in-flight kill to finish first (prevents overlapping processes)
+	if (pendingKill != null) await pendingKill
+
 	if (activeAudioProc == null) return
 	const proc = activeAudioProc
 	activeAudioProc = null
-	// must resume stopped process before SIGTERM
-	if (audioStopped) {
-		proc.kill('SIGCONT')
-		audioStopped = false
-	}
-	proc.kill('SIGTERM')
-	await Promise.race([proc.exited, new Promise((r) => setTimeout(r, 500))])
-	// escalate if still running
+	debug(`killActiveAudio: SIGKILL pid=${String(proc.pid)}`)
 	try {
 		proc.kill('SIGKILL')
 	} catch {
-		// already exited
+		// already dead
 	}
+	pendingKill = proc.exited.then(() => {
+		pendingKill = null
+	})
+	await pendingKill
 }
 
 export async function playAudio(
@@ -144,12 +120,11 @@ export async function playAudio(
 			stderr: 'ignore',
 		})
 
-		// clean up reference when process exits + reset stopped flag
+		// clean up reference when process exits
 		const proc = activeAudioProc
 		void proc.exited.then(() => {
 			if (activeAudioProc === proc) {
 				activeAudioProc = null
-				audioStopped = false
 			}
 		})
 

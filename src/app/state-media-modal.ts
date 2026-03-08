@@ -34,6 +34,17 @@ function openMediaModal(state: AppState): AppState {
 function seekMedia(state: AppState, delta: number, duration: number): AppState {
 	if (state.mediaModal.kind !== 'open') return state
 	const newOffset = Math.max(0, Math.min(state.mediaModal.seekOffset + delta, duration))
+	// seeking backward to/past start — replay from beginning even if seekOffset is already 0
+	if (newOffset === 0 && delta < 0) {
+		return {
+			...state,
+			mediaModal: {
+				...state.mediaModal,
+				seekOffset: 0,
+				restartCount: state.mediaModal.restartCount + 1,
+			},
+		}
+	}
 	if (newOffset === state.mediaModal.seekOffset) return state
 	return {
 		...state,
