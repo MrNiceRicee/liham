@@ -15,6 +15,7 @@ import {
 import {
 	type AppAction,
 	appReducer,
+	type AppState,
 	initialState,
 	isSplitLayout,
 	type LayoutMode,
@@ -55,6 +56,90 @@ import {
 
 function isModalPaused(modal: MediaModalState): boolean {
 	return modal.kind === 'open' && modal.paused
+}
+
+// extracted to reduce App cognitive complexity
+
+function deriveModalState(state: AppState, isViewer: boolean) {
+	const showModal = isViewer && state.mediaModal.kind !== 'closed'
+	const modal = state.mediaModal
+	const mediaIndex = modal.kind === 'open' ? modal.mediaIndex : 0
+	const galleryHidden = modal.kind === 'open' && modal.galleryHidden
+	const galleryFocusIndex = showModal ? mediaIndex : state.mediaFocusIndex
+	const showGallery = isViewer && galleryFocusIndex != null && !galleryHidden
+	return {
+		showModal,
+		mediaIndex,
+		galleryFocusIndex,
+		showGallery,
+		scrollLocked: state.mediaFocusIndex != null || modal.kind !== 'closed',
+		paused: isModalPaused(modal),
+		contentHeight: Math.max(1, state.dimensions.height - 2),
+		restartCount: modal.kind === 'open' ? modal.restartCount : 0,
+	}
+}
+
+function scrollWithSync(
+	direction: ScrollDirection,
+	focusedRef: React.RefObject<ScrollBoxRenderable | null>,
+	otherRef: React.RefObject<ScrollBoxRenderable | null>,
+	scrollSync: boolean,
+	layout: LayoutMode,
+) {
+	applyScroll(focusedRef.current, direction)
+	if (scrollSync && isSplitLayout(layout)) {
+		queueMicrotask(() => syncScroll(focusedRef.current, otherRef.current))
+	}
+}
+
+function dispatchAction(
+	action: AppAction,
+	dispatch: (a: AppAction) => void,
+	handleScroll: (dir: ScrollDirection) => void,
+	renderer: ReturnType<typeof useRenderer> | null,
+) {
+	if (action.type === 'Quit') {
+		void killActiveAudio()
+		renderer?.destroy()
+		return
+	}
+	dispatch(action)
+	if (action.type === 'Scroll') handleScroll(action.direction)
+}
+
+function playMediaAudio(entry: MediaEntry, currentFile: string | undefined, canPlay: boolean) {
+	if (entry.node.type !== 'audio' || !canPlay) return
+	const basePath = currentFile != null ? dirname(currentFile) : process.cwd()
+	const src = entry.node.src
+	if (src == null) return
+	void playAudio(src, basePath)
+}
+
+function dispatchViewerKey(
+	key: KeyEvent,
+	state: AppState,
+	dispatch: (action: AppAction) => void,
+	mediaCount: number,
+	mediaNodes: MediaEntry[],
+	onAudioPlay: (entry: MediaEntry) => void,
+	onAction: (action: AppAction) => void,
+) {
+	// intercept return on audio — play directly instead of opening modal
+	if (key.name === 'return' && state.mediaFocusIndex != null) {
+		const entry = mediaNodes[state.mediaFocusIndex]
+		if (entry?.node.type === 'audio') {
+			onAudioPlay(entry)
+			return
+		}
+	}
+
+	const action =
+		state.mediaModal.kind !== 'closed'
+			? handleModalKey(key, state, dispatch, mediaCount)
+			: handleViewerKey(key, state, dispatch, mediaCount)
+	if (action == null) return
+	if (action.type === 'ReturnToBrowser') clearImageCache()
+	onAction(action)
 }
 
 type AppProps =
@@ -151,8 +236,7 @@ export function App(props: Readonly<AppProps>) {
 	// -- directory watcher for browser live rescan --
 	const noWatch = props.noWatch
 	useEffect(() => {
-		if (browserDir == null || noWatch || state.mode !== 'browser') return
-		if (state.browser.scanStatus !== 'complete') return
+		if (browserDir == null || noWatch || state.mode !== 'browser' || state.browser.scanStatus !== 'complete') return
 		return startDirectoryWatcher(browserDir, previewCacheRef, setBrowserPreviewContent, dispatch)
 	}, [state.mode, state.browser.scanStatus])
 
@@ -192,25 +276,13 @@ export function App(props: Readonly<AppProps>) {
 	const otherRef = state.focus === 'source' ? previewRef : sourceRef
 
 	const handleScroll = useCallback(
-		(direction: ScrollDirection) => {
-			applyScroll(focusedRef.current, direction)
-			if (state.scrollSync && isSplitLayout(state.layout)) {
-				queueMicrotask(() => syncScroll(focusedRef.current, otherRef.current))
-			}
-		},
+		(direction: ScrollDirection) =>
+			scrollWithSync(direction, focusedRef, otherRef, state.scrollSync, state.layout),
 		[state.scrollSync, state.layout, state.focus],
 	)
 
 	const handleAction = useCallback(
-		(action: AppAction) => {
-			if (action.type === 'Quit') {
-				void killActiveAudio()
-				renderer?.destroy()
-				return
-			}
-			dispatch(action)
-			if (action.type === 'Scroll') handleScroll(action.direction)
-		},
+		(action: AppAction) => dispatchAction(action, dispatch, handleScroll, renderer),
 		[handleScroll, renderer],
 	)
 
@@ -233,11 +305,7 @@ export function App(props: Readonly<AppProps>) {
 
 	const handleAudioPlay = useCallback(
 		(entry: MediaEntry) => {
-			if (entry.node.type !== 'audio' || !props.mediaCapabilities.canPlayAudio) return
-			const basePath = currentFile != null ? dirname(currentFile) : process.cwd()
-			const src = entry.node.src
-			if (src == null) return
-			void playAudio(src, basePath)
+			playMediaAudio(entry, currentFile, props.mediaCapabilities.canPlayAudio)
 		},
 		[currentFile, props.mediaCapabilities.canPlayAudio],
 	)
@@ -250,23 +318,7 @@ export function App(props: Readonly<AppProps>) {
 			browserKeyHandler(key, state, dispatch, filteredMatches.length, handleOpenFile, renderer)
 			return
 		}
-
-		// intercept return on audio — play directly instead of opening modal
-		if (key.name === 'return' && state.mediaFocusIndex != null) {
-			const entry = viewerState.mediaNodes[state.mediaFocusIndex]
-			if (entry?.node.type === 'audio') {
-				handleAudioPlay(entry)
-				return
-			}
-		}
-
-		const action =
-			state.mediaModal.kind !== 'closed'
-				? handleModalKey(key, state, dispatch, mediaCount)
-				: handleViewerKey(key, state, dispatch, mediaCount)
-		if (action == null) return
-		if (action.type === 'ReturnToBrowser') clearImageCache()
-		handleAction(action)
+		dispatchViewerKey(key, state, dispatch, mediaCount, viewerState.mediaNodes, handleAudioPlay, handleAction)
 	})
 
 	const panes = paneDimensions(
@@ -316,8 +368,7 @@ export function App(props: Readonly<AppProps>) {
 
 	const mouseHandlers = createMouseHandlers(state, dispatch, sourceRef, previewRef)
 
-	// disable scrollbox focus when media is active (prevents native j/k/arrow handling)
-	const scrollLocked = state.mediaFocusIndex != null || state.mediaModal.kind !== 'closed'
+	const modalDerived = deriveModalState(state, isViewer)
 
 	const viewerLayout = isViewer
 		? renderViewerLayout(
@@ -329,42 +380,32 @@ export function App(props: Readonly<AppProps>) {
 				sourceRef,
 				previewRef,
 				mouseHandlers,
-				scrollLocked,
+				modalDerived.scrollLocked,
 			)
 		: null
-
-	const showModal = isViewer && state.mediaModal.kind !== 'closed'
-	const modalMediaIndex = state.mediaModal.kind === 'open' ? state.mediaModal.mediaIndex : 0
-	const galleryHidden = state.mediaModal.kind === 'open' && state.mediaModal.galleryHidden
-	const galleryFocusIndex = showModal ? modalMediaIndex : state.mediaFocusIndex
-	const showGallery = isViewer && galleryFocusIndex != null && !galleryHidden
-
-	const modalPaused = isModalPaused(state.mediaModal)
-	const contentHeight = Math.max(1, state.dimensions.height - 2)
-	const modalRestartCount = state.mediaModal.kind === 'open' ? state.mediaModal.restartCount : 0
-	const modalElement = showModal ? (
+	const modalElement = modalDerived.showModal ? (
 		<MediaModal
 			mediaNodes={viewerState.mediaNodes}
-			mediaIndex={modalMediaIndex}
+			mediaIndex={modalDerived.mediaIndex}
 			theme={props.theme}
 			termWidth={state.dimensions.width}
-			termHeight={contentHeight}
-			paused={modalPaused}
-			restartCount={modalRestartCount}
+			termHeight={modalDerived.contentHeight}
+			paused={modalDerived.paused}
+			restartCount={modalDerived.restartCount}
 			mediaCapabilities={props.mediaCapabilities}
 			onFrameInfo={setModalFrameInfo}
 		/>
 	) : null
 
-	const galleryElement = showGallery ? (
+	const galleryElement = modalDerived.showGallery ? (
 		<MediaGallery
 			mediaNodes={viewerState.mediaNodes}
-			focusedIndex={galleryFocusIndex}
+			focusedIndex={modalDerived.galleryFocusIndex!}
 			theme={props.theme}
 			termWidth={state.dimensions.width}
-			termHeight={contentHeight}
+			termHeight={modalDerived.contentHeight}
 			frameInfo={modalFrameInfo}
-			paused={modalPaused}
+			paused={modalDerived.paused}
 		/>
 	) : null
 

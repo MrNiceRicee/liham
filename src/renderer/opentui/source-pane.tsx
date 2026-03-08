@@ -10,8 +10,8 @@ interface SourcePaneProps {
 	focused: boolean
 	theme: ThemeTokens
 	scrollRef: RefObject<ScrollBoxRenderable | null>
-	width?: number
-	height?: number
+	width?: number | undefined
+	height?: number | undefined
 	onMouseDown?: () => void
 	onMouseScroll?: () => void
 }
@@ -49,13 +49,13 @@ export function SourcePane({
 			focused={focused}
 			viewportCulling
 			border
-			onMouseDown={onMouseDown}
-			onMouseScroll={onMouseScroll}
+			{...(onMouseDown != null ? { onMouseDown } : {})}
+			{...(onMouseScroll != null ? { onMouseScroll } : {})}
 			style={{ rootOptions }}
 		>
 			<box style={{ flexDirection: 'column', padding: 1 }}>
 				{chunks.map((chunk, i) => (
-					<text key={`src-${String(i)}`} color={theme.paragraph.textColor}>
+					<text key={`src-${String(i)}`} fg={theme.paragraph.textColor}>
 						{chunk}
 					</text>
 				))}

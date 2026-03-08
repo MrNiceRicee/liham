@@ -3,6 +3,7 @@
 
 import type { ReactNode } from 'react'
 
+import { TextAttributes } from '@opentui/core'
 import { type CoreIRNode, type IRNode, isBlockNode, type MediaIRNode } from '../../ir/types.ts'
 import { renderBlockquote } from './blockquote.tsx'
 import { renderCodeBlock } from './code-block.tsx'
@@ -28,7 +29,7 @@ export interface RenderResult {
 
 // mutable accumulator threaded through render calls
 interface RenderContext {
-	maxWidth?: number
+	maxWidth?: number | undefined
 	media: MediaEntry[]
 }
 
@@ -75,9 +76,11 @@ function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 		case 'video': {
 			const mediaIndex = ctx.media.length
 			ctx.media.push({ node, index: mediaIndex })
+			const vidProps: Record<string, unknown> = { attributes: TextAttributes.DIM }
+			if (node.style.fg != null) vidProps['fg'] = node.style.fg
 			return (
 				<text key={key}>
-					<span style={{ fg: node.style.fg, dim: true }}>[video: {node.alt}]</span>
+					<span {...vidProps}>[video: {node.alt}]</span>
 				</text>
 			)
 		}
@@ -85,9 +88,11 @@ function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 		case 'audio': {
 			const mediaIndex = ctx.media.length
 			ctx.media.push({ node, index: mediaIndex })
+			const audProps: Record<string, unknown> = { attributes: TextAttributes.DIM }
+			if (node.style.fg != null) audProps['fg'] = node.style.fg
 			return (
 				<text key={key}>
-					<span style={{ fg: node.style.fg, dim: true }}>[audio: {node.alt}]</span>
+					<span {...audProps}>[audio: {node.alt}]</span>
 				</text>
 			)
 		}

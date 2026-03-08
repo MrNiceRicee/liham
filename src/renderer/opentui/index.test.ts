@@ -5,15 +5,21 @@ import type { AudioNode, ImageNode, IRNode, VideoNode } from '../../ir/types.ts'
 import { renderToOpenTUIWithMedia } from './index.tsx'
 
 function makeImage(alt: string, url?: string): ImageNode {
-	return { type: 'image', alt, url, style: { fg: '#888888' } }
+	const node: ImageNode = { type: 'image', alt, style: { fg: '#888888' } }
+	if (url != null) node.url = url
+	return node
 }
 
 function makeVideo(alt: string, src?: string): VideoNode {
-	return { type: 'video', alt, src, autoplay: false, loop: false, style: { fg: '#888888' } }
+	const node: VideoNode = { type: 'video', alt, autoplay: false, loop: false, style: { fg: '#888888' } }
+	if (src != null) node.src = src
+	return node
 }
 
 function makeAudio(alt: string, src?: string): AudioNode {
-	return { type: 'audio', alt, src, autoplay: false, loop: false, style: { fg: '#888888' } }
+	const node: AudioNode = { type: 'audio', alt, autoplay: false, loop: false, style: { fg: '#888888' } }
+	if (src != null) node.src = src
+	return node
 }
 
 function makeRoot(...children: IRNode[]): IRNode {

@@ -7,8 +7,8 @@ interface StatusBarProps {
 	entries: LegendEntry[]
 	layout: string
 	theme: ThemeTokens
-	renderTimeMs?: number
-	fileDeleted?: boolean
+	renderTimeMs?: number | undefined
+	fileDeleted?: boolean | undefined
 }
 
 function formatRenderTime(ms: number): string {
@@ -33,7 +33,7 @@ export function StatusBar({
 	// height: 2 = 1 row border-top + 1 row text (Yoga border-box sizing)
 	const barStyle = {
 		height: 2,
-		width: '100%',
+		width: '100%' as const,
 		flexDirection: 'row' as const,
 		rootOptions: { borderColor },
 	}
@@ -43,12 +43,12 @@ export function StatusBar({
 
 	return (
 		<box border={['top']} style={barStyle}>
-			<text color={fg}>
+			<text fg={fg}>
 				{layoutLabel} · {legend}
 			</text>
 			<box style={{ flexGrow: 1 }} />
-			{fileDeleted === true && <text color={theme.heading.color}> file deleted </text>}
-			{timeLabel != null && <text color={dimFg}>{timeLabel}</text>}
+			{fileDeleted === true && <text fg={theme.heading.levels[1].color}> file deleted </text>}
+			{timeLabel != null && <text fg={dimFg}>{timeLabel}</text>}
 		</box>
 	)
 }

@@ -34,18 +34,20 @@ afterEach(() => {
 })
 
 function stubFetch(body: Uint8Array | null, status = 200, headers?: Record<string, string>): void {
-	globalThis.fetch = () => Promise.resolve(new Response(body, { status, headers }))
+	const opts: ResponseInit = { status }
+	if (headers != null) opts.headers = headers
+	globalThis.fetch = (() => Promise.resolve(new Response(body as unknown as BodyInit | null, opts))) as unknown as typeof fetch
 }
 
 function stubFetchRedirect(location: string, then: Uint8Array): void {
 	let call = 0
-	globalThis.fetch = () => {
+	globalThis.fetch = (() => {
 		call++
 		if (call === 1) {
 			return Promise.resolve(new Response(null, { status: 302, headers: { location } }))
 		}
-		return Promise.resolve(new Response(then, { status: 200 }))
-	}
+		return Promise.resolve(new Response(then as unknown as BodyInit, { status: 200 }))
+	}) as unknown as typeof fetch
 }
 
 describe('fetchRemoteImage', () => {
@@ -124,7 +126,7 @@ describe('fetchRemoteImage', () => {
 	})
 
 	test('handles network error', async () => {
-		globalThis.fetch = () => Promise.reject(new Error('network error'))
+		globalThis.fetch = (() => Promise.reject(new Error('network error'))) as unknown as typeof fetch
 		const result = await fetchRemoteImage('https://example.com/img.png')
 		expect(result.ok).toBe(false)
 		if (!result.ok) expect(result.error).toBe('remote image failed')

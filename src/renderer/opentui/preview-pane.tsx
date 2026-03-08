@@ -10,8 +10,8 @@ interface PreviewPaneProps {
 	focused: boolean
 	theme: ThemeTokens
 	scrollRef: RefObject<ScrollBoxRenderable | null>
-	width?: number
-	height?: number
+	width?: number | undefined
+	height?: number | undefined
 	onMouseDown?: () => void
 	onMouseScroll?: () => void
 }
@@ -38,8 +38,8 @@ export function PreviewPane({
 			focused={focused}
 			viewportCulling
 			border
-			onMouseDown={onMouseDown}
-			onMouseScroll={onMouseScroll}
+			{...(onMouseDown != null ? { onMouseDown } : {})}
+			{...(onMouseScroll != null ? { onMouseScroll } : {})}
 			style={{ rootOptions }}
 		>
 			<box style={{ flexDirection: 'column', padding: 1 }}>{content}</box>

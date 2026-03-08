@@ -53,7 +53,7 @@ export function renderBrowserLayout(
 			{browserPane}
 			<PreviewPane
 				content={
-					previewContent ?? <text color={theme.fallback.textColor}>select a file to preview</text>
+					previewContent ?? <text fg={theme.fallback.textColor}>select a file to preview</text>
 				}
 				focused={false}
 				theme={theme}

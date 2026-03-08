@@ -125,7 +125,7 @@ describe('decodeImage', () => {
 			expect(result.value.delays).toBeDefined()
 			expect(result.value.frames!.length).toBe(5)
 			expect(result.value.delays!.length).toBe(result.value.frames!.length)
-			expect(result.value.rgba).toBe(result.value.frames![0])
+			expect(result.value.rgba).toBe(result.value.frames![0]!)
 		}
 	})
 

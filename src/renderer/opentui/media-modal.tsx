@@ -157,9 +157,15 @@ function ModalImageContent({
 	// animation state
 	const [frameIndex, setFrameIndex] = useState(0)
 	const timerRef = useRef<FrameTimerHandle | null>(null)
+	const renderPendingRef = useRef(false)
 	const { getGrid, precomputeNext } = useFrameGridCache(image, ctx?.bgColor ?? '')
 
 	const isAnimated = image?.frames != null && image.frames.length > 1
+
+	// clear renderPending after React commits (frame-skip backpressure)
+	useEffect(() => {
+		renderPendingRef.current = false
+	})
 
 	// report frame info to parent for info bar
 	useEffect(() => {
@@ -178,6 +184,8 @@ function ModalImageContent({
 		const timer = createFrameTimer({
 			delays: image.delays,
 			onFrame: (idx) => {
+				if (renderPendingRef.current) return // frame-skip: previous render not flushed
+				renderPendingRef.current = true
 				setFrameIndex(idx)
 				precomputeNext(idx)
 			},
@@ -379,7 +387,7 @@ function ModalMediaFallback({
 }: {
 	readonly node: MediaIRNode
 	readonly theme: ThemeTokens
-	readonly hint?: string
+	readonly hint?: string | undefined
 }): ReactNode {
 	const label = node.type === 'video' ? 'video' : 'audio'
 	return (

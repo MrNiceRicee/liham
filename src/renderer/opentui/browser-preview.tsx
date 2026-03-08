@@ -57,7 +57,7 @@ export function renderBrowserPreview(
 			if (cursorRef.current !== cursorSnapshot) return
 
 			if (!result.ok) {
-				const errNode = <text color={theme.fallback.textColor}>preview error: {result.error}</text>
+				const errNode = <text fg={theme.fallback.textColor}>preview error: {result.error}</text>
 				setContent(errNode)
 				return
 			}
@@ -77,7 +77,7 @@ export function renderBrowserPreview(
 				setRenderTime(elapsed)
 			}
 		} catch {
-			setContent(<text color={theme.fallback.textColor}>cannot read file</text>)
+			setContent(<text fg={theme.fallback.textColor}>cannot read file</text>)
 		}
 	})()
 }
@@ -188,7 +188,7 @@ export function openFileFromBrowser(
 
 			if (!result.ok) {
 				setBrowserPreviewContent(
-					<text color={theme.fallback.textColor}>pipeline error: {result.error}</text>,
+					<text fg={theme.fallback.textColor}>pipeline error: {result.error}</text>,
 				)
 				return
 			}
@@ -202,7 +202,7 @@ export function openFileFromBrowser(
 
 			setViewerState({ content: rendered, raw: markdown, mediaNodes })
 		} catch {
-			setBrowserPreviewContent(<text color={theme.fallback.textColor}>cannot read file</text>)
+			setBrowserPreviewContent(<text fg={theme.fallback.textColor}>cannot read file</text>)
 		}
 	})()
 }

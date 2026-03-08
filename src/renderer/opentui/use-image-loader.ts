@@ -10,7 +10,7 @@ import {
 	localCacheKey,
 	remoteCacheKey,
 } from '../../media/cache.ts'
-import { type AnimationLimits, decodeImage } from '../../media/decoder.ts'
+import { type AnimationLimits, type DecodeOptions, decodeImage } from '../../media/decoder.ts'
 import { fetchRemoteImage } from '../../media/fetcher.ts'
 import { loadImageFile } from '../../media/loader.ts'
 import { createSemaphore, type Semaphore } from '../../media/semaphore.ts'
@@ -148,17 +148,18 @@ function coalescedDecode(
 	let decodePromise = inflightDecodes.get(cacheKey)
 	if (decodePromise == null) {
 		const purpose = ctx.capabilities.protocol === 'kitty-virtual' ? 'kitty' : 'halfblock'
-		decodePromise = decodeImage({
+		const decodeOpts: DecodeOptions = {
 			bytes: file.bytes,
 			targetCols,
-			maxRows,
 			cellPixelWidth: ctx.capabilities.cellPixelWidth,
 			cellPixelHeight: ctx.capabilities.cellPixelHeight,
 			purpose,
 			source: url,
 			animationLimits: limits,
 			signal,
-		}).then((r) => {
+		}
+		if (maxRows != null) decodeOpts.maxRows = maxRows
+		decodePromise = decodeImage(decodeOpts).then((r) => {
 			inflightDecodes.delete(cacheKey)
 			if (r.ok) {
 				imageCache.set(cacheKey, r.value)

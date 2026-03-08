@@ -34,7 +34,7 @@ function HighlightedName({
 	highlightColor: string
 }>): ReactNode {
 	if (positions.length === 0) {
-		return <text color={normalColor}>{text}</text>
+		return <text fg={normalColor}>{text}</text>
 	}
 
 	const posSet = new Set(positions)
@@ -47,11 +47,11 @@ function HighlightedName({
 		if (charHighlighted !== isHighlight && current.length > 0) {
 			segments.push(
 				isHighlight ? (
-					<text key={`h-${String(i)}`} color={highlightColor} bold>
-						{current}
+					<text key={`h-${String(i)}`} fg={highlightColor}>
+						<b>{current}</b>
 					</text>
 				) : (
-					<text key={`n-${String(i)}`} color={normalColor}>
+					<text key={`n-${String(i)}`} fg={normalColor}>
 						{current}
 					</text>
 				),
@@ -65,11 +65,11 @@ function HighlightedName({
 	if (current.length > 0) {
 		segments.push(
 			isHighlight ? (
-				<text key="h-end" color={highlightColor} bold>
-					{current}
+				<text key="h-end" fg={highlightColor}>
+					<b>{current}</b>
 				</text>
 			) : (
-				<text key="n-end" color={normalColor}>
+				<text key="n-end" fg={normalColor}>
 					{current}
 				</text>
 			),
@@ -97,8 +97,8 @@ function buildFileList(
 			lastDir = entry.directory
 			const dirLabel = entry.directory || '.'
 			items.push(
-				<text key={`dir-${dirLabel}`} color={bt.directoryColor} bold>
-					{dirLabel}/
+				<text key={`dir-${dirLabel}`} fg={bt.directoryColor}>
+					<b>{dirLabel}/</b>
 				</text>,
 			)
 		}
@@ -113,10 +113,10 @@ function buildFileList(
 				key={`file-${entry.relativePath}`}
 				style={{
 					flexDirection: 'row',
-					rootOptions: isSelected ? { backgroundColor: bt.selectedBg } : undefined,
+					...(isSelected ? { backgroundColor: bt.selectedBg } : {}),
 				}}
 			>
-				<text color={fgColor}>{prefix}</text>
+				<text fg={fgColor}>{prefix}</text>
 				<HighlightedName
 					text={entry.name}
 					positions={namePositions}
@@ -154,13 +154,13 @@ export function BrowserPane({
 	// main content based on scan status
 	let content: ReactNode
 	if (scanStatus === 'scanning') {
-		content = <text color={bt.fileCountColor}>scanning...</text>
+		content = <text fg={bt.fileCountColor}>scanning...</text>
 	} else if (scanStatus === 'error') {
-		content = <text color={bt.matchHighlightColor}>{scanError ?? 'scan failed'}</text>
+		content = <text fg={bt.matchHighlightColor}>{scanError ?? 'scan failed'}</text>
 	} else if (totalFiles === 0) {
-		content = <text color={bt.fileCountColor}>no markdown files found</text>
+		content = <text fg={bt.fileCountColor}>no markdown files found</text>
 	} else if (matchCount === 0) {
-		content = <text color={bt.fileCountColor}>no matches</text>
+		content = <text fg={bt.fileCountColor}>no matches</text>
 	} else {
 		content = buildFileList(matches, cursorIndex, bt, theme.paragraph.textColor)
 	}
@@ -168,14 +168,14 @@ export function BrowserPane({
 	return (
 		<box style={{ flexDirection: 'column', width: '100%', flexGrow: 1 }}>
 			{/* filter input */}
-			<box border={['bottom']} style={{ height: 2, width: '100%', rootOptions: { borderColor } }}>
+			<box border={['bottom']} borderColor={borderColor} style={{ height: 2, width: '100%' }}>
 				<box style={{ flexDirection: 'row', width: '100%' }}>
-					<text color={bt.filterColor}>
+					<text fg={bt.filterColor}>
 						{'> '}
 						{filter}
 					</text>
 					<box style={{ flexGrow: 1 }} />
-					<text color={bt.fileCountColor}>{countLabel}</text>
+					<text fg={bt.fileCountColor}>{countLabel}</text>
 				</box>
 			</box>
 
@@ -186,8 +186,8 @@ export function BrowserPane({
 				focused={focused}
 				viewportCulling
 				border
-				onMouseDown={onMouseDown}
-				onMouseScroll={onMouseScroll}
+				{...(onMouseDown != null ? { onMouseDown } : {})}
+				{...(onMouseScroll != null ? { onMouseScroll } : {})}
 				style={{
 					rootOptions: { width: '100%', flexGrow: 1, borderColor, borderStyle: 'single' },
 				}}

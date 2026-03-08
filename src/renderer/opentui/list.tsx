@@ -11,10 +11,12 @@ export function renderList(node: ListNode, key: string) {
 }
 
 export function renderListItem(node: ListItemNode, key: string) {
+	const bulletProps: Record<string, unknown> = {}
+	if (node.style.fg != null) bulletProps['fg'] = node.style.fg
 	return (
 		<box key={key} style={{ flexDirection: 'row' }}>
 			<text>
-				<span fg={node.style.fg}>{node.bullet}</span>
+				<span {...bulletProps}>{node.bullet}</span>
 			</text>
 			<box style={{ flexDirection: 'column', flexShrink: 1 }}>
 				{renderChildren(node.children, key)}

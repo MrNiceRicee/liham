@@ -15,7 +15,7 @@ import {
 	generateImageId,
 } from '../../media/kitty.ts'
 import type { LoadedImage } from '../../media/types.ts'
-import { ImageContext } from './image-context.tsx'
+import { ImageContext, type ImageContextValue } from './image-context.tsx'
 import { MediaFocusContext } from './media-focus-context.tsx'
 import { useImageLoader, useViewportVisibility } from './use-image-loader.ts'
 
@@ -42,7 +42,7 @@ function registerExitHandler(): void {
 interface HalfBlockRowsProps {
 	readonly rows: MergedSpan[][]
 	readonly width: number
-	readonly href?: string
+	readonly href?: string | undefined
 }
 
 function renderSpans(spans: MergedSpan[], rowIdx: number): ReactNode[] {
@@ -98,14 +98,14 @@ function ImageBlock({
 }: {
 	readonly node: ImageNode
 	readonly nodeKey: string
-	readonly mediaIndex?: number
+	readonly mediaIndex?: number | undefined
 }): ReactNode {
 	const ctx = useContext(ImageContext)
 	const focusCtx = useContext(MediaFocusContext)
 	const renderer = useRenderer()
 	const boxRef = useRef<BoxRenderable | null>(null)
 	const isVisible = useViewportVisibility(boxRef, ctx?.scrollRef)
-	const { state, image, errorMsg } = useImageLoader(node.url, ctx, isVisible)
+	const { state, image, errorMsg } = useImageLoader(node.url, ctx ?? null, isVisible)
 	const kittyIdRef = useRef<number | null>(null)
 
 	const isFocused = mediaIndex != null && focusCtx?.focusedMediaIndex === mediaIndex
@@ -154,12 +154,14 @@ function ImageBlock({
 	const fgProps: Record<string, unknown> = {}
 	if (node.style.fg != null) fgProps['fg'] = node.style.fg
 
-	const focusBorder = isFocused ? true : undefined
-	const focusBorderColor = isFocused ? focusCtx?.focusBorderColor : undefined
 	const focusLabel =
 		isFocused && focusCtx != null
 			? buildFocusLabel(node, mediaIndex, focusCtx.mediaCount, focusCtx.focusBorderColor)
 			: null
+
+	const focusProps = isFocused && focusCtx != null
+		? { border: true as const, borderColor: focusCtx.focusBorderColor }
+		: {}
 
 	// wrap all states in a ref'd box for viewport position tracking
 	if (state === 'idle' || state === 'loading') {
@@ -167,8 +169,7 @@ function ImageBlock({
 			<box
 				ref={boxRef}
 				key={nodeKey}
-				border={focusBorder}
-				borderColor={focusBorderColor}
+				{...focusProps}
 				onMouseDown={handleMouseDown}
 			>
 				<text>
@@ -185,8 +186,7 @@ function ImageBlock({
 			<box
 				ref={boxRef}
 				key={nodeKey}
-				border={focusBorder}
-				borderColor={focusBorderColor}
+				{...focusProps}
 				onMouseDown={handleMouseDown}
 			>
 				<text>
@@ -202,8 +202,7 @@ function ImageBlock({
 			<box
 				ref={boxRef}
 				key={nodeKey}
-				border={focusBorder}
-				borderColor={focusBorderColor}
+				{...focusProps}
 				onMouseDown={handleMouseDown}
 			>
 				{renderLoadedImage(image, node, nodeKey, ctx)}
@@ -266,7 +265,7 @@ function renderLoadedImage(
 	image: LoadedImage,
 	node: ImageNode,
 	key: string,
-	ctx: NonNullable<ReturnType<typeof useContext<typeof ImageContext>>>,
+	ctx: ImageContextValue,
 ): ReactNode {
 	// degrade to halfblock for linked images (OSC 8 per-row wrapping needs text elements)
 	let protocol = ctx.capabilities.protocol
