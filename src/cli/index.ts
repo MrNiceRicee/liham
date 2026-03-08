@@ -4,11 +4,12 @@ import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
 import type { LayoutMode } from '../app/state.ts'
-import type { ImageCapabilities } from '../media/types.ts'
+import type { MediaCapabilities } from '../media/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 
 import { isSharpAvailable } from '../media/decoder.ts'
 import { detectCapabilities } from '../media/detect.ts'
+import { isFfplayAvailable } from '../media/ffplay.ts'
 import { processMarkdown } from '../pipeline/processor.ts'
 import { boot } from '../renderer/opentui/boot.tsx'
 import { darkTheme } from '../theme/dark.ts'
@@ -234,29 +235,39 @@ async function resolvePositional(
 interface ResolvedDetection {
 	themeName: string
 	tokens: ThemeTokens
-	imageCapabilities: ImageCapabilities
+	mediaCapabilities: MediaCapabilities
+}
+
+function buildMediaCapabilities(result: Awaited<ReturnType<typeof detectCapabilities>>): MediaCapabilities {
+	const ffplay = isFfplayAvailable()
+	return {
+		...result.image,
+		canAnimate: false, // OpenTUI React reconciler causes tearing
+		canPlayVideo: ffplay,
+		canPlayAudio: ffplay,
+	}
 }
 
 async function resolveDetection(themeName: ThemeName): Promise<ResolvedDetection> {
 	// explicit theme skips detection for theme but still detects image
 	if (themeName === 'dark') {
 		const result = await detectCapabilities()
-		return { themeName: 'dark', tokens: darkTheme, imageCapabilities: result.image }
+		return { themeName: 'dark', tokens: darkTheme, mediaCapabilities: buildMediaCapabilities(result) }
 	}
 	if (themeName === 'light') {
 		const result = await detectCapabilities()
-		return { themeName: 'light', tokens: lightTheme, imageCapabilities: result.image }
+		return { themeName: 'light', tokens: lightTheme, mediaCapabilities: buildMediaCapabilities(result) }
 	}
 
 	// auto: flag → env var → combined detection → dark default
 	const envTheme = process.env['LIHAM_THEME']
 	if (envTheme === 'light') {
 		const result = await detectCapabilities()
-		return { themeName: 'light (env)', tokens: lightTheme, imageCapabilities: result.image }
+		return { themeName: 'light (env)', tokens: lightTheme, mediaCapabilities: buildMediaCapabilities(result) }
 	}
 	if (envTheme === 'dark') {
 		const result = await detectCapabilities()
-		return { themeName: 'dark (env)', tokens: darkTheme, imageCapabilities: result.image }
+		return { themeName: 'dark (env)', tokens: darkTheme, mediaCapabilities: buildMediaCapabilities(result) }
 	}
 
 	const result = await detectCapabilities()
@@ -265,7 +276,7 @@ async function resolveDetection(themeName: ThemeName): Promise<ResolvedDetection
 	return {
 		themeName: `${mode} (${source})`,
 		tokens: mode === 'light' ? lightTheme : darkTheme,
-		imageCapabilities: result.image,
+		mediaCapabilities: buildMediaCapabilities(result),
 	}
 }
 
@@ -289,20 +300,26 @@ async function main() {
 	if (args.mode === 'info') {
 		const detection = await resolveDetection(args.theme)
 		if (args.noImages) {
-			detection.imageCapabilities = { protocol: 'text', cellPixelWidth: 0, cellPixelHeight: 0 }
+			detection.mediaCapabilities = {
+				...detection.mediaCapabilities,
+				protocol: 'text',
+				cellPixelWidth: 0,
+				cellPixelHeight: 0,
+			}
 		}
-		const { initSharp } = await import('../image/decoder.ts')
+		const { initSharp } = await import('../media/decoder.ts')
 		await initSharp()
 		console.log(`theme: ${detection.themeName}`)
 		console.log(`renderer: ${args.renderer}`)
 		const protocolLabel = args.noImages
-			? `${detection.imageCapabilities.protocol} (--no-images)`
-			: detection.imageCapabilities.protocol
+			? `${detection.mediaCapabilities.protocol} (--no-images)`
+			: detection.mediaCapabilities.protocol
 		console.log(`image protocol: ${protocolLabel}`)
 		console.log(
-			`cell pixels: ${String(detection.imageCapabilities.cellPixelWidth)}x${String(detection.imageCapabilities.cellPixelHeight)}`,
+			`cell pixels: ${String(detection.mediaCapabilities.cellPixelWidth)}x${String(detection.mediaCapabilities.cellPixelHeight)}`,
 		)
 		console.log(`sharp: ${String(isSharpAvailable())}`)
+		console.log(`ffplay: ${String(detection.mediaCapabilities.canPlayVideo)}`)
 		console.log(`TERM: ${process.env['TERM'] ?? '(unset)'}`)
 		console.log(`TERM_PROGRAM: ${process.env['TERM_PROGRAM'] ?? '(unset)'}`)
 		console.log(`LIHAM_THEME: ${process.env['LIHAM_THEME'] ?? '(unset)'}`)
@@ -313,7 +330,12 @@ async function main() {
 
 	const detection = await resolveDetection(args.theme)
 	if (args.noImages) {
-		detection.imageCapabilities = { protocol: 'text', cellPixelWidth: 0, cellPixelHeight: 0 }
+		detection.mediaCapabilities = {
+			...detection.mediaCapabilities,
+			protocol: 'text',
+			cellPixelWidth: 0,
+			cellPixelHeight: 0,
+		}
 	}
 
 	if (args.mode === 'browser') {
@@ -321,7 +343,7 @@ async function main() {
 			mode: 'browser',
 			dir: args.dir,
 			theme: detection.tokens,
-			imageCapabilities: detection.imageCapabilities,
+			mediaCapabilities: detection.mediaCapabilities,
 			layout: args.layout,
 			noWatch: args.noWatch,
 		})
@@ -351,7 +373,7 @@ async function main() {
 		mode: 'viewer',
 		ir: result.value,
 		theme: detection.tokens,
-		imageCapabilities: detection.imageCapabilities,
+		mediaCapabilities: detection.mediaCapabilities,
 		layout: args.layout,
 		raw: markdown,
 		renderTimeMs,

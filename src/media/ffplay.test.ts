@@ -1,0 +1,70 @@
+import { describe, expect, test } from 'bun:test'
+
+import { isFfplayAvailable, sanitizeMediaPath } from './ffplay.ts'
+
+describe('isFfplayAvailable', () => {
+	test('returns a boolean', () => {
+		const result = isFfplayAvailable()
+		expect(typeof result).toBe('boolean')
+	})
+
+	test('matches Bun.which result', () => {
+		const expected = Bun.which('ffplay') != null
+		expect(isFfplayAvailable()).toBe(expected)
+	})
+})
+
+describe('sanitizeMediaPath', () => {
+	const base = `${import.meta.dir}/../../test/assets`
+
+	test('resolves valid local file', () => {
+		const result = sanitizeMediaPath('profile.png', base)
+		expect(result.ok).toBe(true)
+		expect(result.path).toContain('profile.png')
+	})
+
+	test('rejects empty path', () => {
+		const result = sanitizeMediaPath('', base)
+		expect(result.ok).toBe(false)
+		expect(result.error).toBe('empty path')
+	})
+
+	test('rejects path starting with dash (flag injection)', () => {
+		const result = sanitizeMediaPath('-autoexit', base)
+		expect(result.ok).toBe(false)
+		expect(result.error).toBe('path starts with dash')
+	})
+
+	test('rejects remote URLs', () => {
+		// eslint-disable-next-line sonarjs/no-clear-text-protocols -- intentional: testing URL rejection
+		expect(sanitizeMediaPath('http://evil.com/vid.mp4', base).ok).toBe(false)
+		expect(sanitizeMediaPath('https://evil.com/vid.mp4', base).ok).toBe(false)
+		// eslint-disable-next-line sonarjs/no-clear-text-protocols -- intentional: testing URL rejection
+		expect(sanitizeMediaPath('ftp://evil.com/vid.mp4', base).ok).toBe(false)
+	})
+
+	test('rejects nonexistent file', () => {
+		const result = sanitizeMediaPath('nonexistent.mp4', base)
+		expect(result.ok).toBe(false)
+		expect(result.error).toBe('file not found')
+	})
+
+	test('rejects directory', () => {
+		const result = sanitizeMediaPath('.', base)
+		expect(result.ok).toBe(false)
+		expect(result.error).toBe('not a file')
+	})
+
+	test('resolves relative path from basePath', () => {
+		const result = sanitizeMediaPath('../assets/profile.png', `${base}/../fixtures`)
+		expect(result.ok).toBe(true)
+		expect(result.path).toContain('profile.png')
+	})
+
+	test('path with shell metacharacters is treated as literal filename', () => {
+		// this file doesn't exist, but the point is it doesn't execute
+		const result = sanitizeMediaPath('$(whoami).mp4', base)
+		expect(result.ok).toBe(false)
+		expect(result.error).toBe('file not found')
+	})
+})

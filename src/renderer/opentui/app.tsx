@@ -14,7 +14,7 @@ import {
 	useState,
 } from 'react'
 
-import type { ImageCapabilities } from '../../media/types.ts'
+import type { MediaCapabilities } from '../../media/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import type { MediaEntry } from './index.tsx'
 
@@ -25,10 +25,12 @@ import {
 	isSplitLayout,
 	type LayoutMode,
 	legendEntries,
+	type MediaModalState,
 	paneDimensions,
 	type ScrollDirection,
 } from '../../app/state.ts'
 import { fuzzyFilter } from '../../browser/fuzzy.ts'
+import { killActiveAudio, playAudio, playVideo } from '../../media/ffplay.ts'
 import { browserKeyHandler } from './browser-keys.ts'
 import {
 	openFileFromBrowser,
@@ -44,7 +46,7 @@ import { clearImageCache } from './image.tsx'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-context.tsx'
 import { MediaGallery } from './media-gallery.tsx'
-import { MediaModal } from './media-modal.tsx'
+import { type FrameInfo, MediaModal } from './media-modal.tsx'
 import { StatusBar } from './status-bar.tsx'
 import {
 	applyScroll,
@@ -54,6 +56,10 @@ import {
 	syncScroll,
 } from './viewer-keys.ts'
 
+function isModalPaused(modal: MediaModalState): boolean {
+	return modal.kind === 'image' && modal.paused
+}
+
 type AppProps =
 	| {
 			mode: 'viewer'
@@ -62,7 +68,7 @@ type AppProps =
 			mediaNodes: MediaEntry[]
 			layout: LayoutMode
 			theme: ThemeTokens
-			imageCapabilities: ImageCapabilities
+			mediaCapabilities: MediaCapabilities
 			renderTimeMs: number
 			filePath: string
 			noWatch: boolean
@@ -72,7 +78,7 @@ type AppProps =
 			dir: string
 			layout: LayoutMode
 			theme: ThemeTokens
-			imageCapabilities: ImageCapabilities
+			mediaCapabilities: MediaCapabilities
 			noWatch: boolean
 	  }
 
@@ -99,6 +105,9 @@ export function App(props: Readonly<AppProps>) {
 	const [renderTimeMs, setRenderTimeMs] = useState<number | undefined>(
 		props.mode === 'viewer' ? props.renderTimeMs : undefined,
 	)
+
+	// modal animation frame info — shared between modal and gallery
+	const [modalFrameInfo, setModalFrameInfo] = useState<FrameInfo | null>(null)
 
 	// unified viewer content — mutable state for live reload
 	const [viewerState, setViewerState] = useState<{
@@ -198,6 +207,7 @@ export function App(props: Readonly<AppProps>) {
 	const handleAction = useCallback(
 		(action: AppAction) => {
 			if (action.type === 'Quit') {
+				void killActiveAudio()
 				renderer?.destroy()
 				return
 			}
@@ -222,6 +232,30 @@ export function App(props: Readonly<AppProps>) {
 		[props.theme, state.dimensions, state.layout],
 	)
 
+	// -- media playback (video/audio via ffplay) --
+	const playingRef = useRef(false)
+
+	const handleMediaPlay = useCallback(
+		(entry: MediaEntry) => {
+			if (playingRef.current) return
+			if (!props.mediaCapabilities.canPlayVideo) return
+			const basePath = currentFile != null ? dirname(currentFile) : process.cwd()
+			const src = entry.node.type === 'image' ? entry.node.url : entry.node.src
+			if (src == null) return
+
+			if (entry.node.type === 'video') {
+				playingRef.current = true
+				const tui = renderer != null ? { suspend: () => renderer.suspend(), resume: () => renderer.resume() } : undefined
+				void playVideo(src, basePath, tui).finally(() => {
+					playingRef.current = false
+				})
+			} else if (entry.node.type === 'audio') {
+				void playAudio(src, basePath)
+			}
+		},
+		[currentFile, props.mediaCapabilities.canPlayVideo, renderer],
+	)
+
 	// -- keyboard handler --
 	const mediaCount = viewerState.mediaNodes.length
 
@@ -229,6 +263,24 @@ export function App(props: Readonly<AppProps>) {
 		if (state.mode === 'browser') {
 			browserKeyHandler(key, state, dispatch, filteredMatches.length, handleOpenFile, renderer)
 			return
+		}
+
+		// intercept return on video/audio — play instead of opening modal
+		if (key.name === 'return' && state.mediaFocusIndex != null) {
+			const entry = viewerState.mediaNodes[state.mediaFocusIndex]
+			if (entry != null && entry.node.type !== 'image') {
+				handleMediaPlay(entry)
+				return
+			}
+		}
+
+		// intercept return in modal on video/audio
+		if (key.name === 'return' && state.mediaModal.kind === 'image') {
+			const entry = viewerState.mediaNodes[state.mediaModal.mediaIndex]
+			if (entry != null && entry.node.type !== 'image') {
+				handleMediaPlay(entry)
+				return
+			}
 		}
 
 		const action =
@@ -256,14 +308,14 @@ export function App(props: Readonly<AppProps>) {
 		const maxCols = Math.max(1, previewWidth - 4)
 		return {
 			basePath: dirname(currentFile),
-			capabilities: props.imageCapabilities,
+			capabilities: props.mediaCapabilities,
 			bgColor: props.theme.image.placeholderBg,
 			maxCols,
 			scrollRef: previewRef,
 		}
 	}, [
 		currentFile,
-		props.imageCapabilities,
+		props.mediaCapabilities,
 		props.theme.image.placeholderBg,
 		panes.preview?.width,
 		state.dimensions.width,
@@ -310,13 +362,17 @@ export function App(props: Readonly<AppProps>) {
 	const galleryFocusIndex = showModal ? modalMediaIndex : state.mediaFocusIndex
 	const showGallery = isViewer && galleryFocusIndex != null && !galleryHidden
 
+	const modalPaused = isModalPaused(state.mediaModal)
+	const contentHeight = Math.max(1, state.dimensions.height - 2)
 	const modalElement = showModal ? (
 		<MediaModal
 			mediaNodes={viewerState.mediaNodes}
 			mediaIndex={modalMediaIndex}
 			theme={props.theme}
 			termWidth={state.dimensions.width}
-			termHeight={state.dimensions.height}
+			termHeight={contentHeight}
+			paused={modalPaused}
+			onFrameInfo={setModalFrameInfo}
 		/>
 	) : null
 
@@ -326,7 +382,9 @@ export function App(props: Readonly<AppProps>) {
 			focusedIndex={galleryFocusIndex}
 			theme={props.theme}
 			termWidth={state.dimensions.width}
-			termHeight={state.dimensions.height}
+			termHeight={contentHeight}
+			frameInfo={modalFrameInfo}
+			paused={modalPaused}
 		/>
 	) : null
 

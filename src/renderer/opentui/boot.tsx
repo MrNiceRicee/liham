@@ -5,7 +5,7 @@ import { createCliRenderer } from '@opentui/core'
 import { createRoot } from '@opentui/react'
 
 import type { IRNode } from '../../ir/types.ts'
-import type { ImageCapabilities } from '../../media/types.ts'
+import type { MediaCapabilities } from '../../media/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 
 import { type LayoutMode, paneDimensions } from '../../app/state.ts'
@@ -17,7 +17,7 @@ export type BootContext =
 			mode: 'viewer'
 			ir: IRNode
 			theme: ThemeTokens
-			imageCapabilities: ImageCapabilities
+			mediaCapabilities: MediaCapabilities
 			layout: LayoutMode
 			raw: string
 			renderTimeMs: number
@@ -28,7 +28,7 @@ export type BootContext =
 			mode: 'browser'
 			dir: string
 			theme: ThemeTokens
-			imageCapabilities: ImageCapabilities
+			mediaCapabilities: MediaCapabilities
 			layout: LayoutMode
 			noWatch: boolean
 	  }
@@ -48,7 +48,7 @@ export async function boot(ctx: BootContext): Promise<void> {
 					dir={ctx.dir}
 					layout={ctx.layout}
 					theme={ctx.theme}
-					imageCapabilities={ctx.imageCapabilities}
+					mediaCapabilities={ctx.mediaCapabilities}
 					noWatch={ctx.noWatch}
 				/>,
 			)
@@ -69,7 +69,7 @@ export async function boot(ctx: BootContext): Promise<void> {
 					mediaNodes={mediaNodes}
 					layout={ctx.layout}
 					theme={ctx.theme}
-					imageCapabilities={ctx.imageCapabilities}
+					mediaCapabilities={ctx.mediaCapabilities}
 					renderTimeMs={ctx.renderTimeMs}
 					filePath={ctx.filePath}
 					noWatch={ctx.noWatch}

@@ -50,10 +50,11 @@ export interface ImageCapabilities {
 	cellPixelHeight: number
 }
 
-// extends image capabilities with animation and audio support.
+// extends image capabilities with animation and media playback support.
 // canAnimate: false for OpenTUI (React reconciler tearing), true for Rezi.
-// canPlayAudio: true when ffmpeg/ffplay detected (future).
+// canPlayVideo/canPlayAudio: true when ffplay detected at startup.
 export interface MediaCapabilities extends ImageCapabilities {
 	canAnimate: boolean
+	canPlayVideo: boolean
 	canPlayAudio: boolean
 }

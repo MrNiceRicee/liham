@@ -74,11 +74,13 @@ export function handleModalKey(
 			queueMicrotask(() => dispatch({ type: 'OpenMediaModal' }))
 			return null
 		}
+		case 'return':
+			// video/audio playback — intercepted by app.tsx before reaching here
+			return null
 		case 'g':
 			return { type: 'ToggleGallery' }
-		case ' ':
-			// play/pause — Phase 3 will wire this
-			return null
+		case 'space':
+			return { type: 'TogglePlayPause' }
 		case 'q':
 			return { type: 'Quit' }
 		default:
