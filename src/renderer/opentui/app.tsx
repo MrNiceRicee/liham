@@ -335,8 +335,9 @@ export function App(props: Readonly<AppProps>) {
 	const mediaCount = viewerState.mediaNodes.length
 
 	useKeyboard((key: KeyEvent) => {
+		process.stderr.write(`[DBG] key=${key.name} mode=${state.mode} modal=${state.mediaModal.kind} paused=${String(state.mediaModal.kind === 'open' && state.mediaModal.paused)} vidDur=${String(videoInfo?.duration ?? 0)}\n`)
 		if (state.mode === 'browser') {
-			browserKeyHandler(key, state, dispatch, filteredMatches.length, handleOpenFile, renderer)
+			browserKeyHandler(key, state, dispatch, filteredMatches, handleOpenFile, renderer, browserRef)
 			return
 		}
 		dispatchViewerKey(

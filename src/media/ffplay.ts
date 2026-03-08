@@ -63,15 +63,26 @@ let activeAudioProc: ReturnType<typeof Bun.spawn> | null = null
 let audioStopped = false
 
 export function pauseActiveAudio(): void {
+	process.stderr.write(`[DBG] pauseActiveAudio: proc=${String(activeAudioProc != null)}, stopped=${String(audioStopped)}, pid=${String(activeAudioProc?.pid)}\n`)
 	if (activeAudioProc != null && !audioStopped) {
-		activeAudioProc.kill('SIGSTOP')
+		// use process.kill(pid) — Bun's proc.kill() may not reliably send SIGSTOP
+		try {
+			process.kill(activeAudioProc.pid, 'SIGSTOP')
+		} catch {
+			/* already dead */
+		}
 		audioStopped = true
 	}
 }
 
 export function resumeActiveAudio(): void {
+	process.stderr.write(`[DBG] resumeActiveAudio: proc=${String(activeAudioProc != null)}, stopped=${String(audioStopped)}, pid=${String(activeAudioProc?.pid)}\n`)
 	if (activeAudioProc != null && audioStopped) {
-		activeAudioProc.kill('SIGCONT')
+		try {
+			process.kill(activeAudioProc.pid, 'SIGCONT')
+		} catch {
+			/* already dead */
+		}
 		audioStopped = false
 	}
 }

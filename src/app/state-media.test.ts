@@ -383,7 +383,7 @@ describe('SeekMedia action', () => {
 		}
 	})
 
-	test('SeekMedia resets paused to false', () => {
+	test('SeekMedia preserves paused state', () => {
 		const s = stateWith({
 			mediaFocusIndex: 0,
 			mediaModal: {
@@ -397,7 +397,7 @@ describe('SeekMedia action', () => {
 		})
 		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60 })
 		if (next.mediaModal.kind === 'open') {
-			expect(next.mediaModal.paused).toBe(false)
+			expect(next.mediaModal.paused).toBe(true)
 		}
 	})
 

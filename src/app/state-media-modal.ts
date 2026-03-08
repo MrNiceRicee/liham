@@ -41,7 +41,6 @@ function seekMedia(state: AppState, delta: number, duration: number): AppState {
 			...state.mediaModal,
 			seekOffset: newOffset,
 			restartCount: state.mediaModal.restartCount + 1,
-			paused: false,
 		},
 	}
 }

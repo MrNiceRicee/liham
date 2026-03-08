@@ -263,6 +263,7 @@ interface FrameLoopContext {
 	bgColor: string
 	src: string
 	isStale: () => boolean
+	isPaused: () => boolean
 	renderPendingRef: React.RefObject<boolean>
 	setCurrentGrid: (grid: MergedSpan[][]) => void
 	setGridWidth: (w: number) => void
@@ -275,9 +276,29 @@ async function runFrameLoop(ctx: FrameLoopContext): Promise<void> {
 	ctx.setGridWidth(ctx.dims.termCols)
 	const frameSize = ctx.dims.pixelWidth * ctx.dims.pixelHeight * 4
 	let frameCount = 0
+	const frameIntervalMs = 1000 / ctx.fps
+	let nextFrameAt = Date.now()
 
 	for await (const rgba of readFrames(ctx.proc.stdout as ReadableStream<Uint8Array>, frameSize)) {
 		if (ctx.isStale()) break
+
+		// spin-wait while paused — stops consumption → pipe fills → ffmpeg blocks on write.
+		// SIGSTOP also sent for CPU savings, but backpressure is the primary mechanism.
+		if (ctx.isPaused()) {
+			while (ctx.isPaused() && !ctx.isStale()) {
+				await new Promise((r) => setTimeout(r, 50))
+			}
+			if (ctx.isStale()) break
+			nextFrameAt = Date.now() + frameIntervalMs // reset pacing after resume
+			continue
+		}
+
+		// application-level frame pacing (replaces ffmpeg -re which breaks SIGSTOP)
+		const now = Date.now()
+		const delay = nextFrameAt - now
+		if (delay > 0) await new Promise((r) => setTimeout(r, delay))
+		nextFrameAt = Math.max(Date.now(), nextFrameAt) + frameIntervalMs
+
 		frameCount++
 
 		// report elapsed time every ~10 frames
@@ -340,6 +361,8 @@ function ModalVideoContent({
 	readonly onVideoInfo: (info: VideoPlaybackInfo | null) => void
 }): ReactNode {
 	const loadIdRef = useRef(0)
+	const pausedRef = useRef(paused)
+	pausedRef.current = paused
 	const renderPendingRef = useRef(false)
 	const [currentGrid, setCurrentGrid] = useState<MergedSpan[][] | null>(null)
 	const [gridWidth, setGridWidth] = useState(0)
@@ -379,13 +402,21 @@ function ModalVideoContent({
 			})
 
 			if (meta.hasAudio) {
-				void playAudio(absPath, basePath, seekOffset)
+				await playAudio(absPath, basePath, seekOffset)
 				audioStarted = true
 			}
 
+			// if paused state was set before stream started (e.g. replay then quick pause),
+			// apply it now that the processes exist
+			process.stderr.write(`[DBG] after createVideoStream: pausedRef=${String(pausedRef.current)}\n`)
+			if (pausedRef.current) {
+				pauseActiveVideo()
+				pauseActiveAudio()
+			}
 			await runFrameLoop({
 				proc, dims, fps: meta.fps, duration: meta.duration, seekOffset,
-				bgColor, src, isStale, renderPendingRef, setCurrentGrid,
+				bgColor, src, isStale, isPaused: () => pausedRef.current,
+				renderPendingRef, setCurrentGrid,
 				setGridWidth, setPlaybackState, onVideoInfo,
 			})
 		})()
@@ -406,6 +437,7 @@ function ModalVideoContent({
 
 	// react to external pause/resume toggle
 	useEffect(() => {
+		process.stderr.write(`[DBG] pause effect: paused=${String(paused)}\n`)
 		if (paused) {
 			pauseActiveVideo()
 			pauseActiveAudio()

@@ -56,6 +56,7 @@ export const VIEWER_SHIFT_KEY_MAP: Record<
 	},
 }
 
+
 // modal key handler — called when modal is open, swallows all non-modal keys
 export function handleModalKey(
 	key: KeyEvent,
@@ -87,10 +88,10 @@ export function handleModalKey(
 			return { type: 'TogglePlayPause' }
 		case 'left':
 			if (videoDuration <= 0) return null
-			return { type: 'SeekMedia', delta: key.shift ? -10 : -5, duration: videoDuration }
+			return { type: 'SeekMedia', delta: key.shift ? -5 : -1, duration: videoDuration }
 		case 'right':
 			if (videoDuration <= 0) return null
-			return { type: 'SeekMedia', delta: key.shift ? 10 : 5, duration: videoDuration }
+			return { type: 'SeekMedia', delta: key.shift ? 5 : 1, duration: videoDuration }
 		case 'q':
 			return { type: 'Quit' }
 		default:

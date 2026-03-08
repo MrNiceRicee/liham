@@ -277,15 +277,25 @@ let activeVideoProc: ReturnType<typeof Bun.spawn> | null = null
 let videoStopped = false
 
 export function pauseActiveVideo(): void {
+	process.stderr.write(`[DBG] pauseActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}\n`)
 	if (activeVideoProc != null && !videoStopped) {
-		activeVideoProc.kill('SIGSTOP')
+		try {
+			process.kill(activeVideoProc.pid, 'SIGSTOP')
+		} catch {
+			/* already dead */
+		}
 		videoStopped = true
 	}
 }
 
 export function resumeActiveVideo(): void {
+	process.stderr.write(`[DBG] resumeActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}\n`)
 	if (activeVideoProc != null && videoStopped) {
-		activeVideoProc.kill('SIGCONT')
+		try {
+			process.kill(activeVideoProc.pid, 'SIGCONT')
+		} catch {
+			/* already dead */
+		}
 		videoStopped = false
 	}
 }
@@ -338,7 +348,9 @@ export function createVideoStream(options: VideoStreamOptions): ReturnType<typeo
 	}
 
 	// build args — prepend -ss before -i for input-level seek (fast keyframe seeking)
-	const args = ['ffmpeg', '-re', '-readrate_initial_burst', '0.5', '-v', 'quiet']
+	// no -re: pacing is application-controlled via frame-interval sleep in runFrameLoop.
+	// -re uses wall clock, which breaks SIGSTOP pause (ffmpeg catches up on resume).
+	const args = ['ffmpeg', '-v', 'quiet']
 	if (seekOffset != null && seekOffset > 0) {
 		args.push('-ss', String(seekOffset))
 	}
