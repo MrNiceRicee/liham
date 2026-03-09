@@ -24,6 +24,11 @@ export function handleTextInputKey(
 	if (key.ctrl && key.name === 'u') {
 		return { newText: '', consumed: true }
 	}
+	// space key: OpenTUI sends key.name='space' (not ' ')
+	if (key.name === 'space' && !key.ctrl && !key.meta) {
+		const next = (currentText + ' ').slice(0, maxLength)
+		return { newText: next, consumed: true }
+	}
 	if (key.name.length === 1 && !key.ctrl && !key.meta) {
 		const next = (currentText + key.name).slice(0, maxLength)
 		return { newText: next, consumed: true }

@@ -130,6 +130,7 @@ function useSearchHighlight(
 	state: AppState,
 	raw: string,
 	sourceRef: React.RefObject<ScrollBoxRenderable | null>,
+	previewRef: React.RefObject<ScrollBoxRenderable | null>,
 ) {
 	const searchQuery = state.searchState != null ? state.searchState.query : ''
 	const searchMatches = useMemo(() => findMatches(raw, searchQuery), [raw, searchQuery])
@@ -146,6 +147,12 @@ function useSearchHighlight(
 		const match = searchMatches[safeSearchIndex]
 		if (match == null) return
 		scrollToLine(sourceRef.current, match.line)
+		// sync preview pane: use match position as fraction of total content
+		if (previewRef.current != null) {
+			const totalLines = raw.split('\n').length
+			const fraction = totalLines > 0 ? match.line / totalLines : 0
+			previewRef.current.scrollTo(Math.round(fraction * previewRef.current.scrollHeight))
+		}
 	}, [safeSearchIndex, state.searchState?.phase])
 
 	return { searchQuery, searchMatches, safeSearchIndex }
@@ -154,6 +161,7 @@ function useSearchHighlight(
 function useTocJump(
 	state: AppState,
 	tocEntries: readonly TocEntry[],
+	estimatedTotalHeight: number,
 	previewRef: React.RefObject<ScrollBoxRenderable | null>,
 	sourceRef: React.RefObject<ScrollBoxRenderable | null>,
 	dispatch: React.Dispatch<AppAction>,
@@ -161,8 +169,10 @@ function useTocJump(
 	useEffect(() => {
 		if (state.tocState?.kind !== 'jumping') return
 		const entry = tocEntries[state.tocState.cursorIndex]
-		if (entry != null) {
-			previewRef.current?.scrollTo(entry.estimatedOffset)
+		if (entry != null && previewRef.current != null) {
+			// ratio-based scroll: normalize estimation errors across the document
+			const fraction = estimatedTotalHeight > 0 ? entry.estimatedOffset / estimatedTotalHeight : 0
+			previewRef.current.scrollTo(Math.round(fraction * previewRef.current.scrollHeight))
 			if (state.scrollSync && isSplitLayout(state.layout)) {
 				queueMicrotask(() => syncScroll(previewRef.current, sourceRef.current))
 			}
@@ -178,6 +188,7 @@ type AppProps =
 			raw: string
 			mediaNodes: MediaEntry[]
 			tocEntries: TocEntry[]
+			estimatedTotalHeight: number
 			layout: LayoutMode
 			theme: ThemeTokens
 			mediaCapabilities: MediaCapabilities
@@ -201,12 +212,14 @@ function initialViewerState(props: Readonly<AppProps>) {
 			raw: props.raw,
 			mediaNodes: props.mediaNodes,
 			tocEntries: props.tocEntries,
+			estimatedTotalHeight: props.estimatedTotalHeight,
 		}
 	return {
 		content: null as ReactNode,
 		raw: '',
 		mediaNodes: [] as MediaEntry[],
 		tocEntries: [] as TocEntry[],
+		estimatedTotalHeight: 0,
 	}
 }
 
@@ -362,8 +375,16 @@ export function App(props: Readonly<AppProps>) {
 		state,
 		viewerState.raw,
 		sourceRef,
+		previewRef,
 	)
-	useTocJump(state, viewerState.tocEntries, previewRef, sourceRef, dispatch)
+	useTocJump(
+		state,
+		viewerState.tocEntries,
+		viewerState.estimatedTotalHeight,
+		previewRef,
+		sourceRef,
+		dispatch,
+	)
 
 	// -- keyboard handler --
 	const mediaCount = viewerState.mediaNodes.length

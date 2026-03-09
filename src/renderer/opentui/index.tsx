@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import { TextAttributes } from '@opentui/core'
 import { extractText } from '../../ir/text-utils.ts'
 import { type CoreIRNode, type IRNode, isBlockNode, type MediaIRNode } from '../../ir/types.ts'
-import { estimateHeadingOffset } from './scroll-utils.ts'
+import { estimateHeadingOffset, estimateTotalHeight } from './scroll-utils.ts'
 import type { TocEntry } from './toc.ts'
 import { renderBlockquote } from './blockquote.tsx'
 import { renderCodeBlock } from './code-block.tsx'
@@ -29,6 +29,7 @@ export interface RenderResult {
 	jsx: ReactNode
 	mediaNodes: MediaEntry[]
 	tocEntries: TocEntry[]
+	estimatedTotalHeight: number
 }
 
 // mutable accumulator threaded through render calls
@@ -224,5 +225,6 @@ export function renderToOpenTUI(ir: IRNode, maxWidth?: number): ReactNode {
 export function renderToOpenTUIWithMedia(ir: IRNode, maxWidth?: number): RenderResult {
 	const ctx: RenderContext = { maxWidth, media: [], toc: [], blockIndex: 0, irNodes: [] }
 	const jsx = renderNode(ir, 'root', ctx)
-	return { jsx, mediaNodes: ctx.media, tocEntries: ctx.toc }
+	const totalHeight = estimateTotalHeight(ctx.irNodes, maxWidth)
+	return { jsx, mediaNodes: ctx.media, tocEntries: ctx.toc, estimatedTotalHeight: totalHeight }
 }

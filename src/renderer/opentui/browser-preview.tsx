@@ -203,9 +203,16 @@ export function openFileFromBrowser(
 				jsx: rendered,
 				mediaNodes,
 				tocEntries,
+				estimatedTotalHeight,
 			} = renderToOpenTUIWithMedia(result.value, width)
 
-			setViewerState({ content: rendered, raw: markdown, mediaNodes, tocEntries })
+			setViewerState({
+				content: rendered,
+				raw: markdown,
+				mediaNodes,
+				tocEntries,
+				estimatedTotalHeight,
+			})
 		} catch {
 			setBrowserPreviewContent(<text fg={theme.fallback.textColor}>cannot read file</text>)
 		}
@@ -217,6 +224,7 @@ type ViewerState = {
 	raw: string
 	mediaNodes: MediaEntry[]
 	tocEntries: TocEntry[]
+	estimatedTotalHeight: number
 }
 
 export interface ReloadContext {
@@ -258,13 +266,20 @@ export function reloadViewerFile(
 				jsx: rendered,
 				mediaNodes,
 				tocEntries,
+				estimatedTotalHeight,
 			} = renderToOpenTUIWithMedia(result.value, width)
 			const elapsed = performance.now() - t0
 
 			if (ctx.changeIdRef.current !== changeId) return
 
 			const scrollBefore = ctx.previewRef.current?.scrollTop ?? 0
-			ctx.setViewerState({ content: rendered, raw: markdown, mediaNodes, tocEntries })
+			ctx.setViewerState({
+				content: rendered,
+				raw: markdown,
+				mediaNodes,
+				tocEntries,
+				estimatedTotalHeight,
+			})
 			ctx.setRenderTimeMs(elapsed)
 			queueMicrotask(() => {
 				ctx.previewRef.current?.scrollTo(scrollBefore)

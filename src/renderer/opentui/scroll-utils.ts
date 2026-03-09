@@ -93,6 +93,16 @@ export function estimateHeight(node: CoreIRNode, paneWidth = 80): number {
 	return estimateHeightInternal(node, paneWidth, 0)
 }
 
+// compute estimated total height of all top-level IR nodes
+export function estimateTotalHeight(nodes: IRNode[], paneWidth = 80): number {
+	let total = 0
+	for (const node of nodes) {
+		if (!('type' in node)) continue
+		total += estimateHeight(node as CoreIRNode, paneWidth)
+	}
+	return total
+}
+
 // compute estimated row offset of the Nth heading in a list of top-level IR nodes
 export function estimateHeadingOffset(
 	nodes: IRNode[],

@@ -25,11 +25,13 @@ export function SearchBar({ searchState, matchCount, theme }: Readonly<SearchBar
 	const hasNoMatches = matchCount === 0 && query.length > 0
 
 	let countLabel: string
+	let hintLabel = ''
 	if (isInput) {
 		countLabel = query.length > 0 ? `${String(matchCount)} matches` : ''
 	} else {
 		const current = searchState.phase === 'active' ? searchState.currentMatch + 1 : 0
 		countLabel = `${String(current)}/${String(matchCount)}`
+		hintLabel = 'n/N: next/prev · Esc: close'
 	}
 
 	const queryFg = hasNoMatches ? noMatchColor : queryColor
@@ -52,6 +54,12 @@ export function SearchBar({ searchState, matchCount, theme }: Readonly<SearchBar
 				</span>
 			</text>
 			<box style={{ flexGrow: 1 }} />
+			{hintLabel.length > 0 && (
+				<text fg={fg}>
+					{hintLabel}
+					{'  '}
+				</text>
+			)}
 			{hasNoMatches && <text fg={noMatchColor}>{'no matches '}</text>}
 			{countLabel.length > 0 && !hasNoMatches && <text fg={countFg}>{countLabel}</text>}
 		</box>
