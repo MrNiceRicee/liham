@@ -6,10 +6,9 @@ import { renderMermaidASCII } from 'beautiful-mermaid'
 import type { Element } from 'hast'
 
 import type { CustomNode } from '../ir/types.ts'
-import type { ThemeTokens } from '../theme/types.ts'
 import { extractText } from './hast-utils.ts'
 
-export function compileMermaidBlock(node: Element, theme: ThemeTokens): CustomNode<'mermaid'> {
+export function compileMermaidBlock(node: Element): CustomNode<'mermaid'> {
 	const codeEl = node.children.find(
 		(c): c is Element => c.type === 'element' && c.tagName === 'code',
 	)
@@ -19,13 +18,7 @@ export function compileMermaidBlock(node: Element, theme: ThemeTokens): CustomNo
 	let error: string | null = null
 	try {
 		const options: AsciiRenderOptions = {
-			colorMode: 'truecolor',
-			theme: {
-				fg: theme.mermaid.textColor,
-				border: theme.mermaid.borderColor,
-				line: theme.mermaid.borderColor,
-				arrow: theme.mermaid.labelColor,
-			},
+			colorMode: 'none',
 		}
 		rendered = renderMermaidASCII(source, options)
 	} catch (e) {

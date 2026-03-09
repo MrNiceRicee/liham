@@ -159,7 +159,7 @@ function compilePre(state: CompilerState, node: Element): IRNode {
 	}
 	// mermaid: ```mermaid
 	if (language === 'mermaid') {
-		return compileMermaidBlock(node, theme)
+		return compileMermaidBlock(node)
 	}
 	return {
 		type: 'codeBlock',

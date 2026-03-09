@@ -29,7 +29,7 @@ export function renderMermaidBlock(
 
 	return (
 		<box key={key} style={boxStyle} border title="mermaid">
-			<text>{node.data.rendered}</text>
+			<text fg={theme.mermaid.textColor}>{node.data.rendered}</text>
 		</box>
 	)
 }
