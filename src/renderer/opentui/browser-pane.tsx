@@ -75,7 +75,7 @@ function buildFileList(
 			lastDir = entry.directory
 			const dirLabel = entry.directory || '.'
 			items.push(
-				<text key={`dir-${dirLabel}`} fg={bt.directoryColor}>
+				<text key={`dir-${String(i)}-${dirLabel}`} fg={bt.directoryColor}>
 					<b>{dirLabel}/</b>
 				</text>,
 			)

@@ -43,14 +43,24 @@ export function useSearchHighlight(
 		return Math.min(state.searchState.currentMatch, searchMatches.length - 1)
 	}, [state.searchState, searchMatches.length])
 
+	const lineCount = useMemo(() => {
+		if (raw.length === 0) return 0
+		let count = 1
+		for (let i = 0; i < raw.length; i++) {
+			if (raw[i] === '\n') count++
+		}
+		return count
+	}, [raw])
+
 	useEffect(() => {
 		if (state.searchState?.phase !== 'active') return
 		if (searchMatches.length === 0) return
 		const match = searchMatches[safeSearchIndex]
 		if (match == null) return
-		// character fraction for both panes — best available for search
-		const fraction = raw.length > 0 ? match.charOffset / raw.length : 0
-		scrollToFraction(sourceRef.current, fraction)
+		// source: exact line-based scroll (1 line = 1 row)
+		scrollToLine(sourceRef.current, match.line)
+		// preview: line fraction is more proportional to rendered height than char fraction
+		const fraction = lineCount > 0 ? match.line / lineCount : 0
 		scrollToFraction(previewRef.current, fraction)
 	}, [safeSearchIndex, state.searchState?.phase])
 

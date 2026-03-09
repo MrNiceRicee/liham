@@ -36,7 +36,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # playground / sandbox files (generated fixtures, manual testing)
 sandbox
 
-# all media files in test assets (use sandbox/ for manual testing)
+# large media in test assets (videos, audio — use sandbox/ for manual testing)
 test/assets/*.mov
 test/assets/*.MOV
 test/assets/*.mp4
@@ -45,16 +45,4 @@ test/assets/*.wav
 test/assets/*.avi
 test/assets/*.mkv
 test/assets/*.webm
-test/assets/*.png
-test/assets/*.PNG
-test/assets/*.jpg
-test/assets/*.JPG
-test/assets/*.jpeg
-test/assets/*.JPEG
-test/assets/*.gif
-test/assets/*.GIF
-test/assets/*.bmp
-test/assets/*.tiff
-test/assets/*.svg
-test/assets/*.webp
-test/assets/*.ico
+test/assets

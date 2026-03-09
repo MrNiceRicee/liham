@@ -115,8 +115,8 @@ function ImageBlock({
 		if (!isFocused || boxRef.current == null || ctx?.scrollRef.current == null) return
 		const scrollbox = ctx.scrollRef.current
 		const box = boxRef.current
-		// box.y is the layout position within the scrollbox content
-		const boxTop = box.y
+		// box.y is absolute screen position — convert to content-relative
+		const boxTop = box.y - scrollbox.viewport.y + scrollbox.scrollTop
 		const boxBottom = boxTop + box.height
 		const scrollTop = scrollbox.scrollTop
 		const viewHeight = scrollbox.height

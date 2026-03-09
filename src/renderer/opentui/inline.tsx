@@ -2,7 +2,7 @@
 // handles grouping inline nodes and rendering semantic inline types.
 
 import { TextAttributes } from '@opentui/core'
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 
 import type { CoreIRNode, ImageNode, InlineStyle, IRNode, LinkNode } from '../../ir/types.ts'
 
@@ -91,7 +91,7 @@ export function renderInlineNode(node: IRNode, key: string): ReactNode {
 			return <span key={key}>{core.checked ? '[x] ' : '[ ] '}</span>
 
 		case 'root':
-			return <>{renderInlineChildren(core.children, key)}</>
+			return <Fragment key={key}>{renderInlineChildren(core.children, key)}</Fragment>
 
 		default:
 			return null
