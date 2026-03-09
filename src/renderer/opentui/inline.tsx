@@ -4,7 +4,8 @@
 import { TextAttributes } from '@opentui/core'
 import { Fragment, type ReactNode } from 'react'
 
-import type { CoreIRNode, ImageNode, InlineStyle, IRNode, LinkNode } from '../../ir/types.ts'
+import type { CoreIRNode, CustomNode, ImageNode, InlineStyle, IRNode, LinkNode } from '../../ir/types.ts'
+import { renderMathInline } from './math.tsx'
 
 function renderLink(node: LinkNode, key: string): ReactNode {
 	const children = renderInlineChildren(node.children, key)
@@ -94,6 +95,9 @@ export function renderInlineNode(node: IRNode, key: string): ReactNode {
 			return <Fragment key={key}>{renderInlineChildren(core.children, key)}</Fragment>
 
 		default:
+			if (node.type === 'mathInline') {
+				return renderMathInline(node as CustomNode<'mathInline'>, key)
+			}
 			return null
 	}
 }

@@ -1,0 +1,92 @@
+import { describe, expect, it } from 'bun:test'
+import { replace } from 'unicodeit'
+
+import type { CustomNode, IRNode } from '../ir/types.ts'
+import { isBlockNode } from '../ir/types.ts'
+import { darkTheme } from '../theme/dark.ts'
+import { processMarkdown } from './processor.ts'
+
+function assertOk(result: { ok: boolean; value?: unknown }): asserts result is { ok: true; value: IRNode } {
+	expect(result.ok).toBe(true)
+}
+
+function findNodes(node: IRNode, type: string): IRNode[] {
+	const results: IRNode[] = []
+	if (node.type === type) results.push(node)
+	if ('children' in node && Array.isArray(node.children)) {
+		for (const child of node.children as IRNode[]) {
+			results.push(...findNodes(child, type))
+		}
+	}
+	return results
+}
+
+describe('math pipeline', () => {
+	it('produces mathInline from $x^2$', async () => {
+		const result = await processMarkdown('$x^2$', darkTheme)
+		assertOk(result)
+		const nodes = findNodes(result.value, 'mathInline')
+		expect(nodes.length).toBe(1)
+		const node = nodes[0] as CustomNode<'mathInline'>
+		expect(node.data.latex).toBe('x^2')
+		expect(node.data.unicode).toBe(replace('x^2'))
+		expect(node.data.fg).toBe(darkTheme.math.textColor)
+	})
+
+	it('produces mathDisplay from $$...$$', async () => {
+		const md = '$$\n\\sum_{i=0}^n\n$$'
+		const result = await processMarkdown(md, darkTheme)
+		assertOk(result)
+		const nodes = findNodes(result.value, 'mathDisplay')
+		expect(nodes.length).toBe(1)
+		const node = nodes[0] as CustomNode<'mathDisplay'>
+		expect(node.data.latex).toContain('sum')
+		expect(node.data.fg).toBe(darkTheme.math.textColor)
+	})
+
+	it('regular inline code still produces inlineCode', async () => {
+		const result = await processMarkdown('`code`', darkTheme)
+		assertOk(result)
+		const mathNodes = findNodes(result.value, 'mathInline')
+		expect(mathNodes.length).toBe(0)
+		const codeNodes = findNodes(result.value, 'inlineCode')
+		expect(codeNodes.length).toBe(1)
+	})
+
+	it('regular code block still produces codeBlock', async () => {
+		const md = '```js\nconst x = 1\n```'
+		const result = await processMarkdown(md, darkTheme)
+		assertOk(result)
+		const mathNodes = findNodes(result.value, 'mathDisplay')
+		expect(mathNodes.length).toBe(0)
+		const codeNodes = findNodes(result.value, 'codeBlock')
+		expect(codeNodes.length).toBe(1)
+	})
+
+	it('mathDisplay is a block node, mathInline is not', async () => {
+		const md = '$x^2$\n\n$$\ny\n$$'
+		const result = await processMarkdown(md, darkTheme)
+		assertOk(result)
+		const inlineNodes = findNodes(result.value, 'mathInline')
+		const displayNodes = findNodes(result.value, 'mathDisplay')
+		expect(inlineNodes.length).toBe(1)
+		expect(displayNodes.length).toBe(1)
+		expect(isBlockNode(inlineNodes[0]!)).toBe(false)
+		expect(isBlockNode(displayNodes[0]!)).toBe(true)
+	})
+})
+
+describe('unicodeit', () => {
+	it('converts x^2 to x²', () => {
+		expect(replace('x^2')).toBe('x²')
+	})
+
+	it('converts greek letters', () => {
+		expect(replace('\\alpha + \\beta')).toBe('α + β')
+	})
+
+	it('handles unsupported constructs without crash', () => {
+		const result = replace('\\begin{pmatrix} a & b \\end{pmatrix}')
+		expect(typeof result).toBe('string')
+	})
+})

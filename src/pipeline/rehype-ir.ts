@@ -8,6 +8,7 @@ import type { VFile } from 'vfile'
 import type { IRNode, TableCellNode, TableRowNode } from '../ir/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 
+import { compileMathDisplay, compileMathInline } from './compile-math.ts'
 import { compileAudio, compileImg, compileVideo } from './compile-media.ts'
 import { getHighlightColor } from './hljs-colors.ts'
 import { sanitizeForTerminal } from './sanitize.ts'
@@ -251,10 +252,15 @@ function compileParagraph(state: CompilerState, node: Element): IRNode {
 
 function compilePre(state: CompilerState, node: Element): IRNode {
 	const { theme } = state
+	const language = extractLanguage(node)
+	// math display: <pre><code class="language-math math-display">
+	if (language === 'math') {
+		return compileMathDisplay(node, theme)
+	}
 	return {
 		type: 'codeBlock',
 		code: sanitizeForTerminal(extractCode(node)),
-		language: extractLanguage(node),
+		language,
 		style: {
 			fg: theme.codeBlock.textColor,
 			bg: theme.codeBlock.backgroundColor,
@@ -462,7 +468,16 @@ function flattenChildren(state: CompilerState, node: Element): IRNode | undefine
 	return { type: 'strong', style: {}, children }
 }
 
+function hasClass(node: Element, className: string): boolean {
+	const classes = node.properties?.['className']
+	return Array.isArray(classes) && classes.includes(className)
+}
+
 function compileCode(state: CompilerState, node: Element): IRNode | undefined {
+	// math inline: <code class="language-math math-inline">
+	if (hasClass(node, 'math-inline')) {
+		return compileMathInline(node, state.theme)
+	}
 	const isInsidePre = state.ancestors.some((a) => a.tagName === 'pre')
 	if (isInsidePre) {
 		const children = withAncestors(state, node)

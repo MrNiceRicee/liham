@@ -5,7 +5,13 @@ import type { ReactNode } from 'react'
 
 import { TextAttributes } from '@opentui/core'
 import { extractText } from '../../ir/text-utils.ts'
-import { type CoreIRNode, type IRNode, isBlockNode, type MediaIRNode } from '../../ir/types.ts'
+import {
+	type CoreIRNode,
+	type CustomNode,
+	type IRNode,
+	isBlockNode,
+	type MediaIRNode,
+} from '../../ir/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import { estimateHeadingOffset, estimateTotalHeight } from './scroll-utils.ts'
 import type { TocEntry } from './toc.ts'
@@ -15,6 +21,7 @@ import { renderCustom, renderUnknown } from './fallback.tsx'
 import { renderHeading } from './heading.tsx'
 import { renderImageBlock } from './image.tsx'
 import { renderInlineNode } from './inline.tsx'
+import { renderMathDisplay, renderMathInline } from './math.tsx'
 import { renderList, renderListItem } from './list.tsx'
 import { renderParagraph } from './paragraph.tsx'
 import { renderTable, renderTableCell, renderTableRow } from './table.tsx'
@@ -49,6 +56,8 @@ function isCoreNode(node: IRNode): node is CoreIRNode {
 
 // renders a single IR node to OpenTUI JSX
 function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
+	if (node.type === 'mathInline') return renderMathInline(node as CustomNode<'mathInline'>, key)
+	if (node.type === 'mathDisplay') return renderMathDisplay(node as CustomNode<'mathDisplay'>, key)
 	if (!isCoreNode(node)) return renderCustom(node, key)
 
 	switch (node.type) {
