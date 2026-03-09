@@ -4,7 +4,10 @@
 import type { ReactNode } from 'react'
 
 import { TextAttributes } from '@opentui/core'
+import { extractText } from '../../ir/text-utils.ts'
 import { type CoreIRNode, type IRNode, isBlockNode, type MediaIRNode } from '../../ir/types.ts'
+import { estimateHeadingOffset } from './scroll-utils.ts'
+import type { TocEntry } from './toc.ts'
 import { renderBlockquote } from './blockquote.tsx'
 import { renderCodeBlock } from './code-block.tsx'
 import { renderCustom, renderUnknown } from './fallback.tsx'
@@ -25,12 +28,16 @@ export interface MediaEntry {
 export interface RenderResult {
 	jsx: ReactNode
 	mediaNodes: MediaEntry[]
+	tocEntries: TocEntry[]
 }
 
 // mutable accumulator threaded through render calls
 interface RenderContext {
 	maxWidth?: number | undefined
 	media: MediaEntry[]
+	toc: TocEntry[]
+	blockIndex: number
+	irNodes: IRNode[] // top-level nodes for estimateHeadingOffset
 }
 
 function isCoreNode(node: IRNode): node is CoreIRNode {
@@ -42,15 +49,26 @@ function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 	if (!isCoreNode(node)) return renderCustom(node, key)
 
 	switch (node.type) {
-		case 'root':
+		case 'root': {
+			// set irNodes for estimateHeadingOffset at the top level
+			ctx.irNodes = node.children
+			const rootChildren = renderChildrenInternalTracked(node.children, key, ctx)
 			return (
 				<box key={key} style={{ flexDirection: 'column', width: '100%' }}>
-					{renderChildrenInternal(node.children, key, ctx)}
+					{rootChildren}
 				</box>
 			)
+		}
 
-		case 'heading':
+		case 'heading': {
+			ctx.toc.push({
+				level: node.level,
+				text: extractText(node.children),
+				blockIndex: ctx.blockIndex,
+				estimatedOffset: estimateHeadingOffset(ctx.irNodes, ctx.toc.length, ctx.maxWidth),
+			})
 			return renderHeading(node, key)
+		}
 
 		case 'paragraph':
 			return renderParagraph(node, key)
@@ -118,6 +136,28 @@ function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 	}
 }
 
+// top-level render with blockIndex tracking (for TOC)
+function renderChildrenInternalTracked(
+	children: IRNode[],
+	parentKey: string,
+	ctx: RenderContext,
+): ReactNode[] {
+	const results: ReactNode[] = []
+	for (let i = 0; i < children.length; i++) {
+		const child = children[i]!
+		if (isBlockNode(child)) {
+			const result = renderNode(child, `${parentKey}-${String(i)}`, ctx)
+			if (result != null) results.push(result)
+			ctx.blockIndex++
+		} else {
+			// inline at root level — rare, wrap in text
+			const result = renderInlineNode(child, `${parentKey}-${String(i)}`)
+			if (result != null) results.push(<text key={`${parentKey}-tw-${String(i)}`}>{result}</text>)
+		}
+	}
+	return results
+}
+
 // internal renderChildren that threads RenderContext
 function renderChildrenInternal(
 	children: IRNode[],
@@ -165,18 +205,24 @@ export function renderChildren(
 	parentKey: string,
 	maxWidth?: number,
 ): ReactNode[] {
-	return renderChildrenInternal(children, parentKey, { maxWidth, media: [] })
+	return renderChildrenInternal(children, parentKey, {
+		maxWidth,
+		media: [],
+		toc: [],
+		blockIndex: 0,
+		irNodes: [],
+	})
 }
 
 // public API: renders an IR tree to a React node tree (legacy, no media collection)
 export function renderToOpenTUI(ir: IRNode, maxWidth?: number): ReactNode {
-	const ctx: RenderContext = { maxWidth, media: [] }
+	const ctx: RenderContext = { maxWidth, media: [], toc: [], blockIndex: 0, irNodes: [] }
 	return renderNode(ir, 'root', ctx)
 }
 
-// public API: renders an IR tree and collects media nodes
+// public API: renders an IR tree and collects media + TOC nodes
 export function renderToOpenTUIWithMedia(ir: IRNode, maxWidth?: number): RenderResult {
-	const ctx: RenderContext = { maxWidth, media: [] }
+	const ctx: RenderContext = { maxWidth, media: [], toc: [], blockIndex: 0, irNodes: [] }
 	const jsx = renderNode(ir, 'root', ctx)
-	return { jsx, mediaNodes: ctx.media }
+	return { jsx, mediaNodes: ctx.media, tocEntries: ctx.toc }
 }

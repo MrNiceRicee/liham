@@ -3,6 +3,7 @@
 import type { FileEntry } from '../browser/scanner.ts'
 import { mediaModalReducer } from './state-media-modal.ts'
 import { type SearchState, searchReducer } from './state-search.ts'
+import { type TocState, tocReducer } from './state-toc.ts'
 
 export type LayoutMode = 'preview-only' | 'side' | 'top' | 'source-only'
 
@@ -50,6 +51,7 @@ export interface AppState {
 	mediaFocusIndex: number | null
 	mediaModal: MediaModalState
 	searchState: SearchState | null
+	tocState: TocState | null
 }
 
 // -- actions --
@@ -102,6 +104,12 @@ export type AppAction =
 	| { type: 'SearchNext' }
 	| { type: 'SearchPrev' }
 	| { type: 'SearchClose' }
+	// TOC actions
+	| { type: 'ToggleToc' }
+	| { type: 'SetTocCursor'; index: number }
+	| { type: 'TocJump' }
+	| { type: 'TocJumpComplete' }
+	| { type: 'CloseToc' }
 
 // -- layout helpers --
 
@@ -122,10 +130,6 @@ function autoFocus(layout: LayoutMode, currentFocus: FocusTarget): FocusTarget {
 	return currentFocus
 }
 
-function oppositeFocus(focus: FocusTarget): FocusTarget {
-	return focus === 'source' ? 'preview' : 'source'
-}
-
 const LEGEND_CYCLE: readonly LegendPage[] = ['nav', 'scroll', 'off'] as const
 
 function nextLegendPage(current: LegendPage): LegendPage {
@@ -137,7 +141,11 @@ function nextLegendPage(current: LegendPage): LegendPage {
 
 const PAGE_SIZE = 10
 
-function moveCursor(current: number, direction: CursorDirection, filteredLength: number): number {
+export function moveCursor(
+	current: number,
+	direction: CursorDirection,
+	filteredLength: number,
+): number {
 	if (filteredLength === 0) return 0
 	const max = filteredLength - 1
 
@@ -181,6 +189,7 @@ function returnToBrowser(state: AppState): AppState {
 		mediaFocusIndex: null,
 		mediaModal: { kind: 'closed' },
 		searchState: null,
+		tocState: null,
 	}
 }
 
@@ -246,6 +255,7 @@ function browserReducer(state: AppState, action: BrowserAction): AppState {
 				fileDeleted: false,
 				focus: autoFocus(state.layout, 'preview'),
 				searchState: null,
+				tocState: null,
 			}
 		case 'ReturnToBrowser':
 			return returnToBrowser(state)
@@ -330,6 +340,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 		case 'SearchPrev':
 		case 'SearchClose':
 			return searchReducer(state, action)
+		case 'ToggleToc':
+		case 'SetTocCursor':
+		case 'TocJump':
+		case 'TocJumpComplete':
+		case 'CloseToc':
+			return tocReducer(state, action)
 	}
 }
 
@@ -364,6 +380,7 @@ export function initialState(
 		mediaFocusIndex: null,
 		mediaModal: { kind: 'closed' },
 		searchState: null,
+		tocState: null,
 	}
 }
 
@@ -460,106 +477,6 @@ export function paneDimensions(
 	return viewerPaneDimensions(layout, width, contentHeight)
 }
 
-// -- legend entries --
+// -- legend entries (extracted to state-legend.ts) --
 
-export interface LegendEntry {
-	key: string
-	label: string
-}
-
-function modalLegend(modal: MediaModalState, legendPage: LegendPage): LegendEntry[] {
-	if (legendPage === 'off') return [{ key: '?', label: 'help' }]
-	return [
-		{ key: '?', label: 'more' },
-		{ key: 'n/N', label: 'next/prev' },
-		{ key: 'space', label: modal.kind === 'open' && modal.paused ? 'play' : 'pause' },
-		{ key: '</', label: 'seek' },
-		{ key: 'r', label: 'replay' },
-		{ key: 'g', label: 'gallery' },
-		{ key: 'esc', label: 'close' },
-	]
-}
-
-function mediaFocusLegend(legendPage: LegendPage): LegendEntry[] {
-	if (legendPage === 'off') return [{ key: '?', label: 'help' }]
-	return [
-		{ key: '?', label: 'more' },
-		{ key: 'n/N', label: 'next/prev media' },
-		{ key: 'enter', label: 'view' },
-		{ key: 'esc', label: 'unfocus' },
-	]
-}
-
-function browserLegend(legendPage: LegendPage): LegendEntry[] {
-	if (legendPage === 'off') return [{ key: '?', label: 'help' }]
-	return [
-		{ key: '?', label: 'more' },
-		{ key: '\u2191/\u2193', label: 'navigate' },
-		{ key: 'enter', label: 'open' },
-		{ key: 'esc', label: 'quit' },
-		{ key: 'type', label: 'filter' },
-	]
-}
-
-function viewerLegend(state: AppState): LegendEntry[] {
-	if (state.legendPage === 'off') return [{ key: '?', label: 'help' }]
-
-	if (state.legendPage === 'scroll') {
-		return [
-			{ key: '?', label: 'more' },
-			{ key: 'j/k', label: 'scroll' },
-			{ key: 'g/G', label: 'top/bottom' },
-			{ key: 'pgup/pgdn', label: 'page' },
-			{ key: 'ctrl+d/u', label: 'half' },
-		]
-	}
-
-	// nav page
-	const entries: LegendEntry[] = [{ key: '?', label: 'more' }]
-	entries.push({ key: 'l', label: 'layout' })
-
-	if (isSplitLayout(state.layout)) {
-		const other = oppositeFocus(state.focus)
-		entries.push({ key: 'Tab', label: other })
-		entries.push({ key: 's', label: state.scrollSync ? 'sync on' : 'sync off' })
-	}
-
-	entries.push({ key: '/', label: 'search' })
-	entries.push({ key: 't', label: 'TOC' })
-	entries.push({ key: 'y', label: 'copy' })
-
-	if (state.fromBrowser) {
-		entries.push({ key: 'esc', label: 'back' })
-	}
-
-	entries.push({ key: 'q', label: 'quit' })
-	return entries
-}
-
-function searchInputLegend(): LegendEntry[] {
-	return [
-		{ key: 'Esc', label: 'cancel' },
-		{ key: 'Enter', label: 'confirm' },
-		{ key: 'type', label: 'search' },
-	]
-}
-
-function searchActiveLegend(legendPage: LegendPage): LegendEntry[] {
-	if (legendPage === 'off') return [{ key: '?', label: 'help' }]
-	return [
-		{ key: '?', label: 'more' },
-		{ key: 'n/N', label: 'next/prev' },
-		{ key: 'Esc', label: 'close' },
-		{ key: '/', label: 'new search' },
-	]
-}
-
-// key priority: search-input > search-active > toc > modal > media-focus > normal
-export function legendEntries(state: AppState): LegendEntry[] {
-	if (state.mode === 'browser') return browserLegend(state.legendPage)
-	if (state.searchState?.phase === 'input') return searchInputLegend()
-	if (state.searchState?.phase === 'active') return searchActiveLegend(state.legendPage)
-	if (state.mediaModal.kind !== 'closed') return modalLegend(state.mediaModal, state.legendPage)
-	if (state.mediaFocusIndex != null) return mediaFocusLegend(state.legendPage)
-	return viewerLegend(state)
-}
+export { legendEntries, type LegendEntry } from './state-legend.ts'

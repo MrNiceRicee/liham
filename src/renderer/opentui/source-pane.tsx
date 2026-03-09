@@ -47,6 +47,25 @@ function buildLineMatchMap(matches: SearchMatch[]): Map<number, SearchMatch[]> {
 	return map
 }
 
+// build sets of highlighted and current-match character positions for a line
+function buildMatchPositions(
+	lineMatches: SearchMatch[],
+	queryLength: number,
+	currentCharOffset: number | undefined,
+	lineLength: number,
+) {
+	const highlight = new Set<number>()
+	const current = new Set<number>()
+	for (const m of lineMatches) {
+		const isCurrent = currentCharOffset != null && m.charOffset === currentCharOffset
+		for (let c = m.column; c < m.column + queryLength && c < lineLength; c++) {
+			highlight.add(c)
+			if (isCurrent) current.add(c)
+		}
+	}
+	return { highlight, current }
+}
+
 // render a line with search highlights applied
 function renderHighlightedLine(
 	line: string,
@@ -56,18 +75,12 @@ function renderHighlightedLine(
 	theme: ThemeTokens,
 	keyPrefix: string,
 ): ReactNode[] {
-	// build highlight position sets
-	const highlightPositions = new Set<number>()
-	const currentPositions = new Set<number>()
-
-	for (const m of lineMatches) {
-		const isCurrent = currentCharOffset != null && m.charOffset === currentCharOffset
-		for (let c = m.column; c < m.column + queryLength && c < line.length; c++) {
-			highlightPositions.add(c)
-			if (isCurrent) currentPositions.add(c)
-		}
-	}
-
+	const { highlight: highlightPositions, current: currentPositions } = buildMatchPositions(
+		lineMatches,
+		queryLength,
+		currentCharOffset,
+		line.length,
+	)
 	const segments = splitHighlightSegments(line, highlightPositions)
 	const elements: ReactNode[] = []
 	let charPos = 0
@@ -177,7 +190,11 @@ export function SourcePane({
 		>
 			<box style={{ flexDirection: 'column', padding: 1 }}>
 				{chunks.map((chunk, i) => {
-					if (searchHighlight == null || lineMatchMap == null || searchHighlight.matches.length === 0) {
+					if (
+						searchHighlight == null ||
+						lineMatchMap == null ||
+						searchHighlight.matches.length === 0
+					) {
 						return (
 							<text key={`src-${String(i)}`} fg={theme.paragraph.textColor}>
 								{chunk}

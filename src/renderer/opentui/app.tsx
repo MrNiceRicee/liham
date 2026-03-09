@@ -30,6 +30,7 @@ import type { MediaCapabilities } from '../../media/types.ts'
 import { findMatches } from '../../search/find.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import { browserKeyHandler } from './browser-keys.ts'
+import { dispatchViewerKey } from './viewer-dispatch.ts'
 import {
 	openFileFromBrowser,
 	type PreviewCacheEntry,
@@ -39,24 +40,18 @@ import {
 	startFileWatcher,
 	updateBrowserPreview,
 } from './browser-preview.tsx'
-import { clearImageCache } from './image.tsx'
 import { ImageContext, type ImageContextValue } from './image-context.tsx'
 import type { MediaEntry } from './index.tsx'
+import type { TocEntry } from './toc.ts'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-context.tsx'
 import { MediaGallery } from './media-gallery.tsx'
 import { type FrameInfo, MediaModal, type VideoPlaybackInfo } from './media-modal.tsx'
 import { SearchBar } from './search-bar.tsx'
-import { handleSearchKey } from './search-keys.ts'
 import { scrollToLine } from './scroll-utils.ts'
+import { TocPanel } from './toc-panel.tsx'
 import { StatusBar } from './status-bar.tsx'
-import {
-	applyScroll,
-	createMouseHandlers,
-	handleModalKey,
-	handleViewerKey,
-	syncScroll,
-} from './viewer-keys.ts'
+import { applyScroll, createMouseHandlers, syncScroll } from './viewer-keys.ts'
 
 function isModalPaused(modal: MediaModalState): boolean {
 	return modal.kind === 'open' && modal.paused
@@ -129,43 +124,51 @@ function playMediaAudio(entry: MediaEntry, currentFile: string | undefined, canP
 	void playAudio(src, basePath)
 }
 
-function dispatchViewerKey(
-	key: KeyEvent,
+// -- extracted hooks to reduce App cognitive complexity --
+
+function useSearchHighlight(
 	state: AppState,
-	dispatch: (action: AppAction) => void,
-	mediaCount: number,
-	mediaNodes: MediaEntry[],
-	onAudioPlay: (entry: MediaEntry) => void,
-	onAction: (action: AppAction) => void,
-	videoDuration: number,
-	searchMatchCount: number,
-	renderer?: ReturnType<typeof useRenderer> | null,
+	raw: string,
+	sourceRef: React.RefObject<ScrollBoxRenderable | null>,
 ) {
-	// key priority: search-input > search-active > toc > modal > media-focus > normal
+	const searchQuery = state.searchState != null ? state.searchState.query : ''
+	const searchMatches = useMemo(() => findMatches(raw, searchQuery), [raw, searchQuery])
 
-	// search branch — input swallows all, active passes through scroll keys
-	if (state.searchState != null) {
-		const consumed = handleSearchKey(key, state.searchState, dispatch, searchMatchCount)
-		if (consumed) return
-		// fall through for scroll keys in active phase
-	}
+	const safeSearchIndex = useMemo(() => {
+		if (state.searchState?.phase !== 'active') return 0
+		if (searchMatches.length === 0) return 0
+		return Math.min(state.searchState.currentMatch, searchMatches.length - 1)
+	}, [state.searchState, searchMatches.length])
 
-	// intercept return on audio — play directly instead of opening modal
-	if (key.name === 'return' && state.mediaFocusIndex != null) {
-		const entry = mediaNodes[state.mediaFocusIndex]
-		if (entry?.node.type === 'audio') {
-			onAudioPlay(entry)
-			return
+	useEffect(() => {
+		if (state.searchState?.phase !== 'active') return
+		if (searchMatches.length === 0) return
+		const match = searchMatches[safeSearchIndex]
+		if (match == null) return
+		scrollToLine(sourceRef.current, match.line)
+	}, [safeSearchIndex, state.searchState?.phase])
+
+	return { searchQuery, searchMatches, safeSearchIndex }
+}
+
+function useTocJump(
+	state: AppState,
+	tocEntries: readonly TocEntry[],
+	previewRef: React.RefObject<ScrollBoxRenderable | null>,
+	sourceRef: React.RefObject<ScrollBoxRenderable | null>,
+	dispatch: React.Dispatch<AppAction>,
+) {
+	useEffect(() => {
+		if (state.tocState?.kind !== 'jumping') return
+		const entry = tocEntries[state.tocState.cursorIndex]
+		if (entry != null) {
+			previewRef.current?.scrollTo(entry.estimatedOffset)
+			if (state.scrollSync && isSplitLayout(state.layout)) {
+				queueMicrotask(() => syncScroll(previewRef.current, sourceRef.current))
+			}
 		}
-	}
-
-	const action =
-		state.mediaModal.kind !== 'closed'
-			? handleModalKey(key, state, dispatch, mediaCount, videoDuration)
-			: handleViewerKey(key, state, dispatch, mediaCount, renderer)
-	if (action == null) return
-	if (action.type === 'ReturnToBrowser') clearImageCache()
-	onAction(action)
+		dispatch({ type: 'TocJumpComplete' })
+	}, [state.tocState?.kind])
 }
 
 type AppProps =
@@ -174,6 +177,7 @@ type AppProps =
 			content: ReactNode
 			raw: string
 			mediaNodes: MediaEntry[]
+			tocEntries: TocEntry[]
 			layout: LayoutMode
 			theme: ThemeTokens
 			mediaCapabilities: MediaCapabilities
@@ -189,6 +193,22 @@ type AppProps =
 			mediaCapabilities: MediaCapabilities
 			noWatch: boolean
 	  }
+
+function initialViewerState(props: Readonly<AppProps>) {
+	if (props.mode === 'viewer')
+		return {
+			content: props.content,
+			raw: props.raw,
+			mediaNodes: props.mediaNodes,
+			tocEntries: props.tocEntries,
+		}
+	return {
+		content: null as ReactNode,
+		raw: '',
+		mediaNodes: [] as MediaEntry[],
+		tocEntries: [] as TocEntry[],
+	}
+}
 
 export function App(props: Readonly<AppProps>) {
 	const renderer = useRenderer()
@@ -221,15 +241,7 @@ export function App(props: Readonly<AppProps>) {
 	const [videoInfo, setVideoInfo] = useState<VideoPlaybackInfo | null>(null)
 
 	// unified viewer content — mutable state for live reload
-	const [viewerState, setViewerState] = useState<{
-		content: ReactNode
-		raw: string
-		mediaNodes: MediaEntry[]
-	}>(() => {
-		if (props.mode === 'viewer')
-			return { content: props.content, raw: props.raw, mediaNodes: props.mediaNodes }
-		return { content: null, raw: '', mediaNodes: [] }
-	})
+	const [viewerState, setViewerState] = useState(() => initialViewerState(props))
 
 	// derived state
 	const isViewer = state.mode === 'viewer'
@@ -307,8 +319,8 @@ export function App(props: Readonly<AppProps>) {
 	}, [currentFile, state.mode])
 
 	// -- viewer scroll handling --
-	const focusedRef = state.focus === 'source' ? sourceRef : previewRef
-	const otherRef = state.focus === 'source' ? previewRef : sourceRef
+	const [focusedRef, otherRef] =
+		state.focus === 'source' ? [sourceRef, previewRef] : [previewRef, sourceRef]
 
 	const handleScroll = useCallback(
 		(direction: ScrollDirection) =>
@@ -345,28 +357,13 @@ export function App(props: Readonly<AppProps>) {
 		[currentFile, props.mediaCapabilities.canPlayAudio],
 	)
 
-	// -- search matches (recomputed on query change for highlight-as-you-type) --
-	const searchQuery = state.searchState != null ? state.searchState.query : ''
-	const searchMatches = useMemo(
-		() => findMatches(viewerState.raw, searchQuery),
-		[viewerState.raw, searchQuery],
+	// search highlight + scroll-to-match + TOC jump
+	const { searchQuery, searchMatches, safeSearchIndex } = useSearchHighlight(
+		state,
+		viewerState.raw,
+		sourceRef,
 	)
-
-	// defensive clamping: after live reload, currentMatch may point past end
-	const safeSearchIndex = useMemo(() => {
-		if (state.searchState?.phase !== 'active') return 0
-		if (searchMatches.length === 0) return 0
-		return Math.min(state.searchState.currentMatch, searchMatches.length - 1)
-	}, [state.searchState, searchMatches.length])
-
-	// scroll to current match
-	useEffect(() => {
-		if (state.searchState?.phase !== 'active') return
-		if (searchMatches.length === 0) return
-		const match = searchMatches[safeSearchIndex]
-		if (match == null) return
-		scrollToLine(sourceRef.current, match.line)
-	}, [safeSearchIndex, state.searchState?.phase])
+	useTocJump(state, viewerState.tocEntries, previewRef, sourceRef, dispatch)
 
 	// -- keyboard handler --
 	const mediaCount = viewerState.mediaNodes.length
@@ -391,6 +388,7 @@ export function App(props: Readonly<AppProps>) {
 			handleAction,
 			videoInfo?.duration ?? 0,
 			searchMatches.length,
+			viewerState.tocEntries.length,
 			renderer,
 		)
 	})
@@ -492,12 +490,31 @@ export function App(props: Readonly<AppProps>) {
 		/>
 	) : null
 
-	// wrap viewer layout + modal + gallery inside both context providers so modal has ImageContext
+	// TOC panel — hidden in source-only layout and when modal is open
+	const showToc =
+		isViewer &&
+		state.tocState?.kind === 'open' &&
+		viewerState.tocEntries.length > 0 &&
+		state.layout !== 'source-only' &&
+		state.mediaModal.kind === 'closed'
+
+	const tocElement = showToc ? (
+		<TocPanel
+			entries={viewerState.tocEntries}
+			cursorIndex={state.tocState?.cursorIndex ?? 0}
+			theme={props.theme}
+			termWidth={state.dimensions.width}
+			termHeight={modalDerived.contentHeight}
+		/>
+	) : null
+
+	// wrap viewer layout + modal + gallery + TOC inside both context providers
 	const viewerContent = (
 		<>
 			{viewerLayout}
 			{modalElement}
 			{galleryElement}
+			{tocElement}
 		</>
 	)
 

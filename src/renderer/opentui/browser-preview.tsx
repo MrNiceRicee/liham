@@ -11,6 +11,7 @@ import { processMarkdown } from '../../pipeline/processor.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import { createDirectoryWatcher, createFileWatcher } from '../../watcher/watcher.ts'
 import { type MediaEntry, renderToOpenTUI, renderToOpenTUIWithMedia } from './index.tsx'
+import type { TocEntry } from './toc.ts'
 
 export interface PreviewCacheEntry {
 	content: ReactNode
@@ -198,16 +199,25 @@ export function openFileFromBrowser(
 			const termWidth = state.dimensions.width
 			const panes = paneDimensions(state.layout, termWidth, state.dimensions.height, 'viewer')
 			const width = (panes.preview?.width ?? termWidth) - 4
-			const { jsx: rendered, mediaNodes } = renderToOpenTUIWithMedia(result.value, width)
+			const {
+				jsx: rendered,
+				mediaNodes,
+				tocEntries,
+			} = renderToOpenTUIWithMedia(result.value, width)
 
-			setViewerState({ content: rendered, raw: markdown, mediaNodes })
+			setViewerState({ content: rendered, raw: markdown, mediaNodes, tocEntries })
 		} catch {
 			setBrowserPreviewContent(<text fg={theme.fallback.textColor}>cannot read file</text>)
 		}
 	})()
 }
 
-type ViewerState = { content: ReactNode; raw: string; mediaNodes: MediaEntry[] }
+type ViewerState = {
+	content: ReactNode
+	raw: string
+	mediaNodes: MediaEntry[]
+	tocEntries: TocEntry[]
+}
 
 export interface ReloadContext {
 	changeIdRef: RefObject<number>
@@ -244,13 +254,17 @@ export function reloadViewerFile(
 				'viewer',
 			)
 			const width = (panes.preview?.width ?? state.dimensions.width) - 4
-			const { jsx: rendered, mediaNodes } = renderToOpenTUIWithMedia(result.value, width)
+			const {
+				jsx: rendered,
+				mediaNodes,
+				tocEntries,
+			} = renderToOpenTUIWithMedia(result.value, width)
 			const elapsed = performance.now() - t0
 
 			if (ctx.changeIdRef.current !== changeId) return
 
 			const scrollBefore = ctx.previewRef.current?.scrollTop ?? 0
-			ctx.setViewerState({ content: rendered, raw: markdown, mediaNodes })
+			ctx.setViewerState({ content: rendered, raw: markdown, mediaNodes, tocEntries })
 			ctx.setRenderTimeMs(elapsed)
 			queueMicrotask(() => {
 				ctx.previewRef.current?.scrollTo(scrollBefore)

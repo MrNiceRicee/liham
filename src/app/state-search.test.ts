@@ -106,7 +106,7 @@ describe('search state machine', () => {
 		const s = stateWith({
 			searchState: { phase: 'active', query: 'test', matchCount: 5, currentMatch: 2 },
 		})
-		const next = appReducer(s, { type: 'OpenFile', path: '/tmp/test.md' })
+		const next = appReducer(s, { type: 'OpenFile', path: '/home/user/test.md' })
 		expect(next.searchState).toBeNull()
 	})
 })

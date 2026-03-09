@@ -6,7 +6,11 @@ import { estimateHeadingOffset, estimateHeight, scrollToLine } from './scroll-ut
 describe('scrollToLine', () => {
 	test('applies +1 offset for padding', () => {
 		let scrolledTo = -1
-		const fakeRef = { scrollTo: (pos: number) => { scrolledTo = pos } }
+		const fakeRef = {
+			scrollTo: (pos: number) => {
+				scrolledTo = pos
+			},
+		}
 		scrollToLine(fakeRef as never, 5)
 		expect(scrolledTo).toBe(6)
 	})

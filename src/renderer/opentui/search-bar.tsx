@@ -52,12 +52,8 @@ export function SearchBar({ searchState, matchCount, theme }: Readonly<SearchBar
 				</span>
 			</text>
 			<box style={{ flexGrow: 1 }} />
-			{hasNoMatches && (
-				<text fg={noMatchColor}>{'no matches '}</text>
-			)}
-			{countLabel.length > 0 && !hasNoMatches && (
-				<text fg={countFg}>{countLabel}</text>
-			)}
+			{hasNoMatches && <text fg={noMatchColor}>{'no matches '}</text>}
+			{countLabel.length > 0 && !hasNoMatches && <text fg={countFg}>{countLabel}</text>}
 		</box>
 	)
 }

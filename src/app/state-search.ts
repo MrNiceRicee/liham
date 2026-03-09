@@ -20,6 +20,33 @@ export type SearchAction = Extract<
 	}
 >
 
+function searchConfirm(state: AppState, matchCount: number): AppState {
+	if (state.searchState?.phase !== 'input') return state
+	if (matchCount === 0) return state
+	return {
+		...state,
+		searchState: {
+			phase: 'active',
+			query: state.searchState.query,
+			matchCount,
+			currentMatch: 0,
+		},
+	}
+}
+
+function navigateMatch(state: AppState, delta: number): AppState {
+	if (state.searchState?.phase !== 'active') return state
+	const { matchCount, currentMatch } = state.searchState
+	if (matchCount === 0) return state
+	return {
+		...state,
+		searchState: {
+			...state.searchState,
+			currentMatch: (currentMatch + delta + matchCount) % matchCount,
+		},
+	}
+}
+
 export function searchReducer(state: AppState, action: SearchAction): AppState {
 	switch (action.type) {
 		case 'SearchOpen':
@@ -32,45 +59,14 @@ export function searchReducer(state: AppState, action: SearchAction): AppState {
 			return { ...state, searchState: { phase: 'input', query } }
 		}
 
-		case 'SearchConfirm': {
-			if (state.searchState == null || state.searchState.phase !== 'input') return state
-			if (action.matchCount === 0) return state // stay in input phase
-			return {
-				...state,
-				searchState: {
-					phase: 'active',
-					query: state.searchState.query,
-					matchCount: action.matchCount,
-					currentMatch: 0,
-				},
-			}
-		}
+		case 'SearchConfirm':
+			return searchConfirm(state, action.matchCount)
 
-		case 'SearchNext': {
-			if (state.searchState?.phase !== 'active') return state
-			const { matchCount, currentMatch } = state.searchState
-			if (matchCount === 0) return state
-			return {
-				...state,
-				searchState: {
-					...state.searchState,
-					currentMatch: (currentMatch + 1) % matchCount,
-				},
-			}
-		}
+		case 'SearchNext':
+			return navigateMatch(state, 1)
 
-		case 'SearchPrev': {
-			if (state.searchState?.phase !== 'active') return state
-			const { matchCount, currentMatch } = state.searchState
-			if (matchCount === 0) return state
-			return {
-				...state,
-				searchState: {
-					...state.searchState,
-					currentMatch: (currentMatch - 1 + matchCount) % matchCount,
-				},
-			}
-		}
+		case 'SearchPrev':
+			return navigateMatch(state, -1)
 
 		case 'SearchClose':
 			return { ...state, searchState: null }

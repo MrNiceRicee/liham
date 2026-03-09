@@ -15,7 +15,9 @@ export function handleSearchKey(
 	matchCount: number,
 ): boolean {
 	if (searchState.phase === 'input') {
-		return handleSearchInputKey(key, searchState, dispatch, matchCount)
+		handleSearchInputKey(key, searchState, dispatch, matchCount)
+		// input phase swallows all keys — never pass through
+		return true
 	}
 	return handleSearchActiveKey(key, dispatch)
 }
@@ -25,32 +27,23 @@ function handleSearchInputKey(
 	searchState: SearchState & { phase: 'input' },
 	dispatch: (action: AppAction) => void,
 	matchCount: number,
-): boolean {
+): void {
 	if (key.name === 'escape') {
 		dispatch({ type: 'SearchClose' })
-		return true
+		return
 	}
 	if (key.name === 'return') {
 		dispatch({ type: 'SearchConfirm', matchCount })
-		return true
+		return
 	}
 
 	const result = handleTextInputKey(key, searchState.query)
-	if (result.consumed) {
-		if (result.newText !== searchState.query) {
-			dispatch({ type: 'SearchUpdate', query: result.newText })
-		}
-		return true
+	if (result.consumed && result.newText !== searchState.query) {
+		dispatch({ type: 'SearchUpdate', query: result.newText })
 	}
-
-	// input phase swallows ALL other keys
-	return true
 }
 
-function handleSearchActiveKey(
-	key: KeyEvent,
-	dispatch: (action: AppAction) => void,
-): boolean {
+function handleSearchActiveKey(key: KeyEvent, dispatch: (action: AppAction) => void): boolean {
 	switch (key.name) {
 		case 'n':
 			if (key.shift) dispatch({ type: 'SearchPrev' })

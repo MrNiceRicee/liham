@@ -57,7 +57,11 @@ export async function boot(ctx: BootContext): Promise<void> {
 			const panes = paneDimensions(ctx.layout, termWidth, termHeight)
 			const paneChrome = 4
 			const previewWidth = (panes.preview?.width ?? termWidth) - paneChrome
-			const { jsx: content, mediaNodes } = renderToOpenTUIWithMedia(ctx.ir, previewWidth)
+			const {
+				jsx: content,
+				mediaNodes,
+				tocEntries,
+			} = renderToOpenTUIWithMedia(ctx.ir, previewWidth)
 
 			createRoot(renderer).render(
 				<App
@@ -65,6 +69,7 @@ export async function boot(ctx: BootContext): Promise<void> {
 					content={content}
 					raw={ctx.raw}
 					mediaNodes={mediaNodes}
+					tocEntries={tocEntries}
 					layout={ctx.layout}
 					theme={ctx.theme}
 					mediaCapabilities={ctx.mediaCapabilities}

@@ -109,9 +109,7 @@ export function FloatingPanel({
 
 	// position styles
 	const positionStyle: Record<string, unknown> =
-		position === 'bottom-left'
-			? { bottom: 2, left: 1 }
-			: { top: 0, right: 0 }
+		position === 'bottom-left' ? { bottom: 2, left: 1 } : { top: 0, right: 0 }
 
 	return (
 		<box
