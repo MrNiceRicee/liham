@@ -11,6 +11,15 @@ import type { ThemeTokens } from '../theme/types.ts'
 import { compileMathDisplay, compileMathInline } from './compile-math.ts'
 import { compileAudio, compileImg, compileVideo } from './compile-media.ts'
 import { compileMermaidBlock } from './compile-mermaid.ts'
+import {
+	HAST_BLOCK_TAGS,
+	KNOWN_INLINE_TAGS,
+	STRIP_WHITESPACE_CONTAINERS,
+	extractCode,
+	extractLanguage,
+	extractText,
+	hasClass,
+} from './hast-utils.ts'
 import { getHighlightColor } from './hljs-colors.ts'
 import { sanitizeForTerminal } from './sanitize.ts'
 import { sanitizeUrl } from './sanitize-url.ts'
@@ -37,116 +46,6 @@ interface CompilerState {
 	customHandlers: Record<string, CustomHandler>
 	file: VFile
 	theme: ThemeTokens
-}
-
-// hast block elements
-const HAST_BLOCK_TAGS = new Set([
-	'address',
-	'article',
-	'aside',
-	'blockquote',
-	'details',
-	'dialog',
-	'dd',
-	'div',
-	'dl',
-	'dt',
-	'fieldset',
-	'figcaption',
-	'figure',
-	'footer',
-	'form',
-	'h1',
-	'h2',
-	'h3',
-	'h4',
-	'h5',
-	'h6',
-	'header',
-	'hgroup',
-	'hr',
-	'li',
-	'main',
-	'nav',
-	'ol',
-	'p',
-	'pre',
-	'section',
-	'summary',
-	'table',
-	'tbody',
-	'td',
-	'tfoot',
-	'th',
-	'thead',
-	'tr',
-	'ul',
-	'video',
-	'audio',
-])
-
-const KNOWN_INLINE_TAGS = new Set([
-	'a',
-	'abbr',
-	'b',
-	'br',
-	'code',
-	'del',
-	'em',
-	'i',
-	'img',
-	'input',
-	'kbd',
-	'mark',
-	's',
-	'small',
-	'span',
-	'strong',
-	'sub',
-	'sup',
-	'u',
-])
-
-// block containers where whitespace-only text nodes should be stripped
-const STRIP_WHITESPACE_CONTAINERS = new Set(['ul', 'ol', 'table', 'thead', 'tbody', 'tfoot', 'tr'])
-
-// -- hast text extraction helpers (ported from CodeBlock.tsx) --
-
-function extractText(node: Element): string {
-	let result = ''
-	for (const child of node.children) {
-		if (child.type === 'text') {
-			result += child.value
-		} else if (child.type === 'element') {
-			result += extractText(child)
-		}
-	}
-	return result
-}
-
-function extractCode(node: Element): string {
-	const codeEl = node.children.find(
-		(child): child is Element => child.type === 'element' && child.tagName === 'code',
-	)
-	if (!codeEl) return ''
-	return extractText(codeEl)
-}
-
-function extractLanguage(node: Element): string | undefined {
-	const codeEl = node.children.find(
-		(child): child is Element => child.type === 'element' && child.tagName === 'code',
-	)
-	if (!codeEl) return undefined
-
-	const className = codeEl.properties?.['className']
-	if (!Array.isArray(className)) return undefined
-
-	for (const cls of className) {
-		if (typeof cls === 'string' && cls.startsWith('language-')) {
-			return cls.slice(9)
-		}
-	}
-	return undefined
 }
 
 // -- list bullet computation (ported from List.tsx) --
@@ -471,11 +370,6 @@ function flattenChildren(state: CompilerState, node: Element): IRNode | undefine
 	if (children.length === 1) return children[0]
 	if (children.length === 0) return undefined
 	return { type: 'strong', style: {}, children }
-}
-
-function hasClass(node: Element, className: string): boolean {
-	const classes = node.properties?.['className']
-	return Array.isArray(classes) && classes.includes(className)
 }
 
 function compileCode(state: CompilerState, node: Element): IRNode | undefined {

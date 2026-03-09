@@ -22,9 +22,7 @@ export function renderMermaidBlock(
 		return (
 			<box key={key} style={boxStyle} border title="mermaid">
 				<text fg={theme.mermaid.errorColor}>{node.data.source}</text>
-				<text fg={theme.mermaid.errorColor}>
-					[{node.data.error ?? 'unsupported diagram type'}]
-				</text>
+				<text fg={theme.mermaid.errorColor}>[{node.data.error ?? 'unsupported diagram type'}]</text>
 			</box>
 		)
 	}

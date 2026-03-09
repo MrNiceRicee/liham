@@ -6,7 +6,10 @@ import { isBlockNode } from '../ir/types.ts'
 import { darkTheme } from '../theme/dark.ts'
 import { processMarkdown } from './processor.ts'
 
-function assertOk(result: { ok: boolean; value?: unknown }): asserts result is { ok: true; value: IRNode } {
+function assertOk(result: {
+	ok: boolean
+	value?: unknown
+}): asserts result is { ok: true; value: IRNode } {
 	expect(result.ok).toBe(true)
 }
 
@@ -61,6 +64,41 @@ describe('math pipeline', () => {
 		expect(mathNodes.length).toBe(0)
 		const codeNodes = findNodes(result.value, 'codeBlock')
 		expect(codeNodes.length).toBe(1)
+	})
+
+	it('adjacent inline math produces two nodes', async () => {
+		const result = await processMarkdown('$a$ and $b$', darkTheme)
+		assertOk(result)
+		const nodes = findNodes(result.value, 'mathInline')
+		expect(nodes.length).toBe(2)
+	})
+
+	it('dollar sign without closing is not math', async () => {
+		const result = await processMarkdown('the price is $5', darkTheme)
+		assertOk(result)
+		const nodes = findNodes(result.value, 'mathInline')
+		expect(nodes.length).toBe(0)
+	})
+
+	it('math inside bold text', async () => {
+		const result = await processMarkdown('**$\\alpha$**', darkTheme)
+		assertOk(result)
+		const nodes = findNodes(result.value, 'mathInline')
+		expect(nodes.length).toBe(1)
+	})
+
+	it('full fixture processes without error', async () => {
+		const { readFileSync } = await import('node:fs')
+		const { resolve } = await import('node:path')
+		const fixture = readFileSync(resolve('test/fixtures/math-mermaid.md'), 'utf-8')
+		const result = await processMarkdown(fixture, darkTheme)
+		assertOk(result)
+		const mathInline = findNodes(result.value, 'mathInline')
+		const mathDisplay = findNodes(result.value, 'mathDisplay')
+		const mermaid = findNodes(result.value, 'mermaid')
+		expect(mathInline.length).toBeGreaterThan(0)
+		expect(mathDisplay.length).toBeGreaterThan(0)
+		expect(mermaid.length).toBeGreaterThan(0)
 	})
 
 	it('mathDisplay is a block node, mathInline is not', async () => {

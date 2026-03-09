@@ -59,7 +59,8 @@ function isCoreNode(node: IRNode): node is CoreIRNode {
 function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 	if (node.type === 'mathInline') return renderMathInline(node as CustomNode<'mathInline'>, key)
 	if (node.type === 'mathDisplay') return renderMathDisplay(node as CustomNode<'mathDisplay'>, key)
-	if (node.type === 'mermaid') return renderMermaidBlock(node as CustomNode<'mermaid'>, key, ctx.theme)
+	if (node.type === 'mermaid')
+		return renderMermaidBlock(node as CustomNode<'mermaid'>, key, ctx.theme)
 	if (!isCoreNode(node)) return renderCustom(node, key)
 
 	switch (node.type) {

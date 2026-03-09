@@ -5,7 +5,10 @@ import type { CustomNode, IRNode } from '../ir/types.ts'
 import { darkTheme } from '../theme/dark.ts'
 import { processMarkdown } from './processor.ts'
 
-function assertOk(result: { ok: boolean; value?: unknown }): asserts result is { ok: true; value: IRNode } {
+function assertOk(result: {
+	ok: boolean
+	value?: unknown
+}): asserts result is { ok: true; value: IRNode } {
 	expect(result.ok).toBe(true)
 }
 

@@ -4,7 +4,14 @@
 import { TextAttributes } from '@opentui/core'
 import { Fragment, type ReactNode } from 'react'
 
-import type { CoreIRNode, CustomNode, ImageNode, InlineStyle, IRNode, LinkNode } from '../../ir/types.ts'
+import type {
+	CoreIRNode,
+	CustomNode,
+	ImageNode,
+	InlineStyle,
+	IRNode,
+	LinkNode,
+} from '../../ir/types.ts'
 import { renderMathInline } from './math.tsx'
 
 function renderLink(node: LinkNode, key: string): ReactNode {
