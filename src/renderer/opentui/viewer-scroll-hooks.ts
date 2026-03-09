@@ -1,12 +1,13 @@
 // viewer scroll hooks — search highlight scroll-to-match and TOC jump-to-heading.
-// uses character-offset fraction for scroll position — accounts for line wrapping
-// and avoids syncScroll timing issues (scrollTop may not update before microtask).
+// TOC uses findDescendantById for exact element positions in the preview pane.
+// search uses character-offset fraction for both panes.
 
 import type { ScrollBoxRenderable } from '@opentui/core'
 import { useEffect, useMemo } from 'react'
 
 import type { AppAction, AppState } from '../../app/state.ts'
 import { findMatches } from '../../search/find.ts'
+import { scrollToLine } from './scroll-utils.ts'
 import type { TocEntry } from './toc.ts'
 
 // scroll a scrollbox to a fraction (0..1) of its total content height
@@ -15,14 +16,16 @@ function scrollToFraction(ref: ScrollBoxRenderable | null, fraction: number): vo
 	ref.scrollTo(Math.round(fraction * ref.scrollHeight))
 }
 
-// compute character offset of a 0-based line number in raw text
-function lineToCharOffset(raw: string, targetLine: number): number {
-	let line = 0
-	for (let i = 0; i < raw.length; i++) {
-		if (line === targetLine) return i
-		if (raw[i] === '\n') line++
-	}
-	return raw.length
+// scroll a scrollbox so that a descendant element with the given id is at the top.
+// uses the actual rendered position from OpenTUI's layout engine — no estimation.
+function scrollToDescendant(scrollbox: ScrollBoxRenderable, id: string): boolean {
+	const element = scrollbox.content.findDescendantById(id)
+	if (element == null) return false
+	// element.y is absolute screen position (includes scroll translateY offset).
+	// content-relative position = element.y - viewport.y + scrollTop
+	const position = element.y - scrollbox.viewport.y + scrollbox.scrollTop
+	scrollbox.scrollTo(Math.max(0, position))
+	return true
 }
 
 export function useSearchHighlight(
@@ -45,7 +48,7 @@ export function useSearchHighlight(
 		if (searchMatches.length === 0) return
 		const match = searchMatches[safeSearchIndex]
 		if (match == null) return
-		// character fraction: naturally accounts for line wrapping in both panes
+		// character fraction for both panes — best available for search
 		const fraction = raw.length > 0 ? match.charOffset / raw.length : 0
 		scrollToFraction(sourceRef.current, fraction)
 		scrollToFraction(previewRef.current, fraction)
@@ -57,29 +60,25 @@ export function useSearchHighlight(
 export function useTocJump(
 	state: AppState,
 	tocEntries: readonly TocEntry[],
-	estimatedTotalHeight: number,
-	raw: string,
 	previewRef: React.RefObject<ScrollBoxRenderable | null>,
 	sourceRef: React.RefObject<ScrollBoxRenderable | null>,
 	dispatch: React.Dispatch<AppAction>,
 ) {
 	useEffect(() => {
 		if (state.tocState?.kind !== 'jumping') return
-		const entry = tocEntries[state.tocState.cursorIndex]
+		const cursorIndex = state.tocState.cursorIndex
+		const entry = tocEntries[cursorIndex]
 		if (entry == null) {
 			dispatch({ type: 'TocJumpComplete' })
 			return
 		}
-		if (entry.sourceLine != null && raw.length > 0) {
-			// character fraction from source line position
-			const charOffset = lineToCharOffset(raw, entry.sourceLine)
-			const fraction = charOffset / raw.length
-			scrollToFraction(sourceRef.current, fraction)
-			scrollToFraction(previewRef.current, fraction)
-		} else if (previewRef.current != null) {
-			// fallback: ratio-based estimation for preview-only without source line
-			const fraction = estimatedTotalHeight > 0 ? entry.estimatedOffset / estimatedTotalHeight : 0
-			scrollToFraction(previewRef.current, fraction)
+		// preview: use actual element position from the rendered layout tree
+		if (previewRef.current != null) {
+			scrollToDescendant(previewRef.current, `toc-h-${String(cursorIndex)}`)
+		}
+		// source: scroll to the heading's source line
+		if (entry.sourceLine != null) {
+			scrollToLine(sourceRef.current, entry.sourceLine)
 		}
 		dispatch({ type: 'TocJumpComplete' })
 	}, [state.tocState?.kind])

@@ -321,15 +321,7 @@ export function App(props: Readonly<AppProps>) {
 		sourceRef,
 		previewRef,
 	)
-	useTocJump(
-		state,
-		viewerState.tocEntries,
-		viewerState.estimatedTotalHeight,
-		viewerState.raw,
-		previewRef,
-		sourceRef,
-		dispatch,
-	)
+	useTocJump(state, viewerState.tocEntries, previewRef, sourceRef, dispatch)
 
 	// -- keyboard handler --
 	const mediaCount = viewerState.mediaNodes.length
