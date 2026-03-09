@@ -62,7 +62,7 @@ function assertOk(result: PipelineResult): asserts result is PipelineSuccess {
 async function render(markdown: string): Promise<ReactNode> {
 	const result = await processMarkdown(markdown, darkTheme)
 	assertOk(result)
-	return renderToOpenTUI(result.value)
+	return renderToOpenTUI(result.value, darkTheme)
 }
 
 // -- tests --
@@ -286,7 +286,7 @@ describe('processMarkdown benchmark fixtures', () => {
 		assertOk(result)
 		expect(elapsed).toBeLessThan(200)
 
-		const tree = renderToOpenTUI(result.value)
+		const tree = renderToOpenTUI(result.value, darkTheme)
 
 		// heading color should be on span children inside text elements
 		const headingSpans = findAll(tree, (el) => {

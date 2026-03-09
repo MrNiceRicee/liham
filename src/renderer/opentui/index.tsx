@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import { TextAttributes } from '@opentui/core'
 import { extractText } from '../../ir/text-utils.ts'
 import { type CoreIRNode, type IRNode, isBlockNode, type MediaIRNode } from '../../ir/types.ts'
+import type { ThemeTokens } from '../../theme/types.ts'
 import { estimateHeadingOffset, estimateTotalHeight } from './scroll-utils.ts'
 import type { TocEntry } from './toc.ts'
 import { renderBlockquote } from './blockquote.tsx'
@@ -36,6 +37,7 @@ export interface RenderResult {
 interface RenderContext {
 	maxWidth?: number | undefined
 	media: MediaEntry[]
+	theme: ThemeTokens
 	toc: TocEntry[]
 	blockIndex: number
 	irNodes: IRNode[] // top-level nodes for estimateHeadingOffset
@@ -212,21 +214,32 @@ export function renderChildren(
 	return renderChildrenInternal(children, parentKey, {
 		maxWidth,
 		media: [],
+		theme: currentTheme!,
 		toc: [],
 		blockIndex: 0,
 		irNodes: [],
 	})
 }
 
+// module-level theme set at the start of each render pass.
+// avoids threading theme through every sub-component signature.
+let currentTheme: ThemeTokens | undefined
+
 // public API: renders an IR tree to a React node tree (legacy, no media collection)
-export function renderToOpenTUI(ir: IRNode, maxWidth?: number): ReactNode {
-	const ctx: RenderContext = { maxWidth, media: [], toc: [], blockIndex: 0, irNodes: [] }
+export function renderToOpenTUI(ir: IRNode, theme: ThemeTokens, maxWidth?: number): ReactNode {
+	currentTheme = theme
+	const ctx: RenderContext = { maxWidth, media: [], theme, toc: [], blockIndex: 0, irNodes: [] }
 	return renderNode(ir, 'root', ctx)
 }
 
 // public API: renders an IR tree and collects media + TOC nodes
-export function renderToOpenTUIWithMedia(ir: IRNode, maxWidth?: number): RenderResult {
-	const ctx: RenderContext = { maxWidth, media: [], toc: [], blockIndex: 0, irNodes: [] }
+export function renderToOpenTUIWithMedia(
+	ir: IRNode,
+	theme: ThemeTokens,
+	maxWidth?: number,
+): RenderResult {
+	currentTheme = theme
+	const ctx: RenderContext = { maxWidth, media: [], theme, toc: [], blockIndex: 0, irNodes: [] }
 	const jsx = renderNode(ir, 'root', ctx)
 	const totalHeight = estimateTotalHeight(ctx.irNodes, maxWidth)
 	return { jsx, mediaNodes: ctx.media, tocEntries: ctx.toc, estimatedTotalHeight: totalHeight }

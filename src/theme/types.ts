@@ -88,6 +88,17 @@ export interface BrowserTokens {
 	fileCountColor: string
 }
 
+export interface MathTokens {
+	textColor: string
+}
+
+export interface MermaidTokens {
+	borderColor: string
+	errorColor: string
+	labelColor: string
+	textColor: string
+}
+
 export interface ThemeTokens {
 	heading: HeadingTokens
 	codeBlock: CodeBlockTokens
@@ -104,4 +115,6 @@ export interface ThemeTokens {
 	pane: PaneTokens
 	browser: BrowserTokens
 	search: SearchTokens
+	math: MathTokens
+	mermaid: MermaidTokens
 }

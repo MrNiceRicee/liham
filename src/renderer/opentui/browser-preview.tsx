@@ -70,7 +70,7 @@ export function renderBrowserPreview(
 				'browser',
 			)
 			const width = (panes.preview?.width ?? state.dimensions.width) - 4
-			const rendered = renderToOpenTUI(result.value, width)
+			const rendered = renderToOpenTUI(result.value, theme, width)
 			const elapsed = performance.now() - t0
 			cache.set(filePath, { content: rendered, renderTimeMs: elapsed })
 			if (cursorRef.current === cursorSnapshot) {
@@ -204,7 +204,7 @@ export function openFileFromBrowser(
 				mediaNodes,
 				tocEntries,
 				estimatedTotalHeight,
-			} = renderToOpenTUIWithMedia(result.value, width)
+			} = renderToOpenTUIWithMedia(result.value, theme, width)
 
 			setViewerState({
 				content: rendered,
@@ -267,7 +267,7 @@ export function reloadViewerFile(
 				mediaNodes,
 				tocEntries,
 				estimatedTotalHeight,
-			} = renderToOpenTUIWithMedia(result.value, width)
+			} = renderToOpenTUIWithMedia(result.value, theme, width)
 			const elapsed = performance.now() - t0
 
 			if (ctx.changeIdRef.current !== changeId) return

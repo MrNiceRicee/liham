@@ -77,4 +77,13 @@ export const darkTheme: ThemeTokens = {
 		highlightFg: '#c0caf5',
 		currentHighlightBg: '#ff9e64',
 	},
+	math: {
+		textColor: '#c0caf5',
+	},
+	mermaid: {
+		borderColor: '#414868',
+		errorColor: '#565f89',
+		labelColor: '#7aa2f7',
+		textColor: '#c0caf5',
+	},
 }
