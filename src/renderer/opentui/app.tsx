@@ -325,6 +325,7 @@ export function App(props: Readonly<AppProps>) {
 		state,
 		viewerState.tocEntries,
 		viewerState.estimatedTotalHeight,
+		viewerState.raw,
 		previewRef,
 		sourceRef,
 		dispatch,
