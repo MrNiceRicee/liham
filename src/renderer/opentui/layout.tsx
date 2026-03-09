@@ -9,7 +9,7 @@ import type { ThemeTokens } from '../../theme/types.ts'
 
 import { BrowserPane } from './browser-pane.tsx'
 import { PreviewPane } from './preview-pane.tsx'
-import { SourcePane } from './source-pane.tsx'
+import { type SearchHighlight, SourcePane } from './source-pane.tsx'
 
 export interface ViewerMouseHandlers {
 	onSourceMouseDown: () => void
@@ -73,6 +73,7 @@ export function renderViewerLayout(
 	previewRef: React.RefObject<ScrollBoxRenderable | null>,
 	mouse: ViewerMouseHandlers,
 	scrollLocked = false,
+	searchHighlight?: SearchHighlight | undefined,
 ): ReactNode {
 	const hasSource = panes.source != null
 	const hasPreview = panes.preview != null
@@ -83,7 +84,15 @@ export function renderViewerLayout(
 		)
 	}
 	if (hasSource && !hasPreview) {
-		return <SourcePane content={raw} focused={!scrollLocked} theme={theme} scrollRef={sourceRef} />
+		return (
+			<SourcePane
+				content={raw}
+				focused={!scrollLocked}
+				theme={theme}
+				scrollRef={sourceRef}
+				searchHighlight={searchHighlight}
+			/>
+		)
 	}
 
 	const direction = state.layout === 'side' ? 'row' : 'column'
@@ -100,6 +109,7 @@ export function renderViewerLayout(
 				height={panes.source?.height}
 				onMouseDown={mouse.onSourceMouseDown}
 				onMouseScroll={mouse.onSourceMouseScroll}
+				searchHighlight={searchHighlight}
 			/>
 			<PreviewPane
 				content={content}

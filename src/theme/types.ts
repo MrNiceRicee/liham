@@ -72,6 +72,13 @@ export interface FallbackTokens {
 	textColor: string
 }
 
+export interface SearchTokens {
+	noMatchColor: string
+	highlightBg: string
+	highlightFg: string
+	currentHighlightBg: string
+}
+
 export interface BrowserTokens {
 	directoryColor: string
 	selectedBg: string
@@ -96,4 +103,5 @@ export interface ThemeTokens {
 	statusBar: StatusBarTokens
 	pane: PaneTokens
 	browser: BrowserTokens
+	search: SearchTokens
 }

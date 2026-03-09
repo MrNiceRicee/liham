@@ -27,6 +27,7 @@ import {
 import { fuzzyFilter } from '../../browser/fuzzy.ts'
 import { killActiveAudio, playAudio } from '../../media/ffplay.ts'
 import type { MediaCapabilities } from '../../media/types.ts'
+import { findMatches } from '../../search/find.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import { browserKeyHandler } from './browser-keys.ts'
 import {
@@ -45,6 +46,9 @@ import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-context.tsx'
 import { MediaGallery } from './media-gallery.tsx'
 import { type FrameInfo, MediaModal, type VideoPlaybackInfo } from './media-modal.tsx'
+import { SearchBar } from './search-bar.tsx'
+import { handleSearchKey } from './search-keys.ts'
+import { scrollToLine } from './scroll-utils.ts'
 import { StatusBar } from './status-bar.tsx'
 import {
 	applyScroll,
@@ -134,8 +138,18 @@ function dispatchViewerKey(
 	onAudioPlay: (entry: MediaEntry) => void,
 	onAction: (action: AppAction) => void,
 	videoDuration: number,
+	searchMatchCount: number,
 	renderer?: ReturnType<typeof useRenderer> | null,
 ) {
+	// key priority: search-input > search-active > toc > modal > media-focus > normal
+
+	// search branch — input swallows all, active passes through scroll keys
+	if (state.searchState != null) {
+		const consumed = handleSearchKey(key, state.searchState, dispatch, searchMatchCount)
+		if (consumed) return
+		// fall through for scroll keys in active phase
+	}
+
 	// intercept return on audio — play directly instead of opening modal
 	if (key.name === 'return' && state.mediaFocusIndex != null) {
 		const entry = mediaNodes[state.mediaFocusIndex]
@@ -331,6 +345,29 @@ export function App(props: Readonly<AppProps>) {
 		[currentFile, props.mediaCapabilities.canPlayAudio],
 	)
 
+	// -- search matches (recomputed on query change for highlight-as-you-type) --
+	const searchQuery = state.searchState != null ? state.searchState.query : ''
+	const searchMatches = useMemo(
+		() => findMatches(viewerState.raw, searchQuery),
+		[viewerState.raw, searchQuery],
+	)
+
+	// defensive clamping: after live reload, currentMatch may point past end
+	const safeSearchIndex = useMemo(() => {
+		if (state.searchState?.phase !== 'active') return 0
+		if (searchMatches.length === 0) return 0
+		return Math.min(state.searchState.currentMatch, searchMatches.length - 1)
+	}, [state.searchState, searchMatches.length])
+
+	// scroll to current match
+	useEffect(() => {
+		if (state.searchState?.phase !== 'active') return
+		if (searchMatches.length === 0) return
+		const match = searchMatches[safeSearchIndex]
+		if (match == null) return
+		scrollToLine(sourceRef.current, match.line)
+	}, [safeSearchIndex, state.searchState?.phase])
+
 	// -- keyboard handler --
 	const mediaCount = viewerState.mediaNodes.length
 
@@ -353,6 +390,7 @@ export function App(props: Readonly<AppProps>) {
 			handleAudioPlay,
 			handleAction,
 			videoInfo?.duration ?? 0,
+			searchMatches.length,
 			renderer,
 		)
 	})
@@ -406,6 +444,11 @@ export function App(props: Readonly<AppProps>) {
 
 	const modalDerived = deriveModalState(state, isViewer)
 
+	const searchHighlightProp =
+		searchMatches.length > 0 && state.searchState != null
+			? { matches: searchMatches, currentIndex: safeSearchIndex, queryLength: searchQuery.length }
+			: undefined
+
 	const viewerLayout = isViewer
 		? renderViewerLayout(
 				state,
@@ -417,6 +460,7 @@ export function App(props: Readonly<AppProps>) {
 				previewRef,
 				mouseHandlers,
 				modalDerived.scrollLocked,
+				searchHighlightProp,
 			)
 		: null
 	const modalElement = modalDerived.showModal ? (
@@ -476,13 +520,21 @@ export function App(props: Readonly<AppProps>) {
 						browserRef,
 						previewRef,
 					)}
-			<StatusBar
-				entries={entries}
-				layout={isViewer ? state.layout : 'browser'}
-				theme={props.theme}
-				renderTimeMs={renderTimeMs}
-				fileDeleted={state.fileDeleted}
-			/>
+			{state.searchState != null ? (
+				<SearchBar
+					searchState={state.searchState}
+					matchCount={searchMatches.length}
+					theme={props.theme}
+				/>
+			) : (
+				<StatusBar
+					entries={entries}
+					layout={isViewer ? state.layout : 'browser'}
+					theme={props.theme}
+					renderTimeMs={renderTimeMs}
+					fileDeleted={state.fileDeleted}
+				/>
+			)}
 		</box>
 	)
 }

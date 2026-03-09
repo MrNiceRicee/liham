@@ -2,6 +2,7 @@
 
 import type { FileEntry } from '../browser/scanner.ts'
 import { mediaModalReducer } from './state-media-modal.ts'
+import { type SearchState, searchReducer } from './state-search.ts'
 
 export type LayoutMode = 'preview-only' | 'side' | 'top' | 'source-only'
 
@@ -48,6 +49,7 @@ export interface AppState {
 	fileDeleted: boolean
 	mediaFocusIndex: number | null
 	mediaModal: MediaModalState
+	searchState: SearchState | null
 }
 
 // -- actions --
@@ -93,6 +95,13 @@ export type AppAction =
 	| { type: 'ReplayMedia' }
 	| { type: 'SeekMedia'; delta: number; duration: number }
 	| { type: 'CopySelection' }
+	// search actions
+	| { type: 'SearchOpen' }
+	| { type: 'SearchUpdate'; query: string }
+	| { type: 'SearchConfirm'; matchCount: number }
+	| { type: 'SearchNext' }
+	| { type: 'SearchPrev' }
+	| { type: 'SearchClose' }
 
 // -- layout helpers --
 
@@ -171,6 +180,7 @@ function returnToBrowser(state: AppState): AppState {
 		fileDeleted: false,
 		mediaFocusIndex: null,
 		mediaModal: { kind: 'closed' },
+		searchState: null,
 	}
 }
 
@@ -235,6 +245,7 @@ function browserReducer(state: AppState, action: BrowserAction): AppState {
 				fromBrowser: true,
 				fileDeleted: false,
 				focus: autoFocus(state.layout, 'preview'),
+				searchState: null,
 			}
 		case 'ReturnToBrowser':
 			return returnToBrowser(state)
@@ -312,6 +323,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 		case 'ReplayMedia':
 		case 'SeekMedia':
 			return mediaModalReducer(state, action)
+		case 'SearchOpen':
+		case 'SearchUpdate':
+		case 'SearchConfirm':
+		case 'SearchNext':
+		case 'SearchPrev':
+		case 'SearchClose':
+			return searchReducer(state, action)
 	}
 }
 
@@ -345,6 +363,7 @@ export function initialState(
 		fileDeleted: false,
 		mediaFocusIndex: null,
 		mediaModal: { kind: 'closed' },
+		searchState: null,
 	}
 }
 
@@ -517,9 +536,29 @@ function viewerLegend(state: AppState): LegendEntry[] {
 	return entries
 }
 
+function searchInputLegend(): LegendEntry[] {
+	return [
+		{ key: 'Esc', label: 'cancel' },
+		{ key: 'Enter', label: 'confirm' },
+		{ key: 'type', label: 'search' },
+	]
+}
+
+function searchActiveLegend(legendPage: LegendPage): LegendEntry[] {
+	if (legendPage === 'off') return [{ key: '?', label: 'help' }]
+	return [
+		{ key: '?', label: 'more' },
+		{ key: 'n/N', label: 'next/prev' },
+		{ key: 'Esc', label: 'close' },
+		{ key: '/', label: 'new search' },
+	]
+}
+
 // key priority: search-input > search-active > toc > modal > media-focus > normal
 export function legendEntries(state: AppState): LegendEntry[] {
 	if (state.mode === 'browser') return browserLegend(state.legendPage)
+	if (state.searchState?.phase === 'input') return searchInputLegend()
+	if (state.searchState?.phase === 'active') return searchActiveLegend(state.legendPage)
 	if (state.mediaModal.kind !== 'closed') return modalLegend(state.mediaModal, state.legendPage)
 	if (state.mediaFocusIndex != null) return mediaFocusLegend(state.legendPage)
 	return viewerLegend(state)

@@ -72,4 +72,10 @@ export const lightTheme: ThemeTokens = {
 		filterColor: '#2e7de9',
 		fileCountColor: '#8990b3',
 	},
+	search: {
+		noMatchColor: '#8c4351',
+		highlightBg: '#99a7df',
+		highlightFg: '#343b59',
+		currentHighlightBg: '#965027',
+	},
 }

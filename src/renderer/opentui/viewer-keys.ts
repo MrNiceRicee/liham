@@ -32,6 +32,7 @@ export const VIEWER_KEY_MAP: Record<
 	d: (key) => (key.ctrl ? { type: 'Scroll', direction: 'halfDown' } : null),
 	u: (key) => (key.ctrl ? { type: 'Scroll', direction: 'halfUp' } : null),
 	y: () => ({ type: 'CopySelection' }),
+	'/': () => ({ type: 'SearchOpen' }),
 	// media navigation — no-op in source-only (no preview pane)
 	n: (_, state, mediaCount) => {
 		if (state.layout === 'source-only' || mediaCount === 0) return null

@@ -71,4 +71,10 @@ export const darkTheme: ThemeTokens = {
 		filterColor: '#7aa2f7',
 		fileCountColor: '#565f89',
 	},
+	search: {
+		noMatchColor: '#f7768e',
+		highlightBg: '#3d59a1',
+		highlightFg: '#c0caf5',
+		currentHighlightBg: '#ff9e64',
+	},
 }
