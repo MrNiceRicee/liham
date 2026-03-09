@@ -6,6 +6,7 @@ import type { ReactNode, RefObject } from 'react'
 import type { ScanStatus } from '../../app/state.ts'
 import type { FuzzyMatch } from '../../browser/fuzzy.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
+import { splitHighlightSegments } from './highlight-splits.ts'
 
 interface BrowserPaneProps {
 	matches: FuzzyMatch[]
@@ -37,46 +38,23 @@ function HighlightedName({
 		return <text fg={normalColor}>{text}</text>
 	}
 
-	const posSet = new Set(positions)
-	const segments: ReactNode[] = []
-	let current = ''
-	let isHighlight = false
+	const segments = splitHighlightSegments(text, new Set(positions))
 
-	for (let i = 0; i < text.length; i++) {
-		const charHighlighted = posSet.has(i)
-		if (charHighlighted !== isHighlight && current.length > 0) {
-			segments.push(
-				isHighlight ? (
+	return (
+		<>
+			{segments.map((seg, i) =>
+				seg.highlighted ? (
 					<text key={`h-${String(i)}`} fg={highlightColor}>
-						<b>{current}</b>
+						<b>{seg.text}</b>
 					</text>
 				) : (
 					<text key={`n-${String(i)}`} fg={normalColor}>
-						{current}
+						{seg.text}
 					</text>
 				),
-			)
-			current = ''
-		}
-		current += text[i]
-		isHighlight = charHighlighted
-	}
-
-	if (current.length > 0) {
-		segments.push(
-			isHighlight ? (
-				<text key="h-end" fg={highlightColor}>
-					<b>{current}</b>
-				</text>
-			) : (
-				<text key="n-end" fg={normalColor}>
-					{current}
-				</text>
-			),
-		)
-	}
-
-	return <>{segments}</>
+			)}
+		</>
+	)
 }
 
 // build file list items grouped by directory

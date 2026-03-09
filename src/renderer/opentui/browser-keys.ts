@@ -11,6 +11,7 @@ import {
 	isSplitLayout,
 } from '../../app/state.ts'
 import type { FuzzyMatch } from '../../browser/fuzzy.ts'
+import { handleTextInputKey } from './text-input-keys.ts'
 
 const PAGE_SIZE = 10
 
@@ -112,27 +113,11 @@ function browserFilterKey(
 	state: AppState,
 	dispatch: React.Dispatch<AppAction>,
 ): boolean {
-	if (key.name === 'backspace') {
-		if (state.browser.filter.length > 0) {
-			dispatch({ type: 'FilterUpdate', text: state.browser.filter.slice(0, -1) })
-		}
-		return true
+	const result = handleTextInputKey(key, state.browser.filter)
+	if (result.consumed && result.newText !== state.browser.filter) {
+		dispatch({ type: 'FilterUpdate', text: result.newText })
 	}
-	if (key.ctrl && key.name === 'w') {
-		const filter = state.browser.filter.trimEnd()
-		const lastSpace = filter.lastIndexOf(' ')
-		dispatch({ type: 'FilterUpdate', text: lastSpace >= 0 ? filter.slice(0, lastSpace) : '' })
-		return true
-	}
-	if (key.ctrl && key.name === 'u') {
-		dispatch({ type: 'FilterUpdate', text: '' })
-		return true
-	}
-	if (key.name.length === 1 && !key.ctrl && !key.meta) {
-		dispatch({ type: 'FilterUpdate', text: state.browser.filter + key.name })
-		return true
-	}
-	return false
+	return result.consumed
 }
 
 function browserOpenSelected(
