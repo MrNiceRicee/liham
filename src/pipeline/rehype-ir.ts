@@ -10,6 +10,7 @@ import type { ThemeTokens } from '../theme/types.ts'
 
 import { compileMathDisplay, compileMathInline } from './compile-math.ts'
 import { compileAudio, compileImg, compileVideo } from './compile-media.ts'
+import { compileMermaidBlock } from './compile-mermaid.ts'
 import { getHighlightColor } from './hljs-colors.ts'
 import { sanitizeForTerminal } from './sanitize.ts'
 import { sanitizeUrl } from './sanitize-url.ts'
@@ -256,6 +257,10 @@ function compilePre(state: CompilerState, node: Element): IRNode {
 	// math display: <pre><code class="language-math math-display">
 	if (language === 'math') {
 		return compileMathDisplay(node, theme)
+	}
+	// mermaid: ```mermaid
+	if (language === 'mermaid') {
+		return compileMermaidBlock(node, theme)
 	}
 	return {
 		type: 'codeBlock',

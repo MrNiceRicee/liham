@@ -22,6 +22,7 @@ import { renderHeading } from './heading.tsx'
 import { renderImageBlock } from './image.tsx'
 import { renderInlineNode } from './inline.tsx'
 import { renderMathDisplay, renderMathInline } from './math.tsx'
+import { renderMermaidBlock } from './mermaid.tsx'
 import { renderList, renderListItem } from './list.tsx'
 import { renderParagraph } from './paragraph.tsx'
 import { renderTable, renderTableCell, renderTableRow } from './table.tsx'
@@ -58,6 +59,7 @@ function isCoreNode(node: IRNode): node is CoreIRNode {
 function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 	if (node.type === 'mathInline') return renderMathInline(node as CustomNode<'mathInline'>, key)
 	if (node.type === 'mathDisplay') return renderMathDisplay(node as CustomNode<'mathDisplay'>, key)
+	if (node.type === 'mermaid') return renderMermaidBlock(node as CustomNode<'mermaid'>, key, ctx.theme)
 	if (!isCoreNode(node)) return renderCustom(node, key)
 
 	switch (node.type) {
