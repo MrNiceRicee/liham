@@ -221,9 +221,12 @@ function withAncestors(state: CompilerState, node: Element): IRNode[] {
 function compileHeading(state: CompilerState, node: Element): IRNode {
 	const level = getHeadingLevel(node.tagName)
 	const tokens = state.theme.heading.levels[level]
+	// hast position is 1-based, convert to 0-based for scrollToLine
+	const sourceLine = node.position?.start.line != null ? node.position.start.line - 1 : undefined
 	return {
 		type: 'heading',
 		level,
+		...(sourceLine != null ? { sourceLine } : {}),
 		style: { fg: tokens.color, bold: tokens.bold, dim: tokens.dim },
 		children: withAncestors(state, node),
 	}

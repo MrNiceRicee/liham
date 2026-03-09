@@ -7,6 +7,7 @@ export interface TocEntry {
 	text: string
 	blockIndex: number
 	estimatedOffset: number
+	sourceLine?: number // 0-based line in raw markdown
 }
 
 // convert TocEntry[] to FloatingPanelItem[] with normalized indentation.

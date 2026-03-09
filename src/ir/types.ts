@@ -33,6 +33,7 @@ export interface RootNode {
 export interface HeadingNode {
 	type: 'heading'
 	level: 1 | 2 | 3 | 4 | 5 | 6
+	sourceLine?: number // 0-based source line from hast position
 	style: BlockStyle
 	children: IRNode[]
 }

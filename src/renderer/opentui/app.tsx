@@ -27,7 +27,6 @@ import {
 import { fuzzyFilter } from '../../browser/fuzzy.ts'
 import { killActiveAudio, playAudio } from '../../media/ffplay.ts'
 import type { MediaCapabilities } from '../../media/types.ts'
-import { findMatches } from '../../search/find.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import { browserKeyHandler } from './browser-keys.ts'
 import { dispatchViewerKey } from './viewer-dispatch.ts'
@@ -48,8 +47,8 @@ import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-co
 import { MediaGallery } from './media-gallery.tsx'
 import { type FrameInfo, MediaModal, type VideoPlaybackInfo } from './media-modal.tsx'
 import { SearchBar } from './search-bar.tsx'
-import { scrollToLine } from './scroll-utils.ts'
 import { TocPanel } from './toc-panel.tsx'
+import { useSearchHighlight, useTocJump } from './viewer-scroll-hooks.ts'
 import { StatusBar } from './status-bar.tsx'
 import { applyScroll, createMouseHandlers, syncScroll } from './viewer-keys.ts'
 
@@ -125,61 +124,6 @@ function playMediaAudio(entry: MediaEntry, currentFile: string | undefined, canP
 }
 
 // -- extracted hooks to reduce App cognitive complexity --
-
-function useSearchHighlight(
-	state: AppState,
-	raw: string,
-	sourceRef: React.RefObject<ScrollBoxRenderable | null>,
-	previewRef: React.RefObject<ScrollBoxRenderable | null>,
-) {
-	const searchQuery = state.searchState != null ? state.searchState.query : ''
-	const searchMatches = useMemo(() => findMatches(raw, searchQuery), [raw, searchQuery])
-
-	const safeSearchIndex = useMemo(() => {
-		if (state.searchState?.phase !== 'active') return 0
-		if (searchMatches.length === 0) return 0
-		return Math.min(state.searchState.currentMatch, searchMatches.length - 1)
-	}, [state.searchState, searchMatches.length])
-
-	useEffect(() => {
-		if (state.searchState?.phase !== 'active') return
-		if (searchMatches.length === 0) return
-		const match = searchMatches[safeSearchIndex]
-		if (match == null) return
-		scrollToLine(sourceRef.current, match.line)
-		// sync preview pane: use match position as fraction of total content
-		if (previewRef.current != null) {
-			const totalLines = raw.split('\n').length
-			const fraction = totalLines > 0 ? match.line / totalLines : 0
-			previewRef.current.scrollTo(Math.round(fraction * previewRef.current.scrollHeight))
-		}
-	}, [safeSearchIndex, state.searchState?.phase])
-
-	return { searchQuery, searchMatches, safeSearchIndex }
-}
-
-function useTocJump(
-	state: AppState,
-	tocEntries: readonly TocEntry[],
-	estimatedTotalHeight: number,
-	previewRef: React.RefObject<ScrollBoxRenderable | null>,
-	sourceRef: React.RefObject<ScrollBoxRenderable | null>,
-	dispatch: React.Dispatch<AppAction>,
-) {
-	useEffect(() => {
-		if (state.tocState?.kind !== 'jumping') return
-		const entry = tocEntries[state.tocState.cursorIndex]
-		if (entry != null && previewRef.current != null) {
-			// ratio-based scroll: normalize estimation errors across the document
-			const fraction = estimatedTotalHeight > 0 ? entry.estimatedOffset / estimatedTotalHeight : 0
-			previewRef.current.scrollTo(Math.round(fraction * previewRef.current.scrollHeight))
-			if (state.scrollSync && isSplitLayout(state.layout)) {
-				queueMicrotask(() => syncScroll(previewRef.current, sourceRef.current))
-			}
-		}
-		dispatch({ type: 'TocJumpComplete' })
-	}, [state.tocState?.kind])
-}
 
 type AppProps =
 	| {

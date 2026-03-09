@@ -62,12 +62,14 @@ function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 		}
 
 		case 'heading': {
-			ctx.toc.push({
+			const tocEntry: TocEntry = {
 				level: node.level,
 				text: extractText(node.children),
 				blockIndex: ctx.blockIndex,
 				estimatedOffset: estimateHeadingOffset(ctx.irNodes, ctx.toc.length, ctx.maxWidth),
-			})
+			}
+			if (node.sourceLine != null) tocEntry.sourceLine = node.sourceLine
+			ctx.toc.push(tocEntry)
 			return renderHeading(node, key)
 		}
 
