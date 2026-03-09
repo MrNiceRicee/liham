@@ -56,7 +56,6 @@ export const VIEWER_SHIFT_KEY_MAP: Record<
 	},
 }
 
-
 // modal key handler — called when modal is open, swallows all non-modal keys
 export function handleModalKey(
 	key: KeyEvent,

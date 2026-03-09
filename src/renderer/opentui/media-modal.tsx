@@ -48,7 +48,12 @@ export interface VideoPlaybackInfo {
 
 // -- render a single RGBA frame to a half-block grid --
 
-function renderFrame(rgba: Uint8Array, dims: VideoDimensions, src: string, bgColor: string): MergedSpan[][] {
+function renderFrame(
+	rgba: Uint8Array,
+	dims: VideoDimensions,
+	src: string,
+	bgColor: string,
+): MergedSpan[][] {
 	const image: LoadedImage = {
 		rgba,
 		width: dims.pixelWidth,
@@ -102,14 +107,22 @@ function ModalVideoContent({
 	const [playbackState, setPlaybackState] = useState<PlaybackState>('loading')
 
 	// cached probe result — survives across seek/resize, only re-probed on src change
-	const [probeCache, setProbeCache] = useState<{ meta: VideoMetadata; absPath: string } | null>(null)
+	const [probeCache, setProbeCache] = useState<{ meta: VideoMetadata; absPath: string } | null>(
+		null,
+	)
 
 	// refs for timer and buffer — needed for pause/resume effect
 	const timerRef = useRef<FrameTimerHandle | null>(null)
 	const bufferRef = useRef<RingBuffer | null>(null)
 
 	// audio resync context — ref avoids adding deps to pause effect
-	const audioCtxRef = useRef<{ absPath: string; basePath: string; fps: number; hasAudio: boolean; seekOffset: number } | null>(null)
+	const audioCtxRef = useRef<{
+		absPath: string
+		basePath: string
+		fps: number
+		hasAudio: boolean
+		seekOffset: number
+	} | null>(null)
 
 	// clear renderPending after React commits (NOT queueMicrotask)
 	useEffect(() => {

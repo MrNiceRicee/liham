@@ -66,7 +66,10 @@ function closeMediaModal(state: AppState): AppState {
 	return state
 }
 
-function withOpenModal(state: AppState, update: (modal: MediaModalState & { kind: 'open' }) => MediaModalState): AppState {
+function withOpenModal(
+	state: AppState,
+	update: (modal: MediaModalState & { kind: 'open' }) => MediaModalState,
+): AppState {
 	if (state.mediaModal.kind !== 'open') return state
 	return { ...state, mediaModal: update(state.mediaModal) }
 }

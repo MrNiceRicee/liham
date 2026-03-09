@@ -369,7 +369,9 @@ describe('SeekMedia action', () => {
 		expect(next).not.toBe(s)
 		if (next.mediaModal.kind === 'open') {
 			expect(next.mediaModal.seekOffset).toBe(0)
-			expect(next.mediaModal.restartCount).toBe(s.mediaModal.kind === 'open' ? s.mediaModal.restartCount + 1 : 1)
+			expect(next.mediaModal.restartCount).toBe(
+				s.mediaModal.kind === 'open' ? s.mediaModal.restartCount + 1 : 1,
+			)
 		}
 	})
 

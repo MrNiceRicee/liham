@@ -287,7 +287,9 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 			const focus = autoFocus(next, state.focus)
 			return { ...state, layout: next, focus }
 		}
-		case 'Scroll': case 'Quit': case 'CopySelection':
+		case 'Scroll':
+		case 'Quit':
+		case 'CopySelection':
 			return state
 		case 'FileDeleted':
 			return { ...state, fileDeleted: true }

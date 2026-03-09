@@ -1,7 +1,8 @@
 ---
 title: Bookmarks / Table of Contents Panel
 type: feat
-status: pending
+status: superseded
+superseded_by: docs/plans/2026-03-08-feat-search-toc-floating-panel-plan.md
 date: 2026-03-07
 size: medium
 ---

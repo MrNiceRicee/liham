@@ -282,7 +282,9 @@ let activeVideoProc: ReturnType<typeof Bun.spawn> | null = null
 let videoStopped = false
 
 export function pauseActiveVideo(): void {
-	debug(`pauseActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}`)
+	debug(
+		`pauseActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}`,
+	)
 	if (activeVideoProc != null && !videoStopped) {
 		try {
 			process.kill(activeVideoProc.pid, 'SIGSTOP')
@@ -294,7 +296,9 @@ export function pauseActiveVideo(): void {
 }
 
 export function resumeActiveVideo(): void {
-	debug(`resumeActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}`)
+	debug(
+		`resumeActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}`,
+	)
 	if (activeVideoProc != null && videoStopped) {
 		try {
 			process.kill(activeVideoProc.pid, 'SIGCONT')

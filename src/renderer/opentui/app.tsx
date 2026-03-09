@@ -336,7 +336,9 @@ export function App(props: Readonly<AppProps>) {
 
 	useKeyboard((key: KeyEvent) => {
 		if (process.env['LIHAM_DEBUG'] === '1') {
-			process.stderr.write(`[app] key=${key.name} mode=${state.mode} modal=${state.mediaModal.kind} paused=${String(state.mediaModal.kind === 'open' && state.mediaModal.paused)} vidDur=${String(videoInfo?.duration ?? 0)}\n`)
+			process.stderr.write(
+				`[app] key=${key.name} mode=${state.mode} modal=${state.mediaModal.kind} paused=${String(state.mediaModal.kind === 'open' && state.mediaModal.paused)} vidDur=${String(videoInfo?.duration ?? 0)}\n`,
+			)
 		}
 		if (state.mode === 'browser') {
 			browserKeyHandler(key, state, dispatch, filteredMatches, handleOpenFile, renderer, browserRef)

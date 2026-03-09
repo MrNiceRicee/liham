@@ -1,7 +1,8 @@
 ---
 title: Viewer Search
 type: feat
-status: planned
+status: superseded
+superseded_by: docs/plans/2026-03-08-feat-search-toc-floating-panel-plan.md
 date: 2026-03-07
 origin: docs/brainstorms/2026-03-07-media-modal-and-selection-brainstorm.md
 note: "MEDIUM feature. Search within raw markdown in viewer mode. Vim-style / prompt."
