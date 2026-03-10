@@ -24,10 +24,10 @@ Kamayan in the diaspora is not nostalgia. It's identity.
 
 ```mermaid
 graph TD
-    A[Cook Rice - 30min] --> E[Lay Banana Leaves]
-    B[Grill Liempo - 45min] --> E
-    C[Fry Lumpia - 20min] --> E
-    D[Make Sawsawan - 10min] --> E
+    A[Cook Rice] --> B[Grill Liempo]
+    B --> C[Fry Lumpia]
+    C --> D[Make Sawsawan]
+    D --> E[Lay Banana Leaves]
     E --> F[Arrange the Spread]
     F --> G[Kamayan!]
 ```

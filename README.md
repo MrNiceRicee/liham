@@ -2,11 +2,7 @@
 
 Terminal markdown previewer with split-pane view, search, TOC, math, mermaid, and media support.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/hero-dark.gif">
-  <source media="(prefers-color-scheme: light)" srcset="./assets/hero-light.gif">
-  <img alt="liham — terminal markdown previewer" src="./assets/hero-dark.gif">
-</picture>
+![liham — terminal markdown previewer](./assets/hero.gif)
 
 ## Prerequisites
 
@@ -48,6 +44,8 @@ Press `?` for keybindings.
 - **Mermaid** — diagrams rendered as colored ASCII art
 - **Images** — Kitty graphics protocol with halfblock/text fallback
 - **Video / GIF** — in-terminal playback via ffmpeg
+
+![media playback](./assets/media.gif)
 - **File browser** — fuzzy filter, live file watching
 - **Themes** — auto-detect dark/light from terminal background
 
