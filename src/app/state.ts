@@ -112,6 +112,9 @@ export type AppAction =
 	| { type: 'TocJump' }
 	| { type: 'TocJumpComplete' }
 	| { type: 'CloseToc' }
+	// volume actions
+	| { type: 'SetVolume'; volume: number }
+	| { type: 'ToggleMute' }
 
 // -- layout helpers --
 
@@ -348,6 +351,10 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 		case 'TocJumpComplete':
 		case 'CloseToc':
 			return tocReducer(state, action)
+		case 'SetVolume':
+			return { ...state, volume: action.volume }
+		case 'ToggleMute':
+			return { ...state, muted: !state.muted }
 	}
 }
 

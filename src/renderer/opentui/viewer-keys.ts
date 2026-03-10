@@ -97,6 +97,16 @@ export function handleModalKey(
 		case 'right':
 			if (videoDuration <= 0) return null
 			return { type: 'SeekMedia', delta: key.shift ? 5 : 1, duration: videoDuration }
+		// volume: = or + (raw mode) or shift+= (kitty)
+		case '=':
+		case '+':
+			return { type: 'SetVolume', volume: Math.min(100, _state.volume + 5) }
+		// volume down: - or _ (raw) or shift+- (kitty)
+		case '-':
+		case '_':
+			return { type: 'SetVolume', volume: Math.max(0, _state.volume - 5) }
+		case 'm':
+			return { type: 'ToggleMute' }
 		case 'q':
 			return { type: 'Quit' }
 		default:

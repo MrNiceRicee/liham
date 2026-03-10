@@ -1,7 +1,11 @@
 // legend entries — key hint labels for status bar.
 
+import { detectAudioBackend } from '../media/audio-backend.ts'
 import type { AppState, FocusTarget, LegendPage, MediaModalState } from './state.ts'
 import { isSplitLayout } from './state.ts'
+
+// cached once per process — Bun.which is cheap but no need to call it per render
+const detectedBackend = detectAudioBackend()
 
 export interface LegendEntry {
 	key: string
@@ -14,15 +18,20 @@ function oppositeFocus(focus: FocusTarget): FocusTarget {
 
 function modalLegend(modal: MediaModalState, legendPage: LegendPage): LegendEntry[] {
 	if (legendPage === 'off') return [{ key: '?', label: 'help' }]
-	return [
+	const entries: LegendEntry[] = [
 		{ key: '?', label: 'more' },
 		{ key: 'n/N', label: 'next/prev' },
 		{ key: 'space', label: modal.kind === 'open' && modal.paused ? 'play' : 'pause' },
-		{ key: '</', label: 'seek' },
+		{ key: '</>', label: 'seek' },
 		{ key: 'r', label: 'replay' },
 		{ key: 'g', label: 'gallery' },
-		{ key: 'esc', label: 'close' },
 	]
+	if (detectedBackend === 'mpv') {
+		entries.push({ key: '+/-', label: 'volume' })
+		entries.push({ key: 'm', label: 'mute' })
+	}
+	entries.push({ key: 'esc', label: 'close' })
+	return entries
 }
 
 function mediaFocusLegend(legendPage: LegendPage): LegendEntry[] {

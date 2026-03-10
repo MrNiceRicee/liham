@@ -428,7 +428,7 @@ describe('modal legend with seek', () => {
 			},
 		})
 		const entries = legendEntries(s)
-		expect(entries.some((e) => e.key === '</' && e.label === 'seek')).toBe(true)
+		expect(entries.some((e) => e.key === '</>' && e.label === 'seek')).toBe(true)
 	})
 })
 
