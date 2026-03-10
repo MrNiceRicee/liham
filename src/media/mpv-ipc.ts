@@ -2,7 +2,7 @@
 // spawns mpv in idle mode, connects via JSON IPC, correlates request/response
 // via request_id, dispatches events, and provides synchronous cleanup.
 
-import { mkdtempSync, rmSync, unlinkSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync, unlinkSync } from 'node:fs'
 import { createConnection, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -82,6 +82,28 @@ process.on('exit', () => {
 		}
 	}
 })
+
+// -- stale socket cleanup --
+
+export function cleanupStaleSockets(): void {
+	try {
+		const tmp = tmpdir()
+		for (const entry of readdirSync(tmp)) {
+			if (!entry.startsWith('liham-')) continue
+			const dirPath = join(tmp, entry)
+			// skip our own active socket dir
+			if (dirPath === activeSocketDir) continue
+			try {
+				rmSync(dirPath, { recursive: true })
+				debug(`cleaned stale socket dir: ${dirPath}`)
+			} catch {
+				// may be in use by another liham instance
+			}
+		}
+	} catch {
+		// tmpdir read failed, non-critical
+	}
+}
 
 // -- helpers --
 
@@ -215,6 +237,31 @@ export async function createMpvIpc(options: MpvIpcOptions = {}): Promise<MpvIpc>
 	const closeHandlers: Array<() => void> = []
 	let lineBuffer = ''
 
+	// handle a single parsed message from mpv
+	function handleMessage(msg: unknown) {
+		if (typeof msg !== 'object' || msg === null) return
+
+		if (isResponseMsg(msg)) {
+			const resolver = pending.get(msg.request_id)
+			if (resolver != null) {
+				pending.delete(msg.request_id)
+				if (msg.error === 'success') {
+					resolver.resolve(msg.data)
+				} else {
+					resolver.reject(new Error(`mpv error: ${msg.error}`))
+				}
+			}
+			return
+		}
+
+		if (isEventMsg(msg)) {
+			const event = parseEvent(msg as Record<string, unknown>)
+			if (event != null) {
+				for (const handler of eventHandlers) handler(event)
+			}
+		}
+	}
+
 	// line-buffered JSON parser
 	function processData(chunk: string) {
 		lineBuffer += chunk
@@ -224,33 +271,10 @@ export async function createMpvIpc(options: MpvIpcOptions = {}): Promise<MpvIpc>
 			lineBuffer = lineBuffer.slice(newlineIdx + 1)
 			if (line.length === 0) continue
 
-			let msg: unknown
 			try {
-				msg = JSON.parse(line)
+				handleMessage(JSON.parse(line))
 			} catch {
 				debug(`invalid JSON: ${line}`)
-				continue
-			}
-
-			if (typeof msg !== 'object' || msg === null) continue
-
-			if (isResponseMsg(msg)) {
-				const resolver = pending.get(msg.request_id)
-				if (resolver != null) {
-					pending.delete(msg.request_id)
-					if (msg.error === 'success') {
-						resolver.resolve(msg.data)
-					} else {
-						resolver.reject(new Error(`mpv error: ${msg.error}`))
-					}
-				}
-			} else if (isEventMsg(msg)) {
-				const event = parseEvent(msg as Record<string, unknown>)
-				if (event != null) {
-					for (const handler of eventHandlers) {
-						handler(event)
-					}
-				}
 			}
 		}
 	}

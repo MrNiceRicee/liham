@@ -3,7 +3,10 @@
 
 import { sanitizeMediaPath } from './ffplay.ts'
 import type { AudioBackend, PlayResult } from './audio-backend.ts'
-import { createMpvIpc, type MpvIpc } from './mpv-ipc.ts'
+import { cleanupStaleSockets, createMpvIpc, type MpvIpc } from './mpv-ipc.ts'
+
+// clean stale socket dirs from previous liham sessions on module load
+cleanupStaleSockets()
 
 const debug =
 	process.env['LIHAM_DEBUG'] === '1'

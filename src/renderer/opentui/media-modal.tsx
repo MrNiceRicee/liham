@@ -70,6 +70,19 @@ function renderFrame(
 	return renderHalfBlockMerged(image, bgColor)
 }
 
+// -- helpers --
+
+function resyncFfplayAudio(
+	backendKind: 'mpv' | 'ffplay',
+	ctx: { absPath: string; basePath: string; fps: number; hasAudio: boolean; seekOffset: number } | null,
+	timer: FrameTimerHandle | null,
+) {
+	if (backendKind !== 'ffplay' || ctx == null || !ctx.hasAudio || timer == null) return
+	const elapsed = ctx.seekOffset + timer.tickCount / ctx.fps
+	debug(`ffplay audio resync: elapsed=${String(elapsed.toFixed(2))}s`)
+	void playAudio(ctx.absPath, ctx.basePath, elapsed)
+}
+
 // -- modal video content --
 
 type PlaybackState = 'loading' | 'playing' | 'error' | 'ended'
@@ -168,7 +181,7 @@ function ModalVideoContent({
 	// DECOUPLED from stream effect: mpv stays alive across seeks.
 	// only re-fires when the video file changes.
 	useEffect(() => {
-		if (probeCache == null || !probeCache.meta.hasAudio) return
+		if (!probeCache?.meta.hasAudio) return
 
 		const { absPath } = probeCache
 		let backend: AudioBackend | null = null
@@ -198,7 +211,6 @@ function ModalVideoContent({
 				backend.kill()
 			}
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps -- volume/muted synced in separate effect
 	}, [probeCache, basePath, detectedBackendKind])
 
 	// sync volume/mute to backend when they change
@@ -377,30 +389,14 @@ function ModalVideoContent({
 		}
 
 		const backend = backendRef.current
-		if (backend != null) {
-			// mpv: fire-and-forget pause/resume
-			if (paused) {
-				backend.pause()
-			} else {
-				void backend.resume()
-			}
-		}
-
 		if (paused) {
+			backend?.pause()
 			pauseActiveVideo()
-			// ffplay fallback: kill audio (SIGSTOP leaves OS audio buffers playing)
 			if (detectedBackendKind === 'ffplay') void killActiveAudio()
 		} else {
+			if (backend != null) void backend.resume()
 			resumeActiveVideo()
-			// ffplay fallback: restart audio at current position
-			if (detectedBackendKind === 'ffplay') {
-				const ctx = audioCtxRef.current
-				if (ctx?.hasAudio && timer != null) {
-					const elapsed = ctx.seekOffset + timer.tickCount / ctx.fps
-					debug(`ffplay audio resync: elapsed=${String(elapsed.toFixed(2))}s`)
-					void playAudio(ctx.absPath, ctx.basePath, elapsed)
-				}
-			}
+			resyncFfplayAudio(detectedBackendKind, audioCtxRef.current, timer)
 		}
 	}, [paused])
 

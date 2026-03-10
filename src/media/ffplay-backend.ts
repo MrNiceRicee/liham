@@ -8,7 +8,6 @@ export function createFfplayBackend(): AudioBackend {
 	let currentAbsPath: string | null = null
 	let currentBasePath: string | null = null
 	let currentSeekOffset = 0
-	const endHandlers: Array<() => void> = []
 
 	return {
 		kind: 'ffplay' as const,
@@ -53,8 +52,8 @@ export function createFfplayBackend(): AudioBackend {
 			// no-op — ffplay has no mute control
 		},
 
-		onEnd(handler: () => void): void {
-			endHandlers.push(handler)
+		onEnd(_handler: () => void): void {
+			// ffplay has no end event system
 		},
 
 		onError(_handler: (err: Error) => void): void {
