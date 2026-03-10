@@ -6,15 +6,15 @@ A guide to the beverages that keep the islands hydrated — from the everyday to
 
 The Filipino lemonade. Smaller, rounder, and more fragrant than any lemon.
 
-The golden ratio: $3:1:\frac{1}{2}$ (water : calamansi juice : simple syrup).
+The golden ratio: $3 : 1 : 0.5$ (water : calamansi juice : simple syrup).
 
-For a pitcher, scale linearly: $V_{syrup} = \frac{V_{water}}{6}$
+For a pitcher, scale linearly: $V_s = V_w / 6$
 
 ### Quick Recipe
 
 - 12 calamansi, halved and squeezed
 - 4 cups cold water
-- Simple syrup to taste (start with $\frac{2}{3}$ cup)
+- Simple syrup to taste (start with $2/3$ cup)
 - Ice — the more the better
 
 > **Tip:** Roll each calamansi on the counter before cutting. It releases more juice.
@@ -23,7 +23,7 @@ For a pitcher, scale linearly: $V_{syrup} = \frac{V_{water}}{6}$
 
 The street-side cooler. Brown sugar syrup with tapioca pearls and grass jelly — served from massive glass jars that somehow never run out.
 
-Brown sugar syrup concentration: $\frac{250g}{500ml} = 0.5 \text{ g/ml}$
+Brown sugar syrup concentration: $250g / 500ml = 0.5$ g/ml
 
 ### Components
 
@@ -43,7 +43,7 @@ Brown sugar syrup concentration: $\frac{250g}{500ml} = 0.5 \text{ g/ml}$
 4. stir once — let the layers settle
 ```
 
-The total sugar content per serving: $S = \frac{arnibal_{volume} \times 0.5}{total_{volume}} \times 100\%$
+The total sugar content per serving: $S = (V_a \times 0.5) / V_t \times 100\%$
 
 ## Tsokolate
 
@@ -53,7 +53,7 @@ Traditional Filipino hot chocolate — thick, dark, and frothed with a wooden *b
 
 - Pure cacao, roasted and ground into tablets
 - No sugar added — sweetness comes from you
-- Dissolve in hot water or milk: $1 \text{ tablet} : 200\text{ml liquid}$
+- Dissolve in hot water or milk: $1$ tablet : $200$ml liquid
 
 ### Frothing
 
@@ -67,7 +67,7 @@ technique:
   4. stop when foam holds its shape
 ```
 
-The kinetic energy transfer: $E = \frac{1}{2}I\omega^2$ — but honestly, just spin it fast.
+The kinetic energy transfer: $E = I\omega^2 / 2$ — but honestly, just spin it fast.
 
 > Pair with **pan de sal** fresh from the corner bakery, torn open and dunked.
 
@@ -75,7 +75,7 @@ The kinetic energy transfer: $E = \frac{1}{2}I\omega^2$ — but honestly, just s
 
 Young coconut water, served straight from the shell with a straw.
 
-- Best temperature: $4\degree C$ (refrigerated, not iced)
+- Best temperature: $4^\circ C$ (refrigerated, not iced)
 - Scrape the soft meat with a spoon
 - ~~Add sugar~~ — it doesn't need it
 

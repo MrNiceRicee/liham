@@ -10,9 +10,9 @@ Classic chicken adobo. The recipe everyone starts with.
 
 ### Base Ratio
 
-The vinegar-to-soy ratio is everything: $V_{vinegar}:V_{soy} = 1:1$
+The vinegar-to-soy ratio is everything: $V_v : V_s = 1:1$
 
-I used $\frac{1}{2}$ cup each. Too salty. Next time: $\frac{2}{3}:\frac{1}{2}$.
+I used $1/2$ cup each. Too salty. Next time: $2/3 : 1/2$.
 
 | Ingredient | Amount |
 |---|---|
@@ -37,7 +37,7 @@ I used $\frac{1}{2}$ cup each. Too salty. Next time: $\frac{2}{3}:\frac{1}{2}$.
 
 Batangas-style: **no soy sauce at all**. Pure vinegar, salt, and pork.
 
-Adjusted ratio: $V_{vinegar} = \frac{3}{4} \text{ cup}$, salt to taste.
+Adjusted ratio: $V_v = 3/4$ cup, salt to taste.
 
 This version is paler, sharper, and leaner. The pork fat renders into the vinegar and creates this silky, tangy broth that's entirely different from the Manila version.
 
@@ -55,11 +55,11 @@ This version is paler, sharper, and leaner. The pork fat renders into the vinega
 
 *February 3, 2026*
 
-Coconut milk. That's the twist. The Visayan version adds $200\text{ml}$ coconut milk and finishes with coconut cream.
+Coconut milk. That's the twist. The Visayan version adds $200$ml coconut milk and finishes with coconut cream.
 
 ### Modified Ratio
 
-$$R = \frac{V_{vinegar}}{V_{soy} + V_{coconut}} = \frac{0.5}{0.5 + 0.2} = 0.71$$
+$$R = V_v / (V_s + V_c) = 0.5 / 0.7 \approx 0.71$$
 
 The coconut mellows the acidity and adds body. It's richer, almost like a curry-adobo hybrid.
 
@@ -92,7 +92,7 @@ Adobo flakes — shredded, then fried until crispy.
 
 This is the version that converts adobo skeptics. The crispy edges with the salty-sour flavor — it's closer to a condiment than a stew.
 
-**Crispiness factor:** surface area matters. The finer the shred, the crunchier the result: $A_{surface} \propto \frac{1}{d_{shred}}$
+**Crispiness factor:** surface area matters. The finer the shred, the crunchier the result: $A \propto 1/d$
 
 ---
 
@@ -104,7 +104,7 @@ After weeks of testing, this is the one.
 
 ### The Ratio
 
-$$\frac{V_{vinegar}}{V_{soy}} = \frac{2}{3} \approx 0.67$$
+$$V_v / V_s = 2/3 \approx 0.67$$
 
 ### Final Recipe
 
