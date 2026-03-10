@@ -39,14 +39,8 @@ export type MpvEvent =
 
 export interface MpvIpc {
 	getProperty<K extends keyof MpvPropertyMap>(name: K): Promise<MpvPropertyMap[K]>
-	setProperty<K extends keyof MpvPropertyMap>(
-		name: K,
-		value: MpvPropertyMap[K],
-	): Promise<void>
-	setPropertyFireAndForget<K extends keyof MpvPropertyMap>(
-		name: K,
-		value: MpvPropertyMap[K],
-	): void
+	setProperty<K extends keyof MpvPropertyMap>(name: K, value: MpvPropertyMap[K]): Promise<void>
+	setPropertyFireAndForget<K extends keyof MpvPropertyMap>(name: K, value: MpvPropertyMap[K]): void
 	observeProperty<K extends keyof MpvPropertyMap>(id: number, name: K): Promise<void>
 	command(args: readonly [string, ...unknown[]]): Promise<unknown>
 	readonly connected: boolean
@@ -331,10 +325,7 @@ export async function createMpvIpc(options: MpvIpcOptions = {}): Promise<MpvIpc>
 			sendFireAndForget(['set_property', name, value])
 		},
 
-		async observeProperty<K extends keyof MpvPropertyMap>(
-			id: number,
-			name: K,
-		): Promise<void> {
+		async observeProperty<K extends keyof MpvPropertyMap>(id: number, name: K): Promise<void> {
 			await sendCommand(['observe_property', id, name])
 		},
 

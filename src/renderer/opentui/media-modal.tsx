@@ -74,7 +74,13 @@ function renderFrame(
 
 function resyncFfplayAudio(
 	backendKind: 'mpv' | 'ffplay',
-	ctx: { absPath: string; basePath: string; fps: number; hasAudio: boolean; seekOffset: number } | null,
+	ctx: {
+		absPath: string
+		basePath: string
+		fps: number
+		hasAudio: boolean
+		seekOffset: number
+	} | null,
 	timer: FrameTimerHandle | null,
 ) {
 	if (backendKind !== 'ffplay' || ctx == null || !ctx.hasAudio || timer == null) return
@@ -231,8 +237,7 @@ function ModalVideoContent({
 		let backend: AudioBackend | null = null
 
 		const init = async () => {
-			backend =
-				detectedBackendKind === 'mpv' ? createMpvBackend() : createFfplayBackend()
+			backend = detectedBackendKind === 'mpv' ? createMpvBackend() : createFfplayBackend()
 
 			const result = await backend.play(absPath, basePath, seekOffset)
 			if (result.ok) {
@@ -313,10 +318,19 @@ function ModalVideoContent({
 				// mpv mode: clock-synced frame consumption
 				if (currentBackend?.kind === 'mpv') {
 					const rendered = consumeMpvFrame(
-						currentBackend, buffer, seekOffset,
-						meta.fps, meta.duration, consumedFrameIndexRef,
-						dims, src, bgColor,
-						(grid) => { renderPendingRef.current = true; setCurrentGrid(grid) },
+						currentBackend,
+						buffer,
+						seekOffset,
+						meta.fps,
+						meta.duration,
+						consumedFrameIndexRef,
+						dims,
+						src,
+						bgColor,
+						(grid) => {
+							renderPendingRef.current = true
+							setCurrentGrid(grid)
+						},
 						setPlaybackState,
 						onVideoInfo,
 					)

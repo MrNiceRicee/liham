@@ -6,7 +6,11 @@ import { syncFrameToClockPos } from './clock-sync.ts'
 import { createRingBuffer } from './ring-buffer.ts'
 
 // helper: fill buffer with numbered frames
-async function fillBuffer(buffer: ReturnType<typeof createRingBuffer>, count: number, frameSize: number) {
+async function fillBuffer(
+	buffer: ReturnType<typeof createRingBuffer>,
+	count: number,
+	frameSize: number,
+) {
 	for (let i = 0; i < count; i++) {
 		const frame = new Uint8Array(frameSize)
 		frame[0] = i // tag frame with index for identification
