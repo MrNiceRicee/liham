@@ -50,7 +50,8 @@ The price is $5 and the cost is $10.
 
 ## Empty Math
 
-$$$$
+$$
+$$
 
 ## The $\alpha$ Algorithm
 
