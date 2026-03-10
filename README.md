@@ -54,7 +54,7 @@ Press `?` for keybindings.
 liham uses a [unified.js](https://unifiedjs.com) pipeline to transform markdown into terminal UI:
 
 ```mermaid
-graph LR
+graph TD
     A[Markdown] --> B[remark-parse]
     B --> C[remark-math]
     C --> D[remark-gfm]
