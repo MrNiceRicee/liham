@@ -27,7 +27,7 @@ describe('isFfmpegAvailable', () => {
 })
 
 describe('sanitizeMediaPath', () => {
-	const base = `${import.meta.dir}/../../test/assets`
+	const base = `${import.meta.dir}/../../sandbox/assets`
 
 	test('resolves valid local file', () => {
 		const result = sanitizeMediaPath('fixture.txt', base)
