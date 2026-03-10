@@ -30,6 +30,34 @@ describe('y key (CopySelection)', () => {
 	})
 })
 
+describe('ctrl+y / ctrl+e (line scroll)', () => {
+	test('ctrl+y returns lineUp scroll action', () => {
+		const mapper = VIEWER_KEY_MAP['y']
+		expect(mapper).toBeDefined()
+		const action = mapper!(makeKey('y', { ctrl: true }), initialState(), 0)
+		expect(action).toEqual({ type: 'Scroll', direction: 'lineUp' })
+	})
+
+	test('plain y returns CopySelection (not lineUp)', () => {
+		const mapper = VIEWER_KEY_MAP['y']
+		const action = mapper!(makeKey('y'), initialState(), 0)
+		expect(action).toEqual({ type: 'CopySelection' })
+	})
+
+	test('ctrl+e returns lineDown scroll action', () => {
+		const mapper = VIEWER_KEY_MAP['e']
+		expect(mapper).toBeDefined()
+		const action = mapper!(makeKey('e', { ctrl: true }), initialState(), 0)
+		expect(action).toEqual({ type: 'Scroll', direction: 'lineDown' })
+	})
+
+	test('plain e returns null', () => {
+		const mapper = VIEWER_KEY_MAP['e']
+		const action = mapper!(makeKey('e'), initialState(), 0)
+		expect(action).toBeNull()
+	})
+})
+
 describe('escape selection priority', () => {
 	test('esc clears selection before checking modal/focus/browser/quit', () => {
 		const s = stateWith({ fromBrowser: true })

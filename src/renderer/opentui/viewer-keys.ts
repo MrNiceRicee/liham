@@ -31,7 +31,8 @@ export const VIEWER_KEY_MAP: Record<
 	end: () => ({ type: 'Scroll', direction: 'bottom' }),
 	d: (key) => (key.ctrl ? { type: 'Scroll', direction: 'halfDown' } : null),
 	u: (key) => (key.ctrl ? { type: 'Scroll', direction: 'halfUp' } : null),
-	y: () => ({ type: 'CopySelection' }),
+	y: (key) => (key.ctrl ? { type: 'Scroll', direction: 'lineUp' } : { type: 'CopySelection' }),
+	e: (key) => (key.ctrl ? { type: 'Scroll', direction: 'lineDown' } : null),
 	'/': () => ({ type: 'SearchOpen' }),
 	t: (_, state) => {
 		// guard: no-op in source-only (no preview pane to scroll)
@@ -189,6 +190,12 @@ export function applyScroll(ref: ScrollBoxRenderable | null, direction: ScrollDi
 			break
 		case 'halfDown':
 			ref.scrollBy(0.5, 'viewport')
+			break
+		case 'lineUp':
+			ref.scrollTo(Math.max(0, ref.scrollTop - 1))
+			break
+		case 'lineDown':
+			ref.scrollTo(Math.min(ref.scrollHeight, ref.scrollTop + 1))
 			break
 		default:
 			break

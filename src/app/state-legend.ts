@@ -50,6 +50,7 @@ function browserLegend(legendPage: LegendPage): LegendEntry[] {
 		{ key: '?', label: 'more' },
 		{ key: '\u2191/\u2193', label: 'navigate' },
 		{ key: 'enter', label: 'open' },
+		{ key: 'ctrl+d/u', label: 'half page' },
 		{ key: 'esc', label: 'quit' },
 		{ key: 'type', label: 'filter' },
 	]
@@ -65,6 +66,7 @@ function viewerLegend(state: AppState): LegendEntry[] {
 			{ key: 'g/G', label: 'top/bottom' },
 			{ key: 'pgup/pgdn', label: 'page' },
 			{ key: 'ctrl+d/u', label: 'half' },
+		{ key: 'ctrl+e/y', label: 'line' },
 		]
 	}
 

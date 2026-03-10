@@ -67,8 +67,18 @@ export type ScrollDirection =
 	| 'pageDown'
 	| 'halfUp'
 	| 'halfDown'
+	| 'lineUp'
+	| 'lineDown'
 
-export type CursorDirection = 'up' | 'down' | 'top' | 'bottom' | 'pageUp' | 'pageDown'
+export type CursorDirection =
+	| 'up'
+	| 'down'
+	| 'top'
+	| 'bottom'
+	| 'pageUp'
+	| 'pageDown'
+	| 'halfUp'
+	| 'halfDown'
 
 export type AppAction =
 	| { type: 'Resize'; width: number; height: number }
@@ -167,6 +177,10 @@ export function moveCursor(
 			return Math.max(0, current - PAGE_SIZE)
 		case 'pageDown':
 			return Math.min(max, current + PAGE_SIZE)
+		case 'halfUp':
+			return Math.max(0, current - Math.floor(PAGE_SIZE / 2))
+		case 'halfDown':
+			return Math.min(max, current + Math.floor(PAGE_SIZE / 2))
 	}
 }
 

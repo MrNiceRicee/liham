@@ -7,6 +7,7 @@ import {
 	isSplitLayout,
 	type LayoutMode,
 	legendEntries,
+	moveCursor,
 	paneDimensions,
 } from './state.ts'
 
@@ -176,6 +177,30 @@ describe('CycleLayout action', () => {
 	})
 })
 
+// -- moveCursor halfUp/halfDown --
+
+describe('moveCursor half-page', () => {
+	test('halfDown moves by half page size', () => {
+		expect(moveCursor(0, 'halfDown', 20)).toBe(5)
+	})
+
+	test('halfUp moves by half page size', () => {
+		expect(moveCursor(10, 'halfUp', 20)).toBe(5)
+	})
+
+	test('halfDown clamps to max', () => {
+		expect(moveCursor(18, 'halfDown', 20)).toBe(19)
+	})
+
+	test('halfUp clamps to 0', () => {
+		expect(moveCursor(2, 'halfUp', 20)).toBe(0)
+	})
+
+	test('halfDown on empty list returns 0', () => {
+		expect(moveCursor(0, 'halfDown', 0)).toBe(0)
+	})
+})
+
 // -- Scroll --
 
 describe('Scroll action', () => {
@@ -248,7 +273,15 @@ describe('legendEntries', () => {
 		expect(keys).toContain('g/G')
 		expect(keys).toContain('pgup/pgdn')
 		expect(keys).toContain('ctrl+d/u')
+		expect(keys).toContain('ctrl+e/y')
 		expect(keys).toContain('?')
+	})
+
+	test('browser legend shows ctrl+d/u for half page', () => {
+		const s = stateWith({ mode: 'browser', legendPage: 'nav' })
+		const entries = legendEntries(s)
+		const keys = entries.map((e) => e.key)
+		expect(keys).toContain('ctrl+d/u')
 	})
 
 	test('nav page shows ? as more', () => {

@@ -32,6 +32,10 @@ function predictCursor(current: number, direction: CursorDirection, length: numb
 			return Math.max(0, current - PAGE_SIZE)
 		case 'pageDown':
 			return Math.min(max, current + PAGE_SIZE)
+		case 'halfUp':
+			return Math.max(0, current - Math.floor(PAGE_SIZE / 2))
+		case 'halfDown':
+			return Math.min(max, current + Math.floor(PAGE_SIZE / 2))
 	}
 }
 
@@ -103,6 +107,18 @@ function browserCursorKey(
 		case 'pagedown':
 			dispatch({ type: 'CursorMove', direction: 'pageDown', filteredLength })
 			return 'pageDown'
+		case 'd':
+			if (key.ctrl) {
+				dispatch({ type: 'CursorMove', direction: 'halfDown', filteredLength })
+				return 'halfDown'
+			}
+			return null
+		case 'u':
+			if (key.ctrl) {
+				dispatch({ type: 'CursorMove', direction: 'halfUp', filteredLength })
+				return 'halfUp'
+			}
+			return null
 		default:
 			return null
 	}

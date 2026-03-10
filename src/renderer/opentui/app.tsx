@@ -229,6 +229,7 @@ export function App(props: Readonly<AppProps>) {
 			setBrowserPreviewContent,
 			setRenderTimeMs,
 		)
+		previewRef.current?.scrollTo(0)
 	}, [state.mode, state.browser.cursorIndex, filteredMatches.length, state.browser.scanVersion])
 
 	// -- directory watcher for browser live rescan --
