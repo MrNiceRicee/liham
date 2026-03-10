@@ -429,6 +429,8 @@ export function App(props: Readonly<AppProps>) {
 			paused={modalDerived.paused}
 			restartCount={modalDerived.restartCount}
 			seekOffset={modalDerived.seekOffset}
+			volume={state.volume}
+			muted={state.muted}
 			mediaCapabilities={props.mediaCapabilities}
 			onFrameInfo={setModalFrameInfo}
 			onVideoInfo={setVideoInfo}

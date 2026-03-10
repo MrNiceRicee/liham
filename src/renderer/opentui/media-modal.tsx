@@ -6,10 +6,14 @@ import { resolve } from 'node:path'
 import { type ReactNode, useContext, useEffect, useRef, useState } from 'react'
 
 import type { MediaIRNode } from '../../ir/types.ts'
+import { type AudioBackend, detectAudioBackend } from '../../media/audio-backend.ts'
+import { syncFrameToClockPos } from '../../media/clock-sync.ts'
+import { createFfplayBackend } from '../../media/ffplay-backend.ts'
 import { checkBufferEnd, fillRingBuffer } from '../../media/fill-ring-buffer.ts'
 import { killActiveAudio, playAudio } from '../../media/ffplay.ts'
 import { createFrameTimer, type FrameTimerHandle } from '../../media/frame-timer.ts'
 import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
+import { createMpvBackend } from '../../media/mpv-backend.ts'
 import { createRingBuffer, type RingBuffer } from '../../media/ring-buffer.ts'
 import type { LoadedImage, MediaCapabilities } from '../../media/types.ts'
 import {
@@ -86,6 +90,8 @@ function ModalVideoContent({
 	restartCount,
 	seekOffset,
 	paused,
+	volume,
+	muted,
 	onVideoInfo,
 }: {
 	readonly src: string
@@ -98,6 +104,8 @@ function ModalVideoContent({
 	readonly restartCount: number
 	readonly seekOffset: number
 	readonly paused: boolean
+	readonly volume: number
+	readonly muted: boolean
 	readonly onVideoInfo: (info: VideoPlaybackInfo | null) => void
 }): ReactNode {
 	const loadIdRef = useRef(0)
@@ -111,11 +119,16 @@ function ModalVideoContent({
 		null,
 	)
 
-	// refs for timer and buffer — needed for pause/resume effect
+	// detected backend kind — cached once per component mount
+	const [detectedBackendKind] = useState<'mpv' | 'ffplay'>(() => detectAudioBackend())
+
+	// refs for timer, buffer, and audio backend
 	const timerRef = useRef<FrameTimerHandle | null>(null)
 	const bufferRef = useRef<RingBuffer | null>(null)
+	const backendRef = useRef<AudioBackend | null>(null)
+	const consumedFrameIndexRef = useRef(0)
 
-	// audio resync context — ref avoids adding deps to pause effect
+	// audio resync context — ref avoids adding deps to pause effect (ffplay fallback only)
 	const audioCtxRef = useRef<{
 		absPath: string
 		basePath: string
@@ -151,7 +164,54 @@ function ModalVideoContent({
 		}
 	}, [src, basePath])
 
+	// audio effect — creates/destroys audio backend.
+	// DECOUPLED from stream effect: mpv stays alive across seeks.
+	// only re-fires when the video file changes.
+	useEffect(() => {
+		if (probeCache == null || !probeCache.meta.hasAudio) return
+
+		const { absPath } = probeCache
+		let backend: AudioBackend | null = null
+
+		const init = async () => {
+			backend =
+				detectedBackendKind === 'mpv' ? createMpvBackend() : createFfplayBackend()
+
+			const result = await backend.play(absPath, basePath, seekOffset)
+			if (result.ok) {
+				backend.setVolume(volume)
+				backend.setMuted(muted)
+				backendRef.current = backend
+				debug(`audio backend started: ${backend.kind}`)
+			} else {
+				debug(`audio backend failed: ${result.error}`)
+				backend.kill()
+				backend = null
+			}
+		}
+		void init()
+
+		return () => {
+			backendRef.current = null // null FIRST — prevent stale reads
+			if (backend != null) {
+				debug('audio effect cleanup: killing backend')
+				backend.kill()
+			}
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps -- volume/muted synced in separate effect
+	}, [probeCache, basePath, detectedBackendKind])
+
+	// sync volume/mute to backend when they change
+	useEffect(() => {
+		const backend = backendRef.current
+		if (backend?.kind === 'mpv') {
+			backend.setVolume(volume)
+			backend.setMuted(muted)
+		}
+	}, [volume, muted])
+
 	// stream effect — ring buffer producer + timer-driven consumer
+	// re-fires on seek/resize. backend is NOT managed here.
 	useEffect(() => {
 		if (probeCache == null) return
 
@@ -162,15 +222,21 @@ function ModalVideoContent({
 		const thisLoadId = ++loadIdRef.current
 		const isStale = () => loadIdRef.current !== thisLoadId
 		const frameSize = dims.pixelWidth * dims.pixelHeight * 4
-		let audioStarted = false
 
 		// create ring buffer + timer
 		const buffer = createRingBuffer(RING_BUFFER_CAPACITY, frameSize)
 		bufferRef.current = buffer
+		consumedFrameIndexRef.current = 0
 
 		setGridWidth(dims.termCols)
 		setPlaybackState('playing')
 		audioCtxRef.current = { absPath, basePath, fps: meta.fps, hasAudio: meta.hasAudio, seekOffset }
+
+		// tell mpv to seek (instant IPC ~1ms) — only if backend exists
+		const backend = backendRef.current
+		if (backend?.kind === 'mpv' && seekOffset > 0) {
+			backend.seek(seekOffset)
+		}
 
 		const proc = createVideoStream({
 			filePath: absPath,
@@ -186,9 +252,44 @@ function ModalVideoContent({
 			onFrame: () => {
 				if (renderPendingRef.current) return // backpressure: skip if React hasn't committed
 
+				const currentBackend = backendRef.current
+
+				// mpv mode: clock-synced frame consumption
+				if (currentBackend?.kind === 'mpv') {
+					const timePos = currentBackend.getTimePos()
+					if (timePos == null) return // no clock yet, hold
+
+					const result = syncFrameToClockPos(
+						timePos,
+						meta.fps,
+						meta.duration,
+						consumedFrameIndexRef.current,
+						buffer,
+					)
+					consumedFrameIndexRef.current = result.newIndex
+
+					if (result.frameToRender != null) {
+						const grid = renderFrame(result.frameToRender, dims, src, bgColor)
+						renderPendingRef.current = true
+						setCurrentGrid(grid)
+					}
+
+					// check end
+					const status = checkBufferEnd(buffer)
+					if (status !== 'playing') setPlaybackState(status)
+
+					// report elapsed from mpv clock
+					onVideoInfo({
+						elapsed: timePos,
+						duration: meta.duration,
+						paused: false,
+					})
+					return
+				}
+
+				// ffplay mode: sequential read (unchanged)
 				const frame = buffer.read()
 				if (frame == null) {
-					// underrun — check if stream has ended
 					const status = checkBufferEnd(buffer)
 					if (status !== 'playing') setPlaybackState(status)
 					return
@@ -198,7 +299,6 @@ function ModalVideoContent({
 				renderPendingRef.current = true
 				setCurrentGrid(grid)
 
-				// report elapsed time
 				const elapsed = seekOffset + timer.tickCount / meta.fps
 				onVideoInfo({ elapsed, duration: meta.duration, paused: false })
 			},
@@ -232,15 +332,15 @@ function ModalVideoContent({
 
 			const firstFrame = buffer.read()
 			if (firstFrame != null) {
+				consumedFrameIndexRef.current = 1
 				const grid = renderFrame(firstFrame, dims, src, bgColor)
 				setCurrentGrid(grid)
 			}
 
-			// start audio then timer — await spawn so they begin together
-			if (meta.hasAudio) {
-				const result = await playAudio(absPath, basePath, seekOffset)
+			// ffplay fallback: start audio here (mpv audio managed by audio effect)
+			if (meta.hasAudio && detectedBackendKind === 'ffplay') {
+				await playAudio(absPath, basePath, seekOffset)
 				if (isStale()) return
-				if (result.ok) audioStarted = true
 			}
 			timer.play()
 		})()
@@ -251,6 +351,7 @@ function ModalVideoContent({
 			timerRef.current = null
 			buffer.flush()
 			bufferRef.current = null
+			consumedFrameIndexRef.current = 0
 			// force-close pipe reader to prevent stale producer from draining
 			void (proc.stdout as ReadableStream<Uint8Array>).cancel().catch(() => {
 				/* already closed */
@@ -260,7 +361,9 @@ function ModalVideoContent({
 			} catch {
 				/* already dead */
 			}
-			if (audioStarted) void killActiveAudio()
+			// NOTE: audio backend is NOT killed here — managed by audio effect
+			// only kill ffplay audio if using ffplay backend
+			if (detectedBackendKind === 'ffplay') void killActiveAudio()
 		}
 	}, [probeCache, maxCols, maxRows, restartCount, seekOffset])
 
@@ -272,18 +375,31 @@ function ModalVideoContent({
 			if (paused && timer.state === 'playing') timer.pause()
 			if (!paused && timer.state === 'paused') timer.play()
 		}
+
+		const backend = backendRef.current
+		if (backend != null) {
+			// mpv: fire-and-forget pause/resume
+			if (paused) {
+				backend.pause()
+			} else {
+				void backend.resume()
+			}
+		}
+
 		if (paused) {
 			pauseActiveVideo()
-			// kill audio immediately — SIGSTOP leaves OS audio buffers playing
-			void killActiveAudio()
+			// ffplay fallback: kill audio (SIGSTOP leaves OS audio buffers playing)
+			if (detectedBackendKind === 'ffplay') void killActiveAudio()
 		} else {
 			resumeActiveVideo()
-			// start fresh audio at current video position (playAudio handles kill internally)
-			const ctx = audioCtxRef.current
-			if (ctx?.hasAudio && timer != null) {
-				const elapsed = ctx.seekOffset + timer.tickCount / ctx.fps
-				debug(`audio resync: elapsed=${String(elapsed.toFixed(2))}s`)
-				void playAudio(ctx.absPath, ctx.basePath, elapsed)
+			// ffplay fallback: restart audio at current position
+			if (detectedBackendKind === 'ffplay') {
+				const ctx = audioCtxRef.current
+				if (ctx?.hasAudio && timer != null) {
+					const elapsed = ctx.seekOffset + timer.tickCount / ctx.fps
+					debug(`ffplay audio resync: elapsed=${String(elapsed.toFixed(2))}s`)
+					void playAudio(ctx.absPath, ctx.basePath, elapsed)
+				}
 			}
 		}
 	}, [paused])
@@ -349,6 +465,8 @@ export interface MediaModalProps {
 	readonly paused: boolean
 	readonly restartCount: number
 	readonly seekOffset: number
+	readonly volume: number
+	readonly muted: boolean
 	readonly mediaCapabilities: MediaCapabilities
 	readonly onFrameInfo: (info: FrameInfo | null) => void
 	readonly onVideoInfo: (info: VideoPlaybackInfo | null) => void
@@ -363,6 +481,8 @@ export function MediaModal({
 	paused,
 	restartCount,
 	seekOffset,
+	volume,
+	muted,
 	mediaCapabilities,
 	onFrameInfo,
 	onVideoInfo,
@@ -401,6 +521,8 @@ export function MediaModal({
 					restartCount={restartCount}
 					seekOffset={seekOffset}
 					paused={paused}
+					volume={volume}
+					muted={muted}
 					onVideoInfo={onVideoInfo}
 				/>
 			)

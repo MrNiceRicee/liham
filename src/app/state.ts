@@ -52,6 +52,8 @@ export interface AppState {
 	mediaModal: MediaModalState
 	searchState: SearchState | null
 	tocState: TocState | null
+	volume: number
+	muted: boolean
 }
 
 // -- actions --
@@ -381,6 +383,8 @@ export function initialState(
 		mediaModal: { kind: 'closed' },
 		searchState: null,
 		tocState: null,
+		volume: 100,
+		muted: false,
 	}
 }
 

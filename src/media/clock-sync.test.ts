@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from 'bun:test'
 
-import { syncFrameToClockPos, type FrameSyncResult } from './clock-sync.ts'
+import { syncFrameToClockPos } from './clock-sync.ts'
 import { createRingBuffer } from './ring-buffer.ts'
 
 // helper: fill buffer with numbered frames
