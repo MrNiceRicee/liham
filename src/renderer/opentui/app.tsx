@@ -448,6 +448,8 @@ export function App(props: Readonly<AppProps>) {
 			frameInfo={modalFrameInfo}
 			paused={modalDerived.paused}
 			videoInfo={videoInfo}
+			volume={state.volume}
+			muted={state.muted}
 		/>
 	) : null
 

@@ -109,6 +109,8 @@ export interface MediaGalleryProps {
 	readonly frameInfo?: FrameInfo | null
 	readonly paused?: boolean
 	readonly videoInfo?: VideoPlaybackInfo | null
+	readonly volume?: number
+	readonly muted?: boolean
 }
 
 export function MediaGallery({
@@ -120,6 +122,8 @@ export function MediaGallery({
 	frameInfo,
 	paused = false,
 	videoInfo,
+	volume = 100,
+	muted = false,
 }: MediaGalleryProps): ReactNode {
 	if (mediaNodes.length === 0) return null
 
@@ -150,10 +154,14 @@ export function MediaGallery({
 		)
 	}
 	if (hasProgress) {
+		let volLabel = ''
+		if (muted) volLabel = ' [M]'
+		else if (volume < 100) volLabel = ` [${String(volume)}%]`
+		const barWidth = labelWidth - volLabel.length
 		footerElements.push(
 			<text key="progress">
 				<span fg={theme.pane.focusedBorderColor}>
-					{` ${formatProgressBar(videoInfo.elapsed, videoInfo.duration, labelWidth)}`}
+					{` ${formatProgressBar(videoInfo.elapsed, videoInfo.duration, barWidth)}${volLabel}`}
 				</span>
 			</text>,
 		)
