@@ -7,9 +7,9 @@ import { TextAttributes } from '@opentui/core'
 import { extractText } from '../../ir/text-utils.ts'
 import {
 	type CoreIRNode,
-	type CustomNode,
 	type IRNode,
 	isBlockNode,
+	isCustomNode,
 	type MediaIRNode,
 } from '../../ir/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
@@ -57,10 +57,9 @@ function isCoreNode(node: IRNode): node is CoreIRNode {
 
 // renders a single IR node to OpenTUI JSX
 function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
-	if (node.type === 'mathInline') return renderMathInline(node as CustomNode<'mathInline'>, key)
-	if (node.type === 'mathDisplay') return renderMathDisplay(node as CustomNode<'mathDisplay'>, key)
-	if (node.type === 'mermaid')
-		return renderMermaidBlock(node as CustomNode<'mermaid'>, key, ctx.theme)
+	if (isCustomNode(node, 'mathInline')) return renderMathInline(node, key)
+	if (isCustomNode(node, 'mathDisplay')) return renderMathDisplay(node, key)
+	if (isCustomNode(node, 'mermaid')) return renderMermaidBlock(node, key, ctx.theme)
 	if (!isCoreNode(node)) return renderCustom(node, key)
 
 	switch (node.type) {

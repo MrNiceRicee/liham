@@ -258,3 +258,11 @@ const BLOCK_TYPES = new Set([
 export function isBlockNode(node: IRNode): boolean {
 	return BLOCK_TYPES.has(node.type)
 }
+
+// type guard for custom nodes — narrows CustomNode<string> to CustomNode<T>
+export function isCustomNode<T extends keyof CustomNodeDataMap>(
+	node: IRNode,
+	type: T,
+): node is CustomNode<T> {
+	return node.type === type
+}

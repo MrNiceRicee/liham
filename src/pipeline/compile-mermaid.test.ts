@@ -1,27 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 import { renderMermaidASCII } from 'beautiful-mermaid'
 
-import type { CustomNode, IRNode } from '../ir/types.ts'
+import type { CustomNode } from '../ir/types.ts'
 import { darkTheme } from '../theme/dark.ts'
 import { processMarkdown } from './processor.ts'
-
-function assertOk(result: {
-	ok: boolean
-	value?: unknown
-}): asserts result is { ok: true; value: IRNode } {
-	expect(result.ok).toBe(true)
-}
-
-function findNodes(node: IRNode, type: string): IRNode[] {
-	const results: IRNode[] = []
-	if (node.type === type) results.push(node)
-	if ('children' in node && Array.isArray(node.children)) {
-		for (const child of node.children as IRNode[]) {
-			results.push(...findNodes(child, type))
-		}
-	}
-	return results
-}
+import { assertOk, findNodes } from './test-utils.ts'
 
 describe('mermaid pipeline', () => {
 	it('produces mermaid node from ```mermaid fence', async () => {
