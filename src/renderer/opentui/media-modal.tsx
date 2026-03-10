@@ -83,6 +83,50 @@ function resyncFfplayAudio(
 	void playAudio(ctx.absPath, ctx.basePath, elapsed)
 }
 
+// consume a frame from the ring buffer using mpv's clock position.
+// returns true if a grid was set (render pending), false otherwise.
+function consumeMpvFrame(
+	backend: AudioBackend,
+	buffer: RingBuffer,
+	seekOffset: number,
+	fps: number,
+	duration: number,
+	consumedRef: { current: number },
+	dims: VideoDimensions,
+	src: string,
+	bgColor: string,
+	setGrid: (grid: MergedSpan[][]) => void,
+	setState: (state: PlaybackState) => void,
+	setInfo: (info: VideoPlaybackInfo) => void,
+): boolean {
+	const timePos = backend.getTimePos()
+	if (timePos == null) {
+		// clock unavailable (e.g. mpv reached EOF) — still check buffer end
+		const status = checkBufferEnd(buffer)
+		if (status !== 'playing') setState(status)
+		return false
+	}
+
+	const result = syncFrameToClockPos(
+		timePos - seekOffset,
+		fps,
+		duration > 0 ? duration - seekOffset : 0,
+		consumedRef.current,
+		buffer,
+	)
+	consumedRef.current = result.newIndex
+
+	if (result.frameToRender != null) {
+		setGrid(renderFrame(result.frameToRender, dims, src, bgColor))
+	}
+
+	const status = checkBufferEnd(buffer)
+	if (status !== 'playing') setState(status)
+
+	setInfo({ elapsed: timePos, duration, paused: false })
+	return result.frameToRender != null
+}
+
 // -- modal video content --
 
 type PlaybackState = 'loading' | 'playing' | 'error' | 'ended'
@@ -268,35 +312,15 @@ function ModalVideoContent({
 
 				// mpv mode: clock-synced frame consumption
 				if (currentBackend?.kind === 'mpv') {
-					const timePos = currentBackend.getTimePos()
-					if (timePos == null) return // no clock yet, hold
-
-					// offset timePos relative to ring buffer start — buffer always starts at frame 0
-				const result = syncFrameToClockPos(
-						timePos - seekOffset,
-						meta.fps,
-						meta.duration > 0 ? meta.duration - seekOffset : 0,
-						consumedFrameIndexRef.current,
-						buffer,
+					const rendered = consumeMpvFrame(
+						currentBackend, buffer, seekOffset,
+						meta.fps, meta.duration, consumedFrameIndexRef,
+						dims, src, bgColor,
+						(grid) => { renderPendingRef.current = true; setCurrentGrid(grid) },
+						setPlaybackState,
+						onVideoInfo,
 					)
-					consumedFrameIndexRef.current = result.newIndex
-
-					if (result.frameToRender != null) {
-						const grid = renderFrame(result.frameToRender, dims, src, bgColor)
-						renderPendingRef.current = true
-						setCurrentGrid(grid)
-					}
-
-					// check end
-					const status = checkBufferEnd(buffer)
-					if (status !== 'playing') setPlaybackState(status)
-
-					// report elapsed from mpv clock
-					onVideoInfo({
-						elapsed: timePos,
-						duration: meta.duration,
-						paused: false,
-					})
+					if (rendered) renderPendingRef.current = true
 					return
 				}
 

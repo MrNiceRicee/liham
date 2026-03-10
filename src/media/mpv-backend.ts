@@ -21,6 +21,8 @@ export function createMpvBackend(): AudioBackend {
 	let cachedTimePos: number | null = null
 	let cachedTimePosAt = 0
 	let isPaused = false
+	let fileEnded = false
+	let loadedFilePath: string | null = null
 	const endHandlers: Array<() => void> = []
 	const errorHandlers: Array<(err: Error) => void> = []
 
@@ -54,10 +56,12 @@ export function createMpvBackend(): AudioBackend {
 					}
 					if (event.event === 'property-change' && event.name === 'eof-reached') {
 						if (event.data === true) {
+							fileEnded = true
 							for (const handler of endHandlers) handler()
 						}
 					}
 					if (event.event === 'end-file') {
+						fileEnded = true
 						for (const handler of endHandlers) handler()
 					}
 				})
@@ -77,6 +81,8 @@ export function createMpvBackend(): AudioBackend {
 				// load file
 				const loadArgs: [string, ...unknown[]] = ['loadfile', sanitized.path!]
 				await ipc.command(loadArgs)
+				loadedFilePath = sanitized.path!
+				fileEnded = false
 
 				// seek if needed
 				if (seekOffset > 0) {
@@ -112,11 +118,23 @@ export function createMpvBackend(): AudioBackend {
 			// null cached time-pos immediately — timer holds current frame until fresh value arrives
 			cachedTimePos = null
 			isPaused = false
-			// fire-and-forget seek
-			void ipc.command(['seek', positionSec, 'absolute']).catch(() => {
-				// ignore seek errors (e.g., seeking past end)
-			})
-			debug(`seek to ${String(positionSec)}s`)
+
+			if (fileEnded && loadedFilePath != null) {
+				// mpv is idle after EOF — re-load file then seek
+				fileEnded = false
+				void ipc
+					.command(['loadfile', loadedFilePath])
+					.then(() => {
+						if (ipc != null && positionSec > 0) {
+							return ipc.command(['seek', positionSec, 'absolute'])
+						}
+					})
+					.catch(() => {})
+				debug(`reload + seek to ${String(positionSec)}s`)
+			} else {
+				void ipc.command(['seek', positionSec, 'absolute']).catch(() => {})
+				debug(`seek to ${String(positionSec)}s`)
+			}
 		},
 
 		kill(): void {
