@@ -1,86 +1,82 @@
-# Adobo Journal
+# Adobo: The Dish That Defines a Nation
 
-A cooking journal documenting the quest for the perfect adobo. There are as many adobo recipes as there are Filipino households — this is my attempt to find mine.
+> Few subjects in the Philippines raise as many opinions as the right way to make adobo. Everyone feels passionately about it — whether they cook or not.
 
-## Entry 1: The Starting Point
+Adobo is not one recipe. It is hundreds of recipes, each one a reflection of the region, the family, and the cook. In 2021, the Philippine Department of Trade and Industry attempted to **standardize** adobo to promote it internationally. The reaction was immediate: you cannot standardize something that belongs to everyone differently.
 
-*January 12, 2026*
+## Before the Spanish Named It
 
-Classic chicken adobo. The recipe everyone starts with.
+The cooking method is **indigenous to the Philippines**. Long before Spain arrived, pre-colonial communities preserved food in vinegar and salt to survive the tropical climate. When Spanish friar Pedro de San Buenaventura observed the technique in the early 1600s, he called it *adobo* — from the Spanish *adobar*, "to marinate." The name stuck. The dish was already centuries old.
 
-### Base Ratio
+After World War II and Philippine independence, adobo became a symbol of national identity. Every region claimed its own version. That's the point — adobo is not a dish. It's a **map of the Philippines**.
 
-The vinegar-to-soy ratio is everything: $V_v : V_s = 1:1$
+*Cultural context from [Kapwa Gardens](https://www.kapwagardens.com/blog/the-evolution-of-filipino-adobo) and [Wikipedia](https://en.wikipedia.org/wiki/Philippine_adobo). Regional variations from [Featr](https://featrmedia.com/adobo-recipes-around-the-philippines/).*
 
-I used $1/2$ cup each. Too salty. Next time: $2/3 : 1/2$.
+---
+
+## The Classic
+
+*Adapted from [Panlasang Pinoy](https://panlasangpinoy.com/filipino-chicken-adobo-recipe/) by Vanjo Merano.*
 
 | Ingredient | Amount |
 |---|---|
-| Chicken thighs | 1 kg |
-| Soy sauce | 1/2 cup |
-| White cane vinegar | 1/2 cup |
-| Garlic | 8 cloves, crushed |
-| Bay leaves | 3 |
-| Black peppercorns | 1 tbsp, whole |
-
-### Notes
-
-- **Do not stir** when the vinegar is bubbling — it turns bitter
-- Let the garlic *swim*, don't mince it
-- ~~Used apple cider vinegar~~ — wrong. Use cane or coconut vinegar only.
-
----
-
-## Entry 2: The Batangas Variation
-
-*January 20, 2026*
-
-Batangas-style: **no soy sauce at all**. Pure vinegar, salt, and pork.
-
-Adjusted ratio: $V_v = 3/4$ cup, salt to taste.
-
-This version is paler, sharper, and leaner. The pork fat renders into the vinegar and creates this silky, tangy broth that's entirely different from the Manila version.
-
-### What Changed
-
-- Pork belly instead of chicken
-- No soy — only vinegar, salt, garlic, pepper
-- Cooked *dry* at the end (lid off, let sauce reduce)
-
-> The Batangas version taught me that adobo is not defined by soy sauce. It's defined by the braise.
-
----
-
-## Entry 3: Visayan Adobo
-
-*February 3, 2026*
-
-Coconut milk. That's the twist. The Visayan version adds $200$ml coconut milk and finishes with coconut cream.
-
-### Modified Ratio
-
-$$R = V_v / (V_s + V_c) = 0.5 / 0.7 \approx 0.71$$
-
-The coconut mellows the acidity and adds body. It's richer, almost like a curry-adobo hybrid.
+| Chicken | 2 lbs |
+| Soy sauce | 4 tbsp |
+| White vinegar | 6 tbsp |
+| Garlic | 5 cloves |
+| Water | 1 1/2 cups |
+| Cooking oil | 3 tbsp |
+| Sugar | 1 tsp |
+| Salt | 1/4 tsp |
+| Whole peppercorn | 1 tsp |
+| Dried bay leaves | 3 |
 
 ### Steps
 
-1. Brown the pork in its own fat
-2. Add garlic, soy, vinegar — simmer 20 min
-3. Pour in coconut milk, reduce heat
-4. Finish with coconut cream and fried garlic on top
+1. Combine chicken, soy sauce, and garlic. Marinate **1 hour minimum**
+2. Heat oil, pan-fry chicken **2 minutes per side**
+3. Pour remaining marinade and water. Bring to a boil
+4. Add bay leaves and peppercorn. Simmer **30 minutes**
+5. Add vinegar, cook **10 more minutes**
+6. Add sugar and salt. Serve over rice
+
+The vinegar-to-soy ratio: $V_v : V_s = 6:4 = 1.5$
+
+> **Do not stir** when the vinegar first hits the pot — it turns bitter.
 
 ---
 
-## Entry 4: The Dry Adobo Experiment
+## Regional Variations
 
-*February 15, 2026*
+Every province has its own adobo. Here's why that matters.
 
-Adobo flakes — shredded, then fried until crispy.
+### Adobong Pula (Red Adobo)
+
+Pre-colonial style — **no soy sauce at all**. The color comes from annatto oil (*atsuete*). This is what adobo looked like before Chinese traders brought soy sauce to the archipelago. Vinegar, salt, garlic, peppercorns. Nothing else.
+
+### Adobo sa Gata (Bicol / Visayas)
+
+Coconut milk added to the braise. The ratio shifts:
+
+$$R = V_v / (V_s + V_c) \approx 0.71$$
+
+The coconut mellows the acidity and adds body — richer, almost a curry-adobo hybrid.
+
+### Adobo sa Dilaw (Batangas / Laguna)
+
+Turmeric gives it a golden color. A completely different visual identity from the dark soy-based versions of Manila.
+
+### Adobo sa Puti (Cavite)
+
+White adobo — vinegar and salt only, no soy. Mashed pork liver stirred in for thickness.
+
+---
+
+## Adobo Flakes
+
+The version that converts skeptics. Shred the meat, fry until crispy.
 
 ~~Tried deep frying~~ — too greasy. Pan-frying with minimal oil is the way.
-
-### Process
 
 ```
 1. cook adobo normally (any style)
@@ -90,48 +86,16 @@ Adobo flakes — shredded, then fried until crispy.
 5. serve over garlic rice
 ```
 
-This is the version that converts adobo skeptics. The crispy edges with the salty-sour flavor — it's closer to a condiment than a stew.
-
-**Crispiness factor:** surface area matters. The finer the shred, the crunchier the result: $A \propto 1/d$
+Crispiness factor — surface area matters: $A \propto 1/d$
 
 ---
 
-## Entry 5: Current Best Recipe
+## The Argument
 
-*March 1, 2026*
+Ask ten Filipinos for the "real" adobo recipe and you'll get twelve answers. That's not a problem to solve. That's the whole point.
 
-After weeks of testing, this is the one.
-
-### The Ratio
-
-$$V_v / V_s = 2/3 \approx 0.67$$
-
-### Final Recipe
-
-| Ingredient | Amount | Notes |
-|---|---|---|
-| Chicken thighs | 1 kg | Bone-in, skin-on |
-| Soy sauce | 1/2 cup | Use a good one |
-| Cane vinegar | 1/3 cup | Not apple cider |
-| Garlic | 10 cloves | Crushed, not minced |
-| Bay leaves | 4 | Fresh if possible |
-| Peppercorns | 1 tbsp | Whole, cracked slightly |
-| Brown sugar | 1 tbsp | The secret |
-| Water | 1/4 cup | Optional, for more sauce |
-
-### Method
-
-1. Marinate chicken in soy and vinegar for **30 minutes**
-2. Sear chicken skin-side down in a hot pan — don't touch it for 3 minutes
-3. Add garlic, peppercorns, bay leaves
-4. Pour in the marinade
-5. **Do not stir** until the vinegar stops bubbling
-6. Simmer covered for 25 minutes
-7. Uncover, add sugar, reduce sauce by half
-8. Serve over steaming white rice
-
-> The brown sugar was the missing piece. Just enough to round the edges without making it sweet.
+Adobo is not a recipe. It's a conversation — one that's been going on for centuries and shows no sign of ending.
 
 ---
 
-*The quest continues. Every pot of adobo teaches you something — usually that the last batch was better.*
+*Every pot of adobo teaches you something — usually that the last batch was better.*
