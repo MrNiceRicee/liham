@@ -15,13 +15,13 @@ curl -fsSL https://bun.sh/install | bash
 ## Install
 
 ```sh
-bunx liham README.md
+bunx @mrnicericee/liham README.md
 ```
 
 Or install globally:
 
 ```sh
-bun add -g liham
+bun add -g @mrnicericee/liham
 ```
 
 ## Quick Start
@@ -110,11 +110,15 @@ Best experience in Kitty, WezTerm, Ghostty, or iTerm2. Works in any terminal wit
 
 ## Shell Completions
 
-```sh
-# zsh
-liham --completions zsh > ~/.zfunc/_liham
+### zsh (one-time setup)
 
-# bash
+```sh
+mkdir -p ~/.zfunc && liham --completions zsh > ~/.zfunc/_liham && grep -q 'zfunc' ~/.zshrc || echo 'fpath=(~/.zfunc $fpath)\nautoload -Uz compinit && compinit' >> ~/.zshrc && exec zsh
+```
+
+### bash
+
+```sh
 liham --completions bash > /etc/bash_completion.d/liham
 ```
 

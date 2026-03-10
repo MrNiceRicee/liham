@@ -1,5 +1,5 @@
 {
-	"name": "liham",
+	"name": "@mrnicericee/liham",
 	"version": "1.0.0",
 	"description": "Terminal markdown previewer with split-pane view, search, TOC, math, mermaid, and media support",
 	"type": "module",
@@ -7,10 +7,10 @@
 	"author": "Joshua Santos",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/joshuasantos/liham.git"
+		"url": "git+https://github.com/mrnicericee/liham.git"
 	},
-	"homepage": "https://github.com/joshuasantos/liham",
-	"bugs": "https://github.com/joshuasantos/liham/issues",
+	"homepage": "https://github.com/mrnicericee/liham",
+	"bugs": "https://github.com/mrnicericee/liham/issues",
 	"keywords": [
 		"markdown",
 		"terminal",
