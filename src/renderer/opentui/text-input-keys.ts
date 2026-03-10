@@ -17,21 +17,26 @@ export interface TextInputResult {
 	consumed: boolean
 }
 
+// option key detection: macOS sends option as meta in raw mode, option in kitty protocol
+function isOptionKey(key: KeyEvent): boolean {
+	return key.meta || key.option
+}
+
 function handleMovement(
 	key: KeyEvent,
 	text: string,
 	c: number,
 	len: number,
 ): TextInputResult | null {
-	if (key.name === 'left' && !key.meta)
+	if (key.name === 'left' && !isOptionKey(key))
 		return { newText: text, cursor: Math.max(0, c - 1), consumed: true }
-	if (key.name === 'right' && !key.meta)
+	if (key.name === 'right' && !isOptionKey(key))
 		return { newText: text, cursor: Math.min(len, c + 1), consumed: true }
 	if (key.name === 'home') return { newText: text, cursor: 0, consumed: true }
 	if (key.name === 'end') return { newText: text, cursor: len, consumed: true }
-	if (key.meta && key.name === 'left')
+	if (isOptionKey(key) && key.name === 'left')
 		return { newText: text, cursor: prevWordBoundary(text, c), consumed: true }
-	if (key.meta && key.name === 'right')
+	if (isOptionKey(key) && key.name === 'right')
 		return { newText: text, cursor: nextWordBoundary(text, c), consumed: true }
 	return null
 }
@@ -50,7 +55,7 @@ function handleDeletion(
 		if (c >= len) return { newText: text, cursor: c, consumed: true }
 		return { newText: graphemeDelete(text, c), cursor: c, consumed: true }
 	}
-	if ((key.meta && key.name === 'backspace') || (key.ctrl && key.name === 'w')) {
+	if ((isOptionKey(key) && key.name === 'backspace') || (key.ctrl && key.name === 'w')) {
 		const boundary = prevWordBoundary(text, c)
 		const count = c - boundary
 		if (count === 0) return { newText: text, cursor: c, consumed: true }
@@ -66,8 +71,10 @@ function handleInsert(
 	c: number,
 	maxLength: number,
 ): TextInputResult | null {
-	const ch = key.name === 'space' ? ' ' : key.name.length === 1 ? key.name : null
-	if (ch == null || key.ctrl || key.meta) return null
+	let ch: string | null = null
+	if (key.name === 'space') ch = ' '
+	else if (key.name.length === 1) ch = key.name
+	if (ch == null || key.ctrl || key.meta || key.option) return null
 	const newText = graphemeInsert(text, c, ch)
 	if (graphemeLength(newText) > maxLength) return { newText: text, cursor: c, consumed: true }
 	return { newText, cursor: c + 1, consumed: true }

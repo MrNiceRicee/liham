@@ -30,7 +30,15 @@ const MAX_LINE_SEARCH = 100
 function scrollToNearestBlock(scrollbox: ScrollBoxRenderable | null, line: number): void {
 	if (scrollbox == null) return
 	for (let l = line; l >= 0 && line - l < MAX_LINE_SEARCH; l--) {
-		if (scrollToDescendant(scrollbox, `src-line-${String(l)}`)) return
+		const id = `src-line-${String(l)}`
+		const element = scrollbox.content.findDescendantById(id)
+		if (element == null) continue
+		// offset within the block: match on line 55 of a block starting at line 40 → 15 rows down
+		const lineOffset = line - l
+		const position = element.y - scrollbox.viewport.y + scrollbox.scrollTop + lineOffset
+		const centered = position - Math.floor(scrollbox.viewport.height / 2)
+		scrollbox.scrollTo(Math.max(0, centered))
+		return
 	}
 }
 

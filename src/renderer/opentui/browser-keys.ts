@@ -180,6 +180,12 @@ export function browserKeyHandler(
 			return
 	}
 
+	// when filter has text, prioritize text editing for ctrl+u (clear) and ctrl+w (word delete)
+	if (state.browser.filter.length > 0 && key.ctrl && (key.name === 'u' || key.name === 'w')) {
+		browserFilterKey(key, state, dispatch)
+		return
+	}
+
 	const cursorDir = browserCursorKey(key, dispatch, matches.length)
 	if (cursorDir != null) {
 		const newIndex = predictCursor(state.browser.cursorIndex, cursorDir, matches.length)
