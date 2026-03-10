@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import type { CustomNode } from '../../ir/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import { parseAnsiSegments } from './ansi-spans.ts'
+import { sourceLineId } from './source-line-id.ts'
 
 export function renderMermaidBlock(
 	node: CustomNode<'mermaid'>,
@@ -18,10 +19,12 @@ export function renderMermaidBlock(
 		borderStyle: 'single',
 	}
 
+	const idProps = sourceLineId(node.sourceLine)
+
 	// error case: fallback to source with hint
 	if (node.data.rendered == null) {
 		return (
-			<box key={key} style={boxStyle} border title="mermaid">
+			<box key={key} {...idProps} style={boxStyle} border title="mermaid">
 				<text fg={theme.mermaid.errorColor}>{node.data.source}</text>
 				<text fg={theme.mermaid.errorColor}>[{node.data.error ?? 'unsupported diagram type'}]</text>
 			</box>
@@ -41,7 +44,7 @@ export function renderMermaidBlock(
 	)
 
 	return (
-		<box key={key} style={boxStyle} border title="mermaid">
+		<box key={key} {...idProps} style={boxStyle} border title="mermaid">
 			<text>{spans}</text>
 		</box>
 	)

@@ -4,6 +4,8 @@ import type { ReactNode } from 'react'
 
 import type { CustomNode } from '../../ir/types.ts'
 
+import { sourceLineId } from './source-line-id.ts'
+
 export function renderMathInline(node: CustomNode<'mathInline'>, key: string): ReactNode {
 	return (
 		<span key={key} fg={node.data.fg}>
@@ -14,7 +16,7 @@ export function renderMathInline(node: CustomNode<'mathInline'>, key: string): R
 
 export function renderMathDisplay(node: CustomNode<'mathDisplay'>, key: string): ReactNode {
 	return (
-		<box key={key} style={{ marginBottom: 1 }}>
+		<box key={key} {...sourceLineId(node.sourceLine)} style={{ marginBottom: 1 }}>
 			<text>
 				<span fg={node.data.fg}>{node.data.unicode}</span>
 			</text>

@@ -1,10 +1,15 @@
 import type { ListItemNode, ListNode } from '../../ir/types.ts'
 
 import { renderChildren } from './index.tsx'
+import { sourceLineId } from './source-line-id.ts'
 
 export function renderList(node: ListNode, key: string) {
 	return (
-		<box key={key} style={{ flexDirection: 'column', marginBottom: 1 }}>
+		<box
+			key={key}
+			{...sourceLineId(node.sourceLine)}
+			style={{ flexDirection: 'column', marginBottom: 1 }}
+		>
 			{renderChildren(node.children, key)}
 		</box>
 	)

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { CoreIRNode, IRNode, TableCellNode, TableNode, TableRowNode } from '../../ir/types.ts'
 
 import { renderInlineChildren } from './inline.tsx'
+import { sourceLineId } from './source-line-id.ts'
 
 // -- text extraction + measurement --
 
@@ -339,7 +340,11 @@ export function renderTable(node: TableNode, key: string, maxWidth?: number) {
 	const overflowCount = countDataRows(node) - MAX_DATA_ROWS
 
 	return (
-		<box key={key} style={{ flexDirection: 'column', marginBottom: 1 }}>
+		<box
+			key={key}
+			{...sourceLineId(node.sourceLine)}
+			style={{ flexDirection: 'column', marginBottom: 1 }}
+		>
 			<text>
 				<span {...borderFg}>{buildSeparator(colWidths, '┌', '┬', '┐', '─')}</span>
 			</text>

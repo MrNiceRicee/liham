@@ -6,11 +6,12 @@ import type { CoreIRNode, IRNode } from '../../ir/types.ts'
 import { isCustomNode } from '../../ir/types.ts'
 import { extractText } from '../../ir/text-utils.ts'
 
-// source pane: exact line-based scroll
+// source pane: centered line-based scroll
 // padding offset of 1 from source-pane.tsx <box style={{ padding: 1 }}>
 export function scrollToLine(ref: ScrollBoxRenderable | null, line: number): void {
 	if (ref == null) return
-	ref.scrollTo(line + 1)
+	const centered = line + 1 - Math.floor(ref.viewport.height / 2)
+	ref.scrollTo(Math.max(0, centered))
 }
 
 // -- IR node height estimation --

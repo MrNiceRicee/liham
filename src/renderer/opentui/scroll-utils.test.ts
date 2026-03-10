@@ -4,15 +4,30 @@ import type { CoreIRNode, IRNode } from '../../ir/types.ts'
 import { estimateHeadingOffset, estimateHeight, scrollToLine } from './scroll-utils.ts'
 
 describe('scrollToLine', () => {
-	test('applies +1 offset for padding', () => {
+	test('centers line in viewport with +1 padding offset', () => {
 		let scrolledTo = -1
 		const fakeRef = {
 			scrollTo: (pos: number) => {
 				scrolledTo = pos
 			},
+			viewport: { height: 20 },
 		}
 		scrollToLine(fakeRef as never, 5)
-		expect(scrolledTo).toBe(6)
+		// line 5 + 1 padding - floor(20/2) = 6 - 10 = -4, clamped to 0
+		expect(scrolledTo).toBe(0)
+	})
+
+	test('centers line at large offset', () => {
+		let scrolledTo = -1
+		const fakeRef = {
+			scrollTo: (pos: number) => {
+				scrolledTo = pos
+			},
+			viewport: { height: 20 },
+		}
+		scrollToLine(fakeRef as never, 50)
+		// line 50 + 1 padding - floor(20/2) = 51 - 10 = 41
+		expect(scrolledTo).toBe(41)
 	})
 
 	test('null ref is no-op', () => {

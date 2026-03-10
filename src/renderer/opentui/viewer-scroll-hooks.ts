@@ -1,6 +1,5 @@
 // viewer scroll hooks — search highlight scroll-to-match and TOC jump-to-heading.
-// TOC uses findDescendantById for exact element positions in the preview pane.
-// search uses character-offset fraction for both panes.
+// both search and TOC use findDescendantById for exact element positions via src-line-* ids.
 
 import type { ScrollBoxRenderable } from '@opentui/core'
 import { useEffect, useMemo } from 'react'
@@ -10,13 +9,7 @@ import { findMatches } from '../../search/find.ts'
 import { scrollToLine } from './scroll-utils.ts'
 import type { TocEntry } from './toc.ts'
 
-// scroll a scrollbox to a fraction (0..1) of its total content height
-function scrollToFraction(ref: ScrollBoxRenderable | null, fraction: number): void {
-	if (ref == null) return
-	ref.scrollTo(Math.round(fraction * ref.scrollHeight))
-}
-
-// scroll a scrollbox so that a descendant element with the given id is at the top.
+// scroll a scrollbox so that a descendant element with the given id is centered vertically.
 // uses the actual rendered position from OpenTUI's layout engine — no estimation.
 function scrollToDescendant(scrollbox: ScrollBoxRenderable, id: string): boolean {
 	const element = scrollbox.content.findDescendantById(id)
@@ -24,8 +17,21 @@ function scrollToDescendant(scrollbox: ScrollBoxRenderable, id: string): boolean
 	// element.y is absolute screen position (includes scroll translateY offset).
 	// content-relative position = element.y - viewport.y + scrollTop
 	const position = element.y - scrollbox.viewport.y + scrollbox.scrollTop
-	scrollbox.scrollTo(Math.max(0, position))
+	// center the element in the viewport
+	const centered = position - Math.floor(scrollbox.viewport.height / 2)
+	scrollbox.scrollTo(Math.max(0, centered))
 	return true
+}
+
+// walk backward from the match line to find the nearest block with a src-line-* id.
+// handles matches inside multi-line blocks (code blocks, lists, blockquotes).
+const MAX_LINE_SEARCH = 100
+
+function scrollToNearestBlock(scrollbox: ScrollBoxRenderable | null, line: number): void {
+	if (scrollbox == null) return
+	for (let l = line; l >= 0 && line - l < MAX_LINE_SEARCH; l--) {
+		if (scrollToDescendant(scrollbox, `src-line-${String(l)}`)) return
+	}
 }
 
 export function useSearchHighlight(
@@ -43,26 +49,16 @@ export function useSearchHighlight(
 		return Math.min(state.searchState.currentMatch, searchMatches.length - 1)
 	}, [state.searchState, searchMatches.length])
 
-	const lineCount = useMemo(() => {
-		if (raw.length === 0) return 0
-		let count = 1
-		for (let i = 0; i < raw.length; i++) {
-			if (raw[i] === '\n') count++
-		}
-		return count
-	}, [raw])
-
 	useEffect(() => {
-		if (state.searchState?.phase !== 'active') return
+		if (state.searchState == null) return
 		if (searchMatches.length === 0) return
 		const match = searchMatches[safeSearchIndex]
 		if (match == null) return
 		// source: exact line-based scroll (1 line = 1 row)
 		scrollToLine(sourceRef.current, match.line)
-		// preview: line fraction is more proportional to rendered height than char fraction
-		const fraction = lineCount > 0 ? match.line / lineCount : 0
-		scrollToFraction(previewRef.current, fraction)
-	}, [safeSearchIndex, state.searchState?.phase])
+		// preview: find nearest block element by walking src-line-* ids backward
+		scrollToNearestBlock(previewRef.current, match.line)
+	}, [safeSearchIndex, searchMatches, state.searchState?.phase])
 
 	return { searchQuery, searchMatches, safeSearchIndex }
 }
@@ -83,8 +79,8 @@ export function useTocJump(
 			return
 		}
 		// preview: use actual element position from the rendered layout tree
-		if (previewRef.current != null) {
-			scrollToDescendant(previewRef.current, `toc-h-${String(cursorIndex)}`)
+		if (previewRef.current != null && entry.sourceLine != null) {
+			scrollToDescendant(previewRef.current, `src-line-${String(entry.sourceLine)}`)
 		}
 		// source: scroll to the heading's source line
 		if (entry.sourceLine != null) {

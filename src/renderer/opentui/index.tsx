@@ -75,7 +75,6 @@ function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 		}
 
 		case 'heading': {
-			const tocIndex = ctx.toc.length
 			const tocEntry: TocEntry = {
 				level: node.level,
 				text: extractText(node.children),
@@ -84,7 +83,7 @@ function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 			}
 			if (node.sourceLine != null) tocEntry.sourceLine = node.sourceLine
 			ctx.toc.push(tocEntry)
-			return renderHeading(node, key, tocIndex)
+			return renderHeading(node, key)
 		}
 
 		case 'paragraph':

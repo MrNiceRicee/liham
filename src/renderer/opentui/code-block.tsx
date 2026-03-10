@@ -1,6 +1,7 @@
 import type { CodeBlockNode } from '../../ir/types.ts'
 
 import { renderInlineChildren } from './inline.tsx'
+import { sourceLineId } from './source-line-id.ts'
 
 export function renderCodeBlock(node: CodeBlockNode, key: string) {
 	const hasHighlightedChildren = node.children.length > 0
@@ -21,7 +22,7 @@ export function renderCodeBlock(node: CodeBlockNode, key: string) {
 	const fg = node.style.fg
 
 	return (
-		<box key={key} style={boxStyle} title={node.language ?? ''}>
+		<box key={key} {...sourceLineId(node.sourceLine)} style={boxStyle} title={node.language ?? ''}>
 			{hasHighlightedChildren ? (
 				<text>
 					{fg != null ? (

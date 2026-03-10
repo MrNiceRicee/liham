@@ -1,6 +1,7 @@
 import type { BlockquoteNode } from '../../ir/types.ts'
 
 import { renderChildren } from './index.tsx'
+import { sourceLineId } from './source-line-id.ts'
 
 export function renderBlockquote(node: BlockquoteNode, key: string) {
 	const style: Record<string, unknown> = {
@@ -14,7 +15,7 @@ export function renderBlockquote(node: BlockquoteNode, key: string) {
 	if (node.style.bg != null) style['backgroundColor'] = node.style.bg
 
 	return (
-		<box key={key} style={style}>
+		<box key={key} {...sourceLineId(node.sourceLine)} style={style}>
 			{renderChildren(node.children, key)}
 		</box>
 	)

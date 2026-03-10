@@ -40,6 +40,7 @@ export interface HeadingNode {
 
 export interface ParagraphNode {
 	type: 'paragraph'
+	sourceLine?: number
 	style: BlockStyle
 	children: IRNode[]
 }
@@ -48,12 +49,14 @@ export interface CodeBlockNode {
 	type: 'codeBlock'
 	code: string
 	language?: string
+	sourceLine?: number
 	style: BlockStyle
 	children: IRNode[]
 }
 
 export interface BlockquoteNode {
 	type: 'blockquote'
+	sourceLine?: number
 	style: BlockStyle
 	children: IRNode[]
 }
@@ -62,6 +65,7 @@ export interface ListNode {
 	type: 'list'
 	ordered: boolean
 	start?: number
+	sourceLine?: number
 	children: IRNode[]
 }
 
@@ -75,6 +79,7 @@ export interface ListItemNode {
 export interface TableNode {
 	type: 'table'
 	alignments: ('left' | 'center' | 'right' | null)[]
+	sourceLine?: number
 	style: BlockStyle
 	children: TableRowNode[]
 }
@@ -94,12 +99,14 @@ export interface TableCellNode {
 
 export interface ThematicBreakNode {
 	type: 'thematicBreak'
+	sourceLine?: number
 	style: { char: string; color: string }
 }
 
 export interface UnknownBlockNode {
 	type: 'unknown'
 	tagName: string
+	sourceLine?: number
 	style: BlockStyle
 	children: IRNode[]
 }
@@ -193,6 +200,7 @@ export interface CustomNodeDataMap {
 // optional for generic CustomNode<string> to stay compatible with IRNode union
 export type CustomNode<T extends string = string> = {
 	type: T
+	sourceLine?: number
 	children?: IRNode[]
 	style?: Record<string, unknown>
 } & (T extends keyof CustomNodeDataMap

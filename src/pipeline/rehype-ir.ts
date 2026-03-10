@@ -68,6 +68,12 @@ function getListItemBullet(node: Element, ancestors: Element[]): string {
 	return `${bullets[(depth - 1) % bullets.length]} `
 }
 
+// -- source line extraction (hast 1-based → IR 0-based) --
+
+function getSourceLine(node: Element): number | undefined {
+	return node.position?.start.line != null ? node.position.start.line - 1 : undefined
+}
+
 // -- heading level extraction --
 
 function getHeadingLevel(tagName: string): 1 | 2 | 3 | 4 | 5 | 6 {
@@ -122,8 +128,7 @@ function withAncestors(state: CompilerState, node: Element): IRNode[] {
 function compileHeading(state: CompilerState, node: Element): IRNode {
 	const level = getHeadingLevel(node.tagName)
 	const tokens = state.theme.heading.levels[level]
-	// hast position is 1-based, convert to 0-based for scrollToLine
-	const sourceLine = node.position?.start.line != null ? node.position.start.line - 1 : undefined
+	const sourceLine = getSourceLine(node)
 	return {
 		type: 'heading',
 		level,
@@ -143,8 +148,10 @@ function compileParagraph(state: CompilerState, node: Element): IRNode {
 	) {
 		return first
 	}
+	const sourceLine = getSourceLine(node)
 	return {
 		type: 'paragraph',
+		...(sourceLine != null ? { sourceLine } : {}),
 		style: { fg: state.theme.paragraph.textColor },
 		children,
 	}
@@ -153,18 +160,24 @@ function compileParagraph(state: CompilerState, node: Element): IRNode {
 function compilePre(state: CompilerState, node: Element): IRNode {
 	const { theme } = state
 	const language = extractLanguage(node)
+	const sourceLine = getSourceLine(node)
 	// math display: <pre><code class="language-math math-display">
 	if (language === 'math') {
-		return compileMathDisplay(node, theme)
+		const result = compileMathDisplay(node, theme)
+		if (sourceLine != null) result.sourceLine = sourceLine
+		return result
 	}
 	// mermaid: ```mermaid
 	if (language === 'mermaid') {
-		return compileMermaidBlock(node, theme)
+		const result = compileMermaidBlock(node, theme)
+		if (sourceLine != null) result.sourceLine = sourceLine
+		return result
 	}
 	return {
 		type: 'codeBlock',
 		code: sanitizeForTerminal(extractCode(node)),
 		language,
+		...(sourceLine != null ? { sourceLine } : {}),
 		style: {
 			fg: theme.codeBlock.textColor,
 			bg: theme.codeBlock.backgroundColor,
@@ -178,8 +191,10 @@ function compilePre(state: CompilerState, node: Element): IRNode {
 
 function compileBlockquote(state: CompilerState, node: Element): IRNode {
 	const { theme } = state
+	const sourceLine = getSourceLine(node)
 	return {
 		type: 'blockquote',
+		...(sourceLine != null ? { sourceLine } : {}),
 		style: {
 			fg: theme.blockquote.textColor,
 			borderColor: theme.blockquote.borderColor,
@@ -193,7 +208,14 @@ function compileList(state: CompilerState, node: Element): IRNode {
 	const ordered = node.tagName === 'ol'
 	const start =
 		ordered && typeof node.properties?.['start'] === 'number' ? node.properties['start'] : undefined
-	return { type: 'list', ordered, start, children: withAncestors(state, node) }
+	const sourceLine = getSourceLine(node)
+	return {
+		type: 'list',
+		ordered,
+		start,
+		...(sourceLine != null ? { sourceLine } : {}),
+		children: withAncestors(state, node),
+	}
 }
 
 function compileListItem(state: CompilerState, node: Element): IRNode {
@@ -265,9 +287,11 @@ function compileTable(state: CompilerState, node: Element): IRNode {
 	}
 	state.ancestors.pop()
 
+	const sourceLine = getSourceLine(node)
 	return {
 		type: 'table',
 		alignments,
+		...(sourceLine != null ? { sourceLine } : {}),
 		style: { borderColor: state.theme.table.borderColor },
 		children: rows,
 	}
@@ -340,8 +364,10 @@ function compileElement(state: CompilerState, node: Element): IRNode | undefined
 	if (blockCompiler != null) return blockCompiler(state, node)
 
 	if (tagName === 'hr') {
+		const sourceLine = getSourceLine(node)
 		return {
 			type: 'thematicBreak',
+			...(sourceLine != null ? { sourceLine } : {}),
 			style: { color: theme.horizontalRule.color, char: theme.horizontalRule.char },
 		}
 	}
@@ -352,9 +378,11 @@ function compileElement(state: CompilerState, node: Element): IRNode | undefined
 	// unknown block element
 	if (HAST_BLOCK_TAGS.has(tagName)) {
 		state.file.message(`unknown element: <${tagName}>`, { place: node.position })
+		const sourceLine = getSourceLine(node)
 		return {
 			type: 'unknown',
 			tagName,
+			...(sourceLine != null ? { sourceLine } : {}),
 			style: { fg: theme.fallback.textColor },
 			children: withAncestors(state, node),
 		}

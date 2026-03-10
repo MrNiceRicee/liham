@@ -29,9 +29,10 @@ export function SearchBar({ searchState, matchCount, theme }: Readonly<SearchBar
 	const hasNoMatches = matchCount === 0 && query.length > 0
 
 	let countLabel: string
-	let hintLabel = ''
+	let hintLabel: string
 	if (isInput) {
 		countLabel = query.length > 0 ? `${String(matchCount)} matches` : ''
+		hintLabel = 'Enter: search · Esc: cancel'
 	} else {
 		const current = searchState.phase === 'active' ? searchState.currentMatch + 1 : 0
 		countLabel = `${String(current)}/${String(matchCount)}`
