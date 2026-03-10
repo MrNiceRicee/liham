@@ -20,7 +20,6 @@ import {
 	isSplitLayout,
 	type LayoutMode,
 	legendEntries,
-	type MediaModalState,
 	paneDimensions,
 	type ScrollDirection,
 } from '../../app/state.ts'
@@ -52,29 +51,25 @@ import { useSearchHighlight, useTocJump } from './viewer-scroll-hooks.ts'
 import { StatusBar } from './status-bar.tsx'
 import { applyScroll, createMouseHandlers, syncScroll } from './viewer-keys.ts'
 
-function isModalPaused(modal: MediaModalState): boolean {
-	return modal.kind === 'open' && modal.paused
-}
-
 // extracted to reduce App cognitive complexity
 
 function deriveModalState(state: AppState, isViewer: boolean) {
-	const showModal = isViewer && state.mediaModal.kind !== 'closed'
-	const modal = state.mediaModal
-	const mediaIndex = modal.kind === 'open' ? modal.mediaIndex : 0
-	const galleryHidden = modal.kind === 'open' && modal.galleryHidden
-	const galleryFocusIndex = showModal ? mediaIndex : state.mediaFocusIndex
+	const media = state.media
+	const showModal = isViewer && media.kind === 'modal'
+	const mediaIndex = media.kind === 'modal' ? media.mediaIndex : 0
+	const galleryHidden = media.kind === 'modal' && media.galleryHidden
+	const galleryFocusIndex = media.kind !== 'none' ? (showModal ? mediaIndex : media.index) : null
 	const showGallery = isViewer && galleryFocusIndex != null && !galleryHidden
 	return {
 		showModal,
 		mediaIndex,
 		galleryFocusIndex,
 		showGallery,
-		scrollLocked: state.mediaFocusIndex != null || modal.kind !== 'closed',
-		paused: isModalPaused(modal),
+		scrollLocked: media.kind !== 'none',
+		paused: media.kind === 'modal' && media.paused,
 		contentHeight: Math.max(1, state.dimensions.height - 2),
-		restartCount: modal.kind === 'open' ? modal.restartCount : 0,
-		seekOffset: modal.kind === 'open' ? modal.seekOffset : 0,
+		restartCount: media.kind === 'modal' ? media.restartCount : 0,
+		seekOffset: media.kind === 'modal' ? media.seekOffset : 0,
 	}
 }
 
@@ -330,7 +325,7 @@ export function App(props: Readonly<AppProps>) {
 	useKeyboard((key: KeyEvent) => {
 		if (process.env['LIHAM_DEBUG'] === '1') {
 			process.stderr.write(
-				`[app] key=${key.name} mode=${state.mode} modal=${state.mediaModal.kind} paused=${String(state.mediaModal.kind === 'open' && state.mediaModal.paused)} vidDur=${String(videoInfo?.duration ?? 0)}\n`,
+				`[app] key=${key.name} mode=${state.mode} media=${state.media.kind} paused=${String(state.media.kind === 'modal' && state.media.paused)} vidDur=${String(videoInfo?.duration ?? 0)}\n`,
 			)
 		}
 		if (state.mode === 'browser') {
@@ -390,12 +385,12 @@ export function App(props: Readonly<AppProps>) {
 
 	const mediaFocusCtx: MediaFocusContextValue = useMemo(
 		() => ({
-			focusedMediaIndex: state.mediaFocusIndex,
+			focusedMediaIndex: state.media.kind !== 'none' ? state.media.index : null,
 			mediaCount,
 			onMediaClick,
 			focusBorderColor: props.theme.pane.focusedBorderColor,
 		}),
-		[state.mediaFocusIndex, mediaCount, onMediaClick, props.theme.pane.focusedBorderColor],
+		[state.media, mediaCount, onMediaClick, props.theme.pane.focusedBorderColor],
 	)
 
 	const mouseHandlers = createMouseHandlers(state, dispatch, sourceRef, previewRef)
@@ -460,7 +455,7 @@ export function App(props: Readonly<AppProps>) {
 		state.tocState?.kind === 'open' &&
 		viewerState.tocEntries.length > 0 &&
 		state.layout !== 'source-only' &&
-		state.mediaModal.kind === 'closed'
+		state.media.kind !== 'modal'
 
 	const tocElement = showToc ? (
 		<TocPanel

@@ -2,7 +2,7 @@
 
 import { detectAudioBackend } from '../media/audio-backend.ts'
 import { activeLayer } from './active-layer.ts'
-import type { AppState, FocusTarget, LegendPage, MediaModalState } from './state.ts'
+import type { AppState, FocusTarget, LegendPage, MediaOverlay } from './state.ts'
 import { isSplitLayout } from './state.ts'
 
 // cached once per process — Bun.which is cheap but no need to call it per render
@@ -17,12 +17,15 @@ function oppositeFocus(focus: FocusTarget): FocusTarget {
 	return focus === 'source' ? 'preview' : 'source'
 }
 
-function modalLegend(modal: MediaModalState, legendPage: LegendPage): LegendEntry[] {
+function modalLegend(
+	modal: MediaOverlay & { kind: 'modal' },
+	legendPage: LegendPage,
+): LegendEntry[] {
 	if (legendPage === 'off') return [{ key: '?', label: 'help' }]
 	const entries: LegendEntry[] = [
 		{ key: '?', label: 'more' },
 		{ key: 'n/N', label: 'next/prev' },
-		{ key: 'space', label: modal.kind === 'open' && modal.paused ? 'play' : 'pause' },
+		{ key: 'space', label: modal.paused ? 'play' : 'pause' },
 		{ key: '</>', label: 'seek' },
 		{ key: 'r', label: 'replay' },
 		{ key: 'g', label: 'gallery' },
@@ -133,7 +136,7 @@ export function legendEntries(state: AppState): LegendEntry[] {
 		case 'toc':
 			return tocLegend(state.legendPage)
 		case 'modal':
-			return modalLegend(state.mediaModal, state.legendPage)
+			return modalLegend(state.media as MediaOverlay & { kind: 'modal' }, state.legendPage)
 		case 'mediaFocus':
 			return mediaFocusLegend(state.legendPage)
 		case 'viewer':

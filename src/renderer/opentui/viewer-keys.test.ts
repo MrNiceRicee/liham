@@ -6,6 +6,16 @@ import { type AppState, initialState } from '../../app/state.ts'
 
 import { handleViewerKey, VIEWER_KEY_MAP } from './viewer-keys.ts'
 
+const OPEN_MODAL = {
+	kind: 'modal' as const,
+	index: 0,
+	mediaIndex: 0,
+	galleryHidden: false,
+	paused: false,
+	restartCount: 0,
+	seekOffset: 0,
+}
+
 function stateWith(overrides: Partial<AppState>): AppState {
 	return { ...initialState(), ...overrides }
 }
@@ -23,7 +33,7 @@ describe('y key (CopySelection)', () => {
 	})
 
 	test('y returns null when in media focus mode (blocked by MEDIA_FOCUS_ALLOWED)', () => {
-		const s = stateWith({ mediaFocusIndex: 0 })
+		const s = stateWith({ media: { kind: 'focused', index: 0 } })
 		const dispatch = () => {}
 		const action = handleViewerKey(makeKey('y'), s, dispatch, 1)
 		expect(action).toBeNull()
@@ -79,17 +89,7 @@ describe('escape selection priority', () => {
 	})
 
 	test('esc falls through to modal when no selection', () => {
-		const s = stateWith({
-			mediaFocusIndex: 0,
-			mediaModal: {
-				kind: 'open',
-				mediaIndex: 0,
-				galleryHidden: false,
-				paused: false,
-				restartCount: 0,
-				seekOffset: 0,
-			},
-		})
+		const s = stateWith({ media: { ...OPEN_MODAL } })
 		const dispatched: string[] = []
 		const dispatch = (a: { type: string }) => dispatched.push(a.type)
 

@@ -35,8 +35,8 @@ function tryAudioIntercept(
 	mediaNodes: MediaEntry[],
 	onAudioPlay: (entry: MediaEntry) => void,
 ): boolean {
-	if (key.name !== 'return' || state.mediaFocusIndex == null) return false
-	const entry = mediaNodes[state.mediaFocusIndex]
+	if (key.name !== 'return' || state.media.kind === 'none') return false
+	const entry = mediaNodes[state.media.index]
 	if (entry?.node.type !== 'audio') return false
 	onAudioPlay(entry)
 	return true

@@ -7,6 +7,16 @@ function base() {
 	return initialState('preview-only', 'viewer')
 }
 
+const OPEN_MODAL = {
+	kind: 'modal' as const,
+	index: 0,
+	mediaIndex: 0,
+	galleryHidden: false,
+	paused: false,
+	restartCount: 0,
+	seekOffset: 0,
+}
+
 describe('activeLayer', () => {
 	test('browser mode returns browser', () => {
 		expect(activeLayer({ ...base(), mode: 'browser' })).toBe('browser')
@@ -18,14 +28,7 @@ describe('activeLayer', () => {
 				...base(),
 				searchState: { phase: 'input', query: '', cursor: 0 },
 				tocState: { kind: 'open', cursorIndex: 0 },
-				mediaModal: {
-					kind: 'open',
-					mediaIndex: 0,
-					galleryHidden: false,
-					paused: false,
-					restartCount: 0,
-					seekOffset: 0,
-				},
+				media: { ...OPEN_MODAL },
 			}),
 		).toBe('searchInput')
 	})
@@ -45,14 +48,7 @@ describe('activeLayer', () => {
 			activeLayer({
 				...base(),
 				tocState: { kind: 'open', cursorIndex: 0 },
-				mediaModal: {
-					kind: 'open',
-					mediaIndex: 0,
-					galleryHidden: false,
-					paused: false,
-					restartCount: 0,
-					seekOffset: 0,
-				},
+				media: { ...OPEN_MODAL },
 			}),
 		).toBe('toc')
 	})
@@ -65,21 +61,13 @@ describe('activeLayer', () => {
 		expect(
 			activeLayer({
 				...base(),
-				mediaModal: {
-					kind: 'open',
-					mediaIndex: 0,
-					galleryHidden: false,
-					paused: false,
-					restartCount: 0,
-					seekOffset: 0,
-				},
-				mediaFocusIndex: 1,
+				media: { ...OPEN_MODAL, index: 1 },
 			}),
 		).toBe('modal')
 	})
 
 	test('media focus takes priority over viewer', () => {
-		expect(activeLayer({ ...base(), mediaFocusIndex: 0 })).toBe('mediaFocus')
+		expect(activeLayer({ ...base(), media: { kind: 'focused', index: 0 } })).toBe('mediaFocus')
 	})
 
 	test('default is viewer', () => {

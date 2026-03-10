@@ -46,7 +46,7 @@ export const VIEWER_KEY_MAP: Record<
 	},
 	return: (_, state) => {
 		if (state.layout === 'source-only') return null
-		if (state.mediaFocusIndex == null) return null
+		if (state.media.kind === 'none') return null
 		return { type: 'OpenMediaModal' }
 	},
 }
@@ -145,7 +145,7 @@ export function handleViewerKey(
 			renderer.clearSelection()
 			return null
 		}
-		if (state.mediaModal.kind !== 'closed' || state.mediaFocusIndex != null) {
+		if (state.media.kind !== 'none') {
 			dispatch({ type: 'CloseMediaModal' })
 			return null
 		}
@@ -154,7 +154,7 @@ export function handleViewerKey(
 	}
 
 	// media focus mode — lock keys to media navigation only
-	if (state.mediaFocusIndex != null && !MEDIA_FOCUS_ALLOWED.has(key.name)) {
+	if (state.media.kind === 'focused' && !MEDIA_FOCUS_ALLOWED.has(key.name)) {
 		return null
 	}
 

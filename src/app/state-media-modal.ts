@@ -1,6 +1,6 @@
 // media modal sub-reducer — extracted from state.ts for file size and complexity.
 
-import type { AppAction, AppState, MediaModalState } from './state.ts'
+import type { AppAction, AppState, MediaOverlay } from './state.ts'
 
 type MediaModalAction = Extract<
 	AppAction,
@@ -16,13 +16,14 @@ type MediaModalAction = Extract<
 >
 
 function openMediaModal(state: AppState): AppState {
-	if (state.mediaFocusIndex == null) return state
-	const prevHidden = state.mediaModal.kind === 'open' ? state.mediaModal.galleryHidden : false
+	if (state.media.kind === 'none') return state
+	const prevHidden = state.media.kind === 'modal' ? state.media.galleryHidden : false
 	return {
 		...state,
-		mediaModal: {
-			kind: 'open',
-			mediaIndex: state.mediaFocusIndex,
+		media: {
+			kind: 'modal',
+			index: state.media.index,
+			mediaIndex: state.media.index,
 			galleryHidden: prevHidden,
 			paused: false,
 			restartCount: 0,
@@ -32,47 +33,46 @@ function openMediaModal(state: AppState): AppState {
 }
 
 function seekMedia(state: AppState, delta: number, duration: number, elapsed: number): AppState {
-	if (state.mediaModal.kind !== 'open') return state
-	// compute from actual playback position, not state seekOffset
+	if (state.media.kind !== 'modal') return state
 	const newOffset = Math.max(0, Math.min(elapsed + delta, duration))
 	// seeking backward to/past start — replay from beginning even if seekOffset is already 0
 	if (newOffset === 0 && delta < 0) {
 		return {
 			...state,
-			mediaModal: {
-				...state.mediaModal,
+			media: {
+				...state.media,
 				seekOffset: 0,
-				restartCount: state.mediaModal.restartCount + 1,
+				restartCount: state.media.restartCount + 1,
 			},
 		}
 	}
-	if (newOffset === state.mediaModal.seekOffset) return state
+	if (newOffset === state.media.seekOffset) return state
 	return {
 		...state,
-		mediaModal: {
-			...state.mediaModal,
+		media: {
+			...state.media,
 			seekOffset: newOffset,
-			restartCount: state.mediaModal.restartCount + 1,
+			restartCount: state.media.restartCount + 1,
 		},
 	}
 }
 
 function closeMediaModal(state: AppState): AppState {
-	if (state.mediaModal.kind !== 'closed') {
-		return { ...state, mediaModal: { kind: 'closed' } }
+	if (state.media.kind === 'modal') {
+		return { ...state, media: { kind: 'focused', index: state.media.index } }
 	}
-	if (state.mediaFocusIndex != null) {
-		return { ...state, mediaFocusIndex: null }
+	if (state.media.kind === 'focused') {
+		return { ...state, media: { kind: 'none' } }
 	}
 	return state
 }
 
 function withOpenModal(
 	state: AppState,
-	update: (modal: MediaModalState & { kind: 'open' }) => MediaModalState,
+	update: (modal: MediaOverlay & { kind: 'modal' }) => MediaOverlay,
 ): AppState {
-	if (state.mediaModal.kind !== 'open') return state
-	return { ...state, mediaModal: update(state.mediaModal) }
+	if (state.media.kind !== 'modal') return state
+	return { ...state, media: update(state.media) }
 }
 
 export function mediaModalReducer(state: AppState, action: MediaModalAction): AppState {

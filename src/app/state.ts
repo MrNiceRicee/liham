@@ -26,10 +26,12 @@ export interface BrowserState {
 	scanVersion: number
 }
 
-export type MediaModalState =
-	| { kind: 'closed' }
+export type MediaOverlay =
+	| { kind: 'none' }
+	| { kind: 'focused'; index: number }
 	| {
-			kind: 'open'
+			kind: 'modal'
+			index: number
 			mediaIndex: number
 			galleryHidden: boolean
 			paused: boolean
@@ -49,8 +51,7 @@ export interface AppState {
 	currentFile?: string
 	fromBrowser: boolean
 	fileDeleted: boolean
-	mediaFocusIndex: number | null
-	mediaModal: MediaModalState
+	media: MediaOverlay
 	searchState: SearchState | null
 	tocState: TocState | null
 	volume: number
@@ -206,8 +207,7 @@ function returnToBrowser(state: AppState): AppState {
 		mode: 'browser',
 		focus: 'preview',
 		fileDeleted: false,
-		mediaFocusIndex: null,
-		mediaModal: { kind: 'closed' },
+		media: { kind: 'none' },
 		searchState: null,
 		tocState: null,
 	}
@@ -294,20 +294,30 @@ type MediaFocusAction = Extract<
 	{ type: 'FocusNextMedia' | 'FocusPrevMedia' | 'FocusMedia' }
 >
 
+function focusIndex(media: MediaOverlay): number | null {
+	return media.kind === 'none' ? null : media.index
+}
+
 function mediaFocusReducer(state: AppState, action: MediaFocusAction): AppState {
 	switch (action.type) {
 		case 'FocusNextMedia': {
 			if (action.mediaCount === 0) return state
-			const next = ((state.mediaFocusIndex ?? -1) + 1) % action.mediaCount
-			return { ...state, mediaFocusIndex: next }
+			const cur = focusIndex(state.media) ?? -1
+			const next = (cur + 1) % action.mediaCount
+			if (state.media.kind === 'modal') return { ...state, media: { ...state.media, index: next } }
+			return { ...state, media: { kind: 'focused', index: next } }
 		}
 		case 'FocusPrevMedia': {
 			if (action.mediaCount === 0) return state
-			const prev = ((state.mediaFocusIndex ?? 0) - 1 + action.mediaCount) % action.mediaCount
-			return { ...state, mediaFocusIndex: prev }
+			const cur = focusIndex(state.media) ?? 0
+			const prev = (cur - 1 + action.mediaCount) % action.mediaCount
+			if (state.media.kind === 'modal') return { ...state, media: { ...state.media, index: prev } }
+			return { ...state, media: { kind: 'focused', index: prev } }
 		}
 		case 'FocusMedia':
-			return { ...state, mediaFocusIndex: action.index }
+			if (state.media.kind === 'modal')
+				return { ...state, media: { ...state.media, index: action.index } }
+			return { ...state, media: { kind: 'focused', index: action.index } }
 	}
 }
 
@@ -409,8 +419,7 @@ export function initialState(
 		browser: initialBrowserState(),
 		fromBrowser: false,
 		fileDeleted: false,
-		mediaFocusIndex: null,
-		mediaModal: { kind: 'closed' },
+		media: { kind: 'none' },
 		searchState: null,
 		tocState: null,
 		volume: 100,

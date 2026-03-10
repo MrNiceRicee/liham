@@ -14,9 +14,9 @@ describe('search state machine', () => {
 	})
 
 	test('SearchOpen clears media focus', () => {
-		const s = stateWith({ mediaFocusIndex: 2 })
+		const s = stateWith({ media: { kind: 'focused', index: 2 } })
 		const next = appReducer(s, { type: 'SearchOpen' })
-		expect(next.mediaFocusIndex).toBeNull()
+		expect(next.media).toEqual({ kind: 'none' })
 		expect(next.searchState).toEqual({ phase: 'input', query: '', cursor: 0 })
 	})
 

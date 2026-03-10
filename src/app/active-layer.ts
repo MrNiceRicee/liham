@@ -17,7 +17,7 @@ export function activeLayer(state: AppState): ActiveLayer {
 	if (state.searchState?.phase === 'input') return 'searchInput'
 	if (state.searchState?.phase === 'active') return 'searchActive'
 	if (state.tocState != null) return 'toc'
-	if (state.mediaModal.kind !== 'closed') return 'modal'
-	if (state.mediaFocusIndex != null) return 'mediaFocus'
+	if (state.media.kind === 'modal') return 'modal'
+	if (state.media.kind === 'focused') return 'mediaFocus'
 	return 'viewer'
 }

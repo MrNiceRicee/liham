@@ -54,7 +54,7 @@ export function searchReducer(state: AppState, action: SearchAction): AppState {
 			return {
 				...state,
 				searchState: { phase: 'input', query: '', cursor: 0 },
-				mediaFocusIndex: null,
+				media: { kind: 'none' },
 			}
 
 		case 'SearchUpdate': {
