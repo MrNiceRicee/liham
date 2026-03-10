@@ -158,9 +158,9 @@ describe('media modal actions', () => {
 })
 
 describe('media legend entries', () => {
-	test('modal open shows modal legend with pause', () => {
+	test('modal open shows modal legend with pause for video', () => {
 		const s = stateWith({ media: { ...OPEN_MODAL } })
-		const entries = legendEntries(s)
+		const entries = legendEntries(s, 'video')
 		expect(entries.some((e) => e.key === 'esc' && e.label === 'close')).toBe(true)
 		expect(entries.some((e) => e.key === 'n/N')).toBe(true)
 		expect(entries.some((e) => e.key === 'g' && e.label === 'gallery')).toBe(true)
@@ -168,9 +168,20 @@ describe('media legend entries', () => {
 		expect(entries.some((e) => e.key === 'r' && e.label === 'replay')).toBe(true)
 	})
 
+	test('modal open shows no playback controls for image', () => {
+		const s = stateWith({ media: { ...OPEN_MODAL } })
+		const entries = legendEntries(s, 'image')
+		expect(entries.some((e) => e.key === 'esc' && e.label === 'close')).toBe(true)
+		expect(entries.some((e) => e.key === 'n/N')).toBe(true)
+		expect(entries.some((e) => e.key === 'g' && e.label === 'gallery')).toBe(true)
+		expect(entries.some((e) => e.key === 'space')).toBe(false)
+		expect(entries.some((e) => e.key === '</>')).toBe(false)
+		expect(entries.some((e) => e.key === 'r')).toBe(false)
+	})
+
 	test('modal paused shows play in legend', () => {
 		const s = stateWith({ media: { ...OPEN_MODAL, paused: true } })
-		const entries = legendEntries(s)
+		const entries = legendEntries(s, 'video')
 		expect(entries.some((e) => e.key === 'space' && e.label === 'play')).toBe(true)
 	})
 
@@ -289,9 +300,9 @@ describe('SeekMedia action', () => {
 })
 
 describe('modal legend with seek', () => {
-	test('legend shows seek entry for open modal', () => {
+	test('legend shows seek entry for open modal with video', () => {
 		const s = stateWith({ media: { ...OPEN_MODAL } })
-		const entries = legendEntries(s)
+		const entries = legendEntries(s, 'video')
 		expect(entries.some((e) => e.key === '</>' && e.label === 'seek')).toBe(true)
 	})
 })

@@ -20,17 +20,21 @@ function oppositeFocus(focus: FocusTarget): FocusTarget {
 function modalLegend(
 	modal: MediaOverlay & { kind: 'modal' },
 	legendPage: LegendPage,
+	mediaType?: string,
 ): LegendEntry[] {
 	if (legendPage === 'off') return [{ key: '?', label: 'help' }]
+	const isPlayable = mediaType === 'video' || mediaType === 'audio'
 	const entries: LegendEntry[] = [
 		{ key: '?', label: 'more' },
 		{ key: 'n/N', label: 'next/prev' },
-		{ key: 'space', label: modal.paused ? 'play' : 'pause' },
-		{ key: '</>', label: 'seek' },
-		{ key: 'r', label: 'replay' },
-		{ key: 'g', label: 'gallery' },
 	]
-	if (detectedBackend === 'mpv') {
+	if (isPlayable) {
+		entries.push({ key: 'space', label: modal.paused ? 'play' : 'pause' })
+		entries.push({ key: '</>', label: 'seek' })
+		entries.push({ key: 'r', label: 'replay' })
+	}
+	entries.push({ key: 'g', label: 'gallery' })
+	if (isPlayable && detectedBackend === 'mpv') {
 		entries.push({ key: '+/-', label: 'volume' })
 		entries.push({ key: 'm', label: 'mute' })
 	}
@@ -125,7 +129,7 @@ function searchActiveLegend(legendPage: LegendPage): LegendEntry[] {
 	]
 }
 
-export function legendEntries(state: AppState): LegendEntry[] {
+export function legendEntries(state: AppState, mediaType?: string): LegendEntry[] {
 	switch (activeLayer(state)) {
 		case 'browser':
 			return browserLegend(state.legendPage)
@@ -136,7 +140,11 @@ export function legendEntries(state: AppState): LegendEntry[] {
 		case 'toc':
 			return tocLegend(state.legendPage)
 		case 'modal':
-			return modalLegend(state.media as MediaOverlay & { kind: 'modal' }, state.legendPage)
+			return modalLegend(
+				state.media as MediaOverlay & { kind: 'modal' },
+				state.legendPage,
+				mediaType,
+			)
 		case 'mediaFocus':
 			return mediaFocusLegend(state.legendPage)
 		case 'viewer':
