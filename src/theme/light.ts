@@ -82,9 +82,10 @@ export const lightTheme: ThemeTokens = {
 		textColor: '#343b59',
 	},
 	mermaid: {
-		borderColor: '#9699a3',
+		arrowColor: '#34548a',
+		borderColor: '#34548a',
 		errorColor: '#8c8fa1',
-		labelColor: '#34548a',
+		lineColor: '#8c8fa1',
 		textColor: '#343b59',
 	},
 }

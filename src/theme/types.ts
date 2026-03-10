@@ -93,9 +93,10 @@ export interface MathTokens {
 }
 
 export interface MermaidTokens {
+	arrowColor: string
 	borderColor: string
 	errorColor: string
-	labelColor: string
+	lineColor: string
 	textColor: string
 }
 

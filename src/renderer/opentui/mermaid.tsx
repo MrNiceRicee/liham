@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 
 import type { CustomNode } from '../../ir/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
+import { parseAnsiSegments } from './ansi-spans.ts'
 
 export function renderMermaidBlock(
 	node: CustomNode<'mermaid'>,
@@ -27,9 +28,21 @@ export function renderMermaidBlock(
 		)
 	}
 
+	// parse truecolor ANSI into colored spans
+	const segments = parseAnsiSegments(node.data.rendered)
+	const spans = segments.map((seg, i) =>
+		seg.fg != null ? (
+			<span key={String(i)} fg={seg.fg}>
+				{seg.text}
+			</span>
+		) : (
+			seg.text
+		),
+	)
+
 	return (
 		<box key={key} style={boxStyle} border title="mermaid">
-			<text fg={theme.mermaid.textColor}>{node.data.rendered}</text>
+			<text>{spans}</text>
 		</box>
 	)
 }

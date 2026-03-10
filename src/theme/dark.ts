@@ -81,9 +81,10 @@ export const darkTheme: ThemeTokens = {
 		textColor: '#c0caf5',
 	},
 	mermaid: {
-		borderColor: '#414868',
+		arrowColor: '#7aa2f7',
+		borderColor: '#7aa2f7',
 		errorColor: '#565f89',
-		labelColor: '#7aa2f7',
+		lineColor: '#565f89',
 		textColor: '#c0caf5',
 	},
 }
