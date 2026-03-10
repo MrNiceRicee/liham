@@ -32,7 +32,7 @@ liham README.md    # preview a file
 liham docs/        # browse a directory
 ```
 
-Press `?` for keybindings.
+Press `?` for keybindings. Enable [shell completions](#shell-completions) for tab autocompletion.
 
 ## Features
 
