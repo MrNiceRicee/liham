@@ -49,6 +49,32 @@ Press `?` for keybindings.
 - **File browser** — fuzzy filter, live file watching
 - **Themes** — auto-detect dark/light from terminal background
 
+## How It Works
+
+liham uses a [unified.js](https://unifiedjs.com) pipeline to transform markdown into terminal UI:
+
+```mermaid
+graph LR
+    A[Markdown] --> B[remark-parse]
+    B --> C[remark-math]
+    C --> D[remark-gfm]
+    D --> E[remark-rehype]
+    E --> F[rehype-highlight]
+    F --> G[rehype-ir]
+    G --> H[IR Nodes]
+    H --> I[React / OpenTUI]
+```
+
+| Stage | What it does |
+|---|---|
+| **remark-parse** | Parses markdown into an mdast syntax tree |
+| **remark-math** | Extracts LaTeX `$...$` and `$$...$$` blocks |
+| **remark-gfm** | Adds tables, task lists, strikethrough, autolinks |
+| **remark-rehype** | Converts mdast → hast (HTML AST) |
+| **rehype-highlight** | Applies syntax highlighting to code blocks |
+| **rehype-ir** | Compiles hast into liham's intermediate representation |
+| **React / OpenTUI** | Renders IR nodes as terminal UI components |
+
 ## Keybindings
 
 | Key | Action | Context |
