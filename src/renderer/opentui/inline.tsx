@@ -7,10 +7,13 @@ import { Fragment, type ReactNode } from 'react'
 import type { CoreIRNode, ImageNode, InlineStyle, IRNode, LinkNode } from '../../ir/types.ts'
 import { isCustomNode } from '../../ir/types.ts'
 import { renderMathInline } from './math.tsx'
+import { renderSearchText } from './search-highlight-context.tsx'
 
 function renderLink(node: LinkNode, key: string): ReactNode {
 	const children = renderInlineChildren(node.children, key)
-	if (node.url.length === 0) {
+	if (node.url.length === 0 || node.url.startsWith('#')) {
+		// empty or fragment-only URLs: render as styled underlined text.
+		// fragment URLs (#heading) can't be navigated via OSC 8 — use TOC (t) instead.
 		const props: Record<string, unknown> = {}
 		if (node.style.fg != null) props['fg'] = node.style.fg
 		return (
@@ -44,7 +47,7 @@ function renderInlineCode(style: InlineStyle, value: string, key: string): React
 	if (style.fg != null) props['fg'] = style.fg
 	return (
 		<span key={key} {...props}>
-			{value}
+			{renderSearchText(value, undefined, key)}
 		</span>
 	)
 }
@@ -55,14 +58,7 @@ export function renderInlineNode(node: IRNode, key: string): ReactNode {
 
 	switch (core.type) {
 		case 'text':
-			if (core.style?.fg != null) {
-				return (
-					<span key={key} fg={core.style.fg}>
-						{core.value}
-					</span>
-				)
-			}
-			return core.value
+			return renderSearchText(core.value, core.style?.fg, key)
 
 		case 'strong':
 			return <strong key={key}>{renderInlineChildren(core.children, key)}</strong>

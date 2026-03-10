@@ -49,13 +49,19 @@ function navigateMatch(state: AppState, delta: number): AppState {
 
 export function searchReducer(state: AppState, action: SearchAction): AppState {
 	switch (action.type) {
-		case 'SearchOpen':
+		case 'SearchOpen': {
 			if (state.mode === 'browser') return state
+			// auto-show source pane during search so highlights are visible
+			const needsLayoutSwitch = state.layout === 'preview-only' || state.layout === 'source-only'
 			return {
 				...state,
 				searchState: { phase: 'input', query: '', cursor: 0 },
 				media: { kind: 'none' },
+				...(needsLayoutSwitch
+					? { preSearchLayout: state.layout, layout: 'side', focus: 'source' as const }
+					: { focus: 'source' as const }),
 			}
+		}
 
 		case 'SearchUpdate': {
 			if (state.searchState == null) return state
@@ -72,7 +78,16 @@ export function searchReducer(state: AppState, action: SearchAction): AppState {
 		case 'SearchPrev':
 			return navigateMatch(state, -1)
 
-		case 'SearchClose':
-			return { ...state, searchState: null }
+		case 'SearchClose': {
+			// restore pre-search layout if we switched
+			const restored = state.preSearchLayout
+			const result: AppState = { ...state, searchState: null }
+			if (restored != null) {
+				result.layout = restored
+				delete result.preSearchLayout
+				if (restored === 'preview-only') result.focus = 'preview'
+			}
+			return result
+		}
 	}
 }

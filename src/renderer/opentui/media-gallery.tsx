@@ -127,8 +127,10 @@ export function MediaGallery({
 }: MediaGalleryProps): ReactNode {
 	if (mediaNodes.length === 0) return null
 
+	const focusedNode = mediaNodes[focusedIndex]?.node
+	const isVideo = focusedNode?.type === 'video'
 	const hasInfo = frameInfo != null
-	const hasProgress = videoInfo != null
+	const hasProgress = videoInfo != null && isVideo
 	const maxVisible = Math.min(mediaNodes.length, 8)
 	const galleryHeight = maxVisible + 3 + (hasInfo ? 1 : 0) + (hasProgress ? 1 : 0)
 	const galleryWidth = Math.min(40, Math.floor(termWidth * 0.4))

@@ -523,11 +523,32 @@ export function MediaModal({
 	onVideoInfo,
 }: MediaModalProps): ReactNode {
 	const entry = mediaNodes[mediaIndex]
-	if (entry == null) return null
-
-	const node = entry.node
-	const url = mediaUrl(node)
+	const node = entry?.node
+	const url = node != null ? mediaUrl(node) : undefined
 	const ctx = useContext(ImageContext)
+
+	const isVideo = node?.type === 'video' && mediaCapabilities.canPlayVideo
+	const isAudio = node?.type === 'audio'
+
+	// clear video playback info when not viewing video (prevents lingering timeline)
+	useEffect(() => {
+		if (!isVideo) onVideoInfo(null)
+	}, [isVideo, mediaIndex])
+
+	// audio-only playback — uses audio backend (mpv or ffplay) when an audio node is shown
+	useEffect(() => {
+		if (!isAudio || url == null) return
+		const basePath = ctx?.basePath ?? process.cwd()
+		const absPath = resolve(basePath, url)
+		const backendKind = detectAudioBackend()
+		const backend = backendKind === 'mpv' ? createMpvBackend() : createFfplayBackend()
+		void backend.play(absPath, basePath)
+		return () => {
+			backend.kill()
+		}
+	}, [isAudio, url, mediaIndex])
+
+	if (node == null) return null
 
 	const renderContent = () => {
 		if (node.type === 'image') {
@@ -543,7 +564,7 @@ export function MediaModal({
 				/>
 			)
 		}
-		if (node.type === 'video' && mediaCapabilities.canPlayVideo) {
+		if (isVideo) {
 			return (
 				<ModalVideoContent
 					src={url ?? ''}

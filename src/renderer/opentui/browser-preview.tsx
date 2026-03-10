@@ -8,6 +8,7 @@ import { extractError } from '../../utils/error.ts'
 import { paneDimensions } from '../../app/state.ts'
 import type { FuzzyMatch } from '../../browser/fuzzy.ts'
 import { scanDirectory } from '../../browser/scanner.ts'
+import type { IRNode } from '../../ir/types.ts'
 import { processMarkdown } from '../../pipeline/processor.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import { createDirectoryWatcher, createFileWatcher } from '../../watcher/watcher.ts'
@@ -211,6 +212,7 @@ export function openFileFromBrowser(
 			setViewerState({
 				content: rendered,
 				raw: markdown,
+				ir: result.value,
 				mediaNodes,
 				tocEntries,
 				estimatedTotalHeight,
@@ -221,9 +223,10 @@ export function openFileFromBrowser(
 	})()
 }
 
-type ViewerState = {
+export type ViewerState = {
 	content: ReactNode
 	raw: string
+	ir: IRNode | null
 	mediaNodes: MediaEntry[]
 	tocEntries: TocEntry[]
 	estimatedTotalHeight: number
@@ -278,6 +281,7 @@ export function reloadViewerFile(
 			ctx.setViewerState({
 				content: rendered,
 				raw: markdown,
+				ir: result.value,
 				mediaNodes,
 				tocEntries,
 				estimatedTotalHeight,

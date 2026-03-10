@@ -70,6 +70,7 @@ export async function boot(ctx: BootContext): Promise<void> {
 					mode="viewer"
 					content={content}
 					raw={ctx.raw}
+					ir={ctx.ir}
 					mediaNodes={mediaNodes}
 					tocEntries={tocEntries}
 					estimatedTotalHeight={estimatedTotalHeight}

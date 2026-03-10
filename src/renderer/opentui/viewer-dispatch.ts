@@ -6,7 +6,6 @@ import { activeLayer } from '../../app/active-layer.ts'
 import type { AppAction, AppState } from '../../app/state.ts'
 import { handleFloatingPanelKey } from './floating-panel.tsx'
 import { clearImageCache } from './image.tsx'
-import type { MediaEntry } from './index.tsx'
 import { handleSearchKey } from './search-keys.ts'
 import { handleModalKey, handleViewerKey } from './viewer-keys.ts'
 
@@ -29,26 +28,11 @@ function dispatchTocKey(
 	return true
 }
 
-function tryAudioIntercept(
-	key: KeyEvent,
-	state: AppState,
-	mediaNodes: MediaEntry[],
-	onAudioPlay: (entry: MediaEntry) => void,
-): boolean {
-	if (key.name !== 'return' || state.media.kind === 'none') return false
-	const entry = mediaNodes[state.media.index]
-	if (entry?.node.type !== 'audio') return false
-	onAudioPlay(entry)
-	return true
-}
-
 export function dispatchViewerKey(
 	key: KeyEvent,
 	state: AppState,
 	dispatch: (action: AppAction) => void,
 	mediaCount: number,
-	mediaNodes: MediaEntry[],
-	onAudioPlay: (entry: MediaEntry) => void,
 	onAction: (action: AppAction) => void,
 	videoDuration: number,
 	videoElapsed: number,
@@ -68,9 +52,6 @@ export function dispatchViewerKey(
 
 	// guard: ToggleToc no-op when no headings or modal open
 	if (key.name === 't' && layer === 'viewer' && tocEntryCount === 0) return
-
-	// audio intercept — play directly instead of opening modal
-	if (tryAudioIntercept(key, state, mediaNodes, onAudioPlay)) return
 
 	const action =
 		layer === 'modal'

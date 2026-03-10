@@ -53,6 +53,7 @@ export interface AppState {
 	fileDeleted: boolean
 	media: MediaOverlay
 	searchState: SearchState | null
+	preSearchLayout?: LayoutMode // saved layout to restore when search closes
 	tocState: TocState | null
 	volume: number
 	muted: boolean
@@ -304,19 +305,44 @@ function mediaFocusReducer(state: AppState, action: MediaFocusAction): AppState 
 			if (action.mediaCount === 0) return state
 			const cur = focusIndex(state.media) ?? -1
 			const next = (cur + 1) % action.mediaCount
-			if (state.media.kind === 'modal') return { ...state, media: { ...state.media, index: next } }
+			if (state.media.kind === 'modal')
+				return {
+					...state,
+					media: {
+						...state.media,
+						index: next,
+						mediaIndex: next,
+						paused: false,
+						seekOffset: 0,
+						restartCount: state.media.restartCount + 1,
+					},
+				}
 			return { ...state, media: { kind: 'focused', index: next } }
 		}
 		case 'FocusPrevMedia': {
 			if (action.mediaCount === 0) return state
 			const cur = focusIndex(state.media) ?? 0
 			const prev = (cur - 1 + action.mediaCount) % action.mediaCount
-			if (state.media.kind === 'modal') return { ...state, media: { ...state.media, index: prev } }
+			if (state.media.kind === 'modal')
+				return {
+					...state,
+					media: {
+						...state.media,
+						index: prev,
+						mediaIndex: prev,
+						paused: false,
+						seekOffset: 0,
+						restartCount: state.media.restartCount + 1,
+					},
+				}
 			return { ...state, media: { kind: 'focused', index: prev } }
 		}
 		case 'FocusMedia':
 			if (state.media.kind === 'modal')
-				return { ...state, media: { ...state.media, index: action.index } }
+				return {
+					...state,
+					media: { ...state.media, index: action.index, mediaIndex: action.index },
+				}
 			return { ...state, media: { kind: 'focused', index: action.index } }
 	}
 }

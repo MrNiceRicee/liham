@@ -24,7 +24,8 @@ import {
 	type ScrollDirection,
 } from '../../app/state.ts'
 import { fuzzyFilter } from '../../browser/fuzzy.ts'
-import { killActiveAudio, playAudio } from '../../media/ffplay.ts'
+import type { IRNode } from '../../ir/types.ts'
+import { killActiveAudio } from '../../media/ffplay.ts'
 import type { MediaCapabilities } from '../../media/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import { browserKeyHandler } from './browser-keys.ts'
@@ -39,7 +40,7 @@ import {
 	updateBrowserPreview,
 } from './browser-preview.tsx'
 import { ImageContext, type ImageContextValue } from './image-context.tsx'
-import type { MediaEntry } from './index.tsx'
+import { type MediaEntry, renderToOpenTUIWithMedia, setSearchState } from './index.tsx'
 import type { TocEntry } from './toc.ts'
 import { renderBrowserLayout, renderViewerLayout } from './layout.tsx'
 import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-context.tsx'
@@ -53,12 +54,18 @@ import { applyScroll, createMouseHandlers, syncScroll } from './viewer-keys.ts'
 
 // extracted to reduce App cognitive complexity
 
+function currentMediaType(state: AppState, mediaNodes: MediaEntry[]): string | undefined {
+	if (state.media.kind !== 'modal') return undefined
+	return mediaNodes[state.media.mediaIndex]?.node.type
+}
+
 function deriveModalState(state: AppState, isViewer: boolean) {
 	const media = state.media
 	const showModal = isViewer && media.kind === 'modal'
 	const mediaIndex = media.kind === 'modal' ? media.mediaIndex : 0
 	const galleryHidden = media.kind === 'modal' && media.galleryHidden
-	const galleryFocusIndex = media.kind !== 'none' ? (showModal ? mediaIndex : media.index) : null
+	let galleryFocusIndex: number | null = null
+	if (media.kind !== 'none') galleryFocusIndex = showModal ? mediaIndex : media.index
 	const showGallery = isViewer && galleryFocusIndex != null && !galleryHidden
 	return {
 		showModal,
@@ -110,21 +117,36 @@ function dispatchAction(
 	if (action.type === 'Scroll') handleScroll(action.direction)
 }
 
-function playMediaAudio(entry: MediaEntry, currentFile: string | undefined, canPlay: boolean) {
-	if (entry.node.type !== 'audio' || !canPlay) return
-	const basePath = currentFile != null ? dirname(currentFile) : process.cwd()
-	const src = entry.node.src
-	if (src == null) return
-	void playAudio(src, basePath)
+// -- extracted hooks to reduce App cognitive complexity --
+
+function useClearOnMediaChange(
+	state: AppState,
+	setVideoInfo: (v: VideoPlaybackInfo | null) => void,
+	setModalFrameInfo: (v: FrameInfo | null) => void,
+) {
+	const index = state.media.kind === 'modal' ? state.media.mediaIndex : -1
+	const prevRef = useRef(index)
+	if (index !== prevRef.current) {
+		prevRef.current = index
+		setVideoInfo(null)
+		setModalFrameInfo(null)
+	}
 }
 
-// -- extracted hooks to reduce App cognitive complexity --
+function useClearSearchOnClose(searchQuery: string) {
+	const prevRef = useRef(searchQuery)
+	if (searchQuery.length === 0 && prevRef.current.length > 0) {
+		setSearchState(undefined)
+	}
+	prevRef.current = searchQuery
+}
 
 type AppProps =
 	| {
 			mode: 'viewer'
 			content: ReactNode
 			raw: string
+			ir: IRNode
 			mediaNodes: MediaEntry[]
 			tocEntries: TocEntry[]
 			estimatedTotalHeight: number
@@ -149,6 +171,7 @@ function initialViewerState(props: Readonly<AppProps>) {
 		return {
 			content: props.content,
 			raw: props.raw,
+			ir: props.ir as IRNode | null,
 			mediaNodes: props.mediaNodes,
 			tocEntries: props.tocEntries,
 			estimatedTotalHeight: props.estimatedTotalHeight,
@@ -156,6 +179,7 @@ function initialViewerState(props: Readonly<AppProps>) {
 	return {
 		content: null as ReactNode,
 		raw: '',
+		ir: null as IRNode | null,
 		mediaNodes: [] as MediaEntry[],
 		tocEntries: [] as TocEntry[],
 		estimatedTotalHeight: 0,
@@ -191,6 +215,9 @@ export function App(props: Readonly<AppProps>) {
 
 	// video playback info — elapsed time, duration for progress bar
 	const [videoInfo, setVideoInfo] = useState<VideoPlaybackInfo | null>(null)
+
+	// clear stale playback info when media index changes (synchronous during render)
+	useClearOnMediaChange(state, setVideoInfo, setModalFrameInfo)
 
 	// unified viewer content — mutable state for live reload
 	const [viewerState, setViewerState] = useState(() => initialViewerState(props))
@@ -301,15 +328,6 @@ export function App(props: Readonly<AppProps>) {
 		[props.theme, state.dimensions, state.layout],
 	)
 
-	// -- audio playback (audio-only nodes play directly via ffplay) --
-
-	const handleAudioPlay = useCallback(
-		(entry: MediaEntry) => {
-			playMediaAudio(entry, currentFile, props.mediaCapabilities.canPlayAudio)
-		},
-		[currentFile, props.mediaCapabilities.canPlayAudio],
-	)
-
 	// search highlight + scroll-to-match + TOC jump
 	const { searchQuery, searchMatches, safeSearchIndex } = useSearchHighlight(
 		state,
@@ -318,6 +336,29 @@ export function App(props: Readonly<AppProps>) {
 		previewRef,
 	)
 	useTocJump(state, viewerState.tocEntries, previewRef, sourceRef, dispatch)
+
+	// compute preview content with search highlights baked in.
+	// runs synchronously during render — the IR-to-JSX step is fast (~10-50ms).
+	// when no search is active, uses the cached viewerState.content directly.
+	const searchPreviewWidth =
+		paneDimensions(state.layout, state.dimensions.width, state.dimensions.height, state.mode)
+			.preview?.width ?? state.dimensions.width
+
+	const highlightedPreview = useMemo(() => {
+		if (viewerState.ir == null || searchQuery.length === 0) return null
+		setSearchState(
+			searchQuery,
+			props.theme.search.currentHighlightBg,
+			props.theme.codeBlock.backgroundColor,
+		)
+		const width = Math.max(1, searchPreviewWidth - 4)
+		return renderToOpenTUIWithMedia(viewerState.ir, props.theme, width)
+	}, [searchQuery, viewerState.ir, searchPreviewWidth, props.theme])
+
+	// clear search state when search closes so future non-search renders are clean
+	useClearSearchOnClose(searchQuery)
+
+	const previewContent = highlightedPreview?.jsx ?? viewerState.content
 
 	// -- keyboard handler --
 	const mediaCount = viewerState.mediaNodes.length
@@ -337,8 +378,6 @@ export function App(props: Readonly<AppProps>) {
 			state,
 			dispatch,
 			mediaCount,
-			viewerState.mediaNodes,
-			handleAudioPlay,
 			handleAction,
 			videoInfo?.duration ?? 0,
 			videoInfo?.elapsed ?? 0,
@@ -354,7 +393,7 @@ export function App(props: Readonly<AppProps>) {
 		state.dimensions.height,
 		state.mode,
 	)
-	const entries = legendEntries(state)
+	const entries = legendEntries(state, currentMediaType(state, viewerState.mediaNodes))
 
 	// image context for viewer mode — provides basePath for relative image resolution
 	const imageCtx: ImageContextValue | undefined = useMemo(() => {
@@ -406,7 +445,7 @@ export function App(props: Readonly<AppProps>) {
 		? renderViewerLayout(
 				state,
 				panes,
-				viewerState.content,
+				previewContent,
 				viewerState.raw,
 				props.theme,
 				sourceRef,
