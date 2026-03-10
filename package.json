@@ -1,13 +1,34 @@
 {
 	"name": "liham",
-	"version": "2.0.0-alpha.0",
-	"description": "Terminal markdown previewer TUI",
-	"module": "src/cli/index.ts",
+	"version": "1.0.0",
+	"description": "Terminal markdown previewer with split-pane view, search, TOC, math, mermaid, and media support",
 	"type": "module",
-	"private": true,
+	"license": "MIT",
+	"author": "Joshua Santos",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/joshuasantos/liham.git"
+	},
+	"homepage": "https://github.com/joshuasantos/liham",
+	"bugs": "https://github.com/joshuasantos/liham/issues",
+	"keywords": [
+		"markdown",
+		"terminal",
+		"previewer",
+		"tui",
+		"cli",
+		"bun"
+	],
+	"engines": {
+		"bun": ">=1.1.0"
+	},
 	"bin": {
 		"liham": "src/cli/index.ts"
 	},
+	"files": [
+		"src/",
+		"!src/**/*.test.ts"
+	],
 	"scripts": {
 		"dev": "bun run src/cli/index.ts",
 		"lint": "eslint src/",
@@ -15,7 +36,8 @@
 		"format:check": "biome format",
 		"typecheck": "tsc --noEmit",
 		"check": "bun run typecheck && bun run lint && bun run format:check",
-		"test": "bun test"
+		"test": "bun test",
+		"prepublishOnly": "bun run check && bun test"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.5",
@@ -34,11 +56,13 @@
 	"dependencies": {
 		"@opentui/core": "^0.1.86",
 		"@opentui/react": "^0.1.86",
+		"beautiful-mermaid": "^1.1.3",
 		"rehype-highlight": "^7.0.2",
 		"remark-gfm": "^4.0.1",
 		"remark-math": "^6.0.0",
 		"remark-parse": "^11.0.0",
 		"remark-rehype": "^11.1.2",
+		"unicodeit": "^0.7.5",
 		"unified": "^11.0.5"
 	},
 	"optionalDependencies": {

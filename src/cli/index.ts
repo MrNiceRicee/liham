@@ -1,4 +1,11 @@
+#!/usr/bin/env bun
+
 // cli entry point — parses args, validates input, dispatches to renderer boot.
+
+if (typeof Bun === 'undefined') {
+	console.error('liham requires Bun. Install it: https://bun.sh')
+	process.exit(1)
+}
 
 import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
