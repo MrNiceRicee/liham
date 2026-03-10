@@ -27,6 +27,7 @@ import { renderList, renderListItem } from './list.tsx'
 import { renderParagraph } from './paragraph.tsx'
 import { renderTable, renderTableCell, renderTableRow } from './table.tsx'
 import { renderThematicBreak } from './thematic-break.tsx'
+import { renderVideoThumbnail } from './video-thumbnail.tsx'
 
 // media collection accumulated during IR-to-JSX traversal
 export interface MediaEntry {
@@ -110,13 +111,7 @@ function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 		case 'video': {
 			const mediaIndex = ctx.media.length
 			ctx.media.push({ node, index: mediaIndex })
-			const vidProps: Record<string, unknown> = { attributes: TextAttributes.DIM }
-			if (node.style.fg != null) vidProps['fg'] = node.style.fg
-			return (
-				<text key={key}>
-					<span {...vidProps}>[video: {node.alt}]</span>
-				</text>
-			)
+			return renderVideoThumbnail(node, key, mediaIndex)
 		}
 
 		case 'audio': {
@@ -234,6 +229,31 @@ export function renderChildren(
 // module-level theme set at the start of each render pass.
 // avoids threading theme through every sub-component signature.
 let currentTheme: ThemeTokens | undefined
+
+// module-level search state set before each render pass.
+// SearchText reads these during IR-to-JSX traversal (not via React context,
+// because the preview JSX tree is cached and context changes don't propagate).
+let currentSearchQuery: string | undefined
+let currentSearchHighlightBg: string | undefined
+let currentSearchHighlightFg: string | undefined
+
+export function setSearchState(
+	query: string | undefined,
+	highlightBg?: string | undefined,
+	highlightFg?: string | undefined,
+): void {
+	currentSearchQuery = query
+	currentSearchHighlightBg = highlightBg
+	currentSearchHighlightFg = highlightFg
+}
+
+export function getSearchState() {
+	return {
+		query: currentSearchQuery,
+		highlightBg: currentSearchHighlightBg,
+		highlightFg: currentSearchHighlightFg,
+	}
+}
 
 // public API: renders an IR tree to a React node tree (legacy, no media collection)
 export function renderToOpenTUI(ir: IRNode, theme: ThemeTokens, maxWidth?: number): ReactNode {

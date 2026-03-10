@@ -375,6 +375,96 @@ export async function* readFrames(
 	// partial frame at end deliberately discarded
 }
 
+// -- thumbnail extraction --
+
+const THUMBNAIL_TIMEOUT_MS = 5_000
+const THUMBNAIL_MAX_BYTES = 5 * 1024 * 1024 // 5MB cap on thumbnail output
+
+export async function extractVideoThumbnail(
+	filePath: string,
+	basePath: string,
+	signal?: AbortSignal,
+): Promise<ImageResult<Uint8Array>> {
+	const sanitized = sanitizeMediaPath(filePath, basePath)
+	if (!sanitized.ok) {
+		return { ok: false, error: sanitized.error ?? 'invalid path' }
+	}
+
+	const absPath = sanitized.path!
+
+	try {
+		const proc = Bun.spawn(
+			[
+				'ffmpeg',
+				'-v',
+				'quiet',
+				'-ss',
+				'0',
+				'-i',
+				absPath,
+				'-vframes',
+				'1',
+				'-f',
+				'image2pipe',
+				'-vcodec',
+				'png',
+				'pipe:1',
+			],
+			{ stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' },
+		)
+
+		if (signal != null) {
+			signal.addEventListener('abort', () => safeKill(proc), { once: true })
+		}
+
+		const exited = proc.exited
+		const timeout = new Promise<'timeout'>((r) =>
+			setTimeout(() => r('timeout'), THUMBNAIL_TIMEOUT_MS),
+		)
+		const race = await Promise.race([exited, timeout])
+
+		if (race === 'timeout') {
+			safeKill(proc)
+			return { ok: false, error: 'thumbnail extraction timed out' }
+		}
+
+		if (signal?.aborted) {
+			return { ok: false, error: 'aborted' }
+		}
+
+		const chunks: Uint8Array[] = []
+		let totalLen = 0
+		const reader = proc.stdout.getReader()
+		for (;;) {
+			const { done, value } = await reader.read()
+			if (done) break
+			totalLen += value.byteLength
+			if (totalLen > THUMBNAIL_MAX_BYTES) {
+				reader.releaseLock()
+				safeKill(proc)
+				return { ok: false, error: 'thumbnail too large' }
+			}
+			chunks.push(value)
+		}
+		reader.releaseLock()
+
+		if (totalLen === 0) {
+			return { ok: false, error: 'no thumbnail data' }
+		}
+
+		const result = new Uint8Array(totalLen)
+		let offset = 0
+		for (const chunk of chunks) {
+			result.set(chunk, offset)
+			offset += chunk.byteLength
+		}
+
+		return { ok: true, value: result }
+	} catch (err) {
+		return { ok: false, error: extractError(err, 'thumbnail extraction failed') }
+	}
+}
+
 // kill video on process exit — prevents orphaned ffmpeg
 process.on('exit', () => {
 	if (activeVideoProc != null) safeKill(activeVideoProc)
