@@ -37,9 +37,12 @@ function handleSearchInputKey(
 		return
 	}
 
-	const result = handleTextInputKey(key, searchState.query)
-	if (result.consumed && result.newText !== searchState.query) {
-		dispatch({ type: 'SearchUpdate', query: result.newText })
+	const result = handleTextInputKey(key, searchState.query, searchState.cursor)
+	if (
+		result.consumed &&
+		(result.newText !== searchState.query || result.cursor !== searchState.cursor)
+	) {
+		dispatch({ type: 'SearchUpdate', query: result.newText, cursor: result.cursor })
 	}
 }
 

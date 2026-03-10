@@ -4,6 +4,7 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 import type { ReactNode, RefObject } from 'react'
 
 import type { ScanStatus } from '../../app/state.ts'
+import { graphemeSlice } from '../../utils/grapheme.ts'
 import type { FuzzyMatch } from '../../browser/fuzzy.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
 import { splitHighlightSegments } from './highlight-splits.ts'
@@ -11,6 +12,7 @@ import { splitHighlightSegments } from './highlight-splits.ts'
 interface BrowserPaneProps {
 	matches: FuzzyMatch[]
 	filter: string
+	inputCursor: number
 	cursorIndex: number
 	totalFiles: number
 	scanStatus: ScanStatus
@@ -111,6 +113,7 @@ function buildFileList(
 export function BrowserPane({
 	matches,
 	filter,
+	inputCursor,
 	cursorIndex,
 	totalFiles,
 	scanStatus,
@@ -150,7 +153,9 @@ export function BrowserPane({
 				<box style={{ flexDirection: 'row', width: '100%' }}>
 					<text fg={bt.filterColor}>
 						{'> '}
-						{filter}
+						{graphemeSlice(filter, 0, inputCursor)}
+						{'_'}
+						{graphemeSlice(filter, inputCursor)}
 					</text>
 					<box style={{ flexGrow: 1 }} />
 					<text fg={bt.fileCountColor}>{countLabel}</text>

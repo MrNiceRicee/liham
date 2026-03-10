@@ -2,7 +2,8 @@
 
 // safe process kill — wraps try/catch for already-exited processes
 export function safeKill(
-	proc: { kill: (signal?: number | string) => void },
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts Bun Subprocess, Node ChildProcess, etc.
+	proc: { kill: (...args: any[]) => void },
 	signal: string = 'SIGKILL',
 ): void {
 	try {

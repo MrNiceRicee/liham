@@ -42,12 +42,12 @@ Press `?` for keybindings. Enable [shell completions](#shell-completions) for ta
 - **Table of contents** — `t` to toggle, jump to any heading
 - **Math** — LaTeX rendered as Unicode
 - **Mermaid** — diagrams rendered as colored ASCII art
-- **Images** — Kitty graphics protocol with halfblock/text fallback
-- **Video / GIF** — in-terminal playback via ffmpeg
+- **Images** — Kitty graphics protocol with halfblock/text fallback ([terminal compatibility](#terminal-compatibility))
+- **Video / GIF** — in-terminal playback via ffmpeg ([optional dependencies](#optional-dependencies))
 
 ![media playback](./assets/media.gif)
 - **File browser** — fuzzy filter, live file watching
-- **Themes** — auto-detect dark/light from terminal background
+- **Themes** — auto-detect dark/light from terminal background ([environment variables](#environment-variables))
 
 ## How It Works
 

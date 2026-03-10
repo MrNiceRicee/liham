@@ -3,6 +3,7 @@
 
 import type { SearchState } from '../../app/state-search.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
+import { graphemeSlice } from '../../utils/grapheme.ts'
 
 interface SearchBarProps {
 	readonly searchState: SearchState
@@ -19,7 +20,10 @@ export function SearchBar({ searchState, matchCount, theme }: Readonly<SearchBar
 
 	const isInput = searchState.phase === 'input'
 	const query = searchState.query
-	const cursor = isInput ? '_' : ''
+	const inputCursor = isInput ? searchState.cursor : 0
+	const before = isInput ? graphemeSlice(query, 0, inputCursor) : query
+	const after = isInput ? graphemeSlice(query, inputCursor) : ''
+	const cursorChar = isInput ? '_' : ''
 
 	// match count display
 	const hasNoMatches = matchCount === 0 && query.length > 0
@@ -49,8 +53,9 @@ export function SearchBar({ searchState, matchCount, theme }: Readonly<SearchBar
 			<text>
 				<span fg={promptColor}>{'/ '}</span>
 				<span fg={queryFg}>
-					{query}
-					{cursor}
+					{before}
+					{cursorChar}
+					{after}
 				</span>
 			</text>
 			<box style={{ flexGrow: 1 }} />

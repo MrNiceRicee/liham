@@ -18,6 +18,7 @@ export type ScanStatus = 'scanning' | 'complete' | 'error'
 export interface BrowserState {
 	files: FileEntry[]
 	filter: string
+	inputCursor: number
 	cursorIndex: number
 	scrollPosition: number
 	scanStatus: ScanStatus
@@ -92,7 +93,7 @@ export type AppAction =
 	| { type: 'ScanComplete'; files: FileEntry[] }
 	| { type: 'RescanComplete'; files: FileEntry[] }
 	| { type: 'ScanError'; error: string }
-	| { type: 'FilterUpdate'; text: string }
+	| { type: 'FilterUpdate'; text: string; cursor: number }
 	| { type: 'CursorMove'; direction: CursorDirection; filteredLength: number }
 	| { type: 'OpenFile'; path: string }
 	| { type: 'ReturnToBrowser' }
@@ -111,7 +112,7 @@ export type AppAction =
 	| { type: 'CopySelection' }
 	// search actions
 	| { type: 'SearchOpen' }
-	| { type: 'SearchUpdate'; query: string }
+	| { type: 'SearchUpdate'; query: string; cursor: number }
 	| { type: 'SearchConfirm'; matchCount: number }
 	| { type: 'SearchNext' }
 	| { type: 'SearchPrev' }
@@ -251,12 +252,19 @@ function browserReducer(state: AppState, action: BrowserAction): AppState {
 				...state,
 				browser: { ...state.browser, scanStatus: 'error', scanError: action.error },
 			}
-		case 'FilterUpdate':
-			if (state.browser.filter === action.text) return state
+		case 'FilterUpdate': {
+			const textChanged = state.browser.filter !== action.text
+			if (!textChanged && state.browser.inputCursor === action.cursor) return state
 			return {
 				...state,
-				browser: { ...state.browser, filter: action.text, cursorIndex: 0 },
+				browser: {
+					...state.browser,
+					filter: action.text,
+					inputCursor: action.cursor,
+					...(textChanged ? { cursorIndex: 0 } : {}),
+				},
 			}
+		}
 		case 'CursorMove': {
 			const next = moveCursor(state.browser.cursorIndex, action.direction, action.filteredLength)
 			if (next === state.browser.cursorIndex) return state
@@ -378,6 +386,7 @@ function initialBrowserState(): BrowserState {
 	return {
 		files: [],
 		filter: '',
+		inputCursor: 0,
 		cursorIndex: 0,
 		scrollPosition: 0,
 		scanStatus: 'scanning',

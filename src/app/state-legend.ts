@@ -66,7 +66,7 @@ function viewerLegend(state: AppState): LegendEntry[] {
 			{ key: 'g/G', label: 'top/bottom' },
 			{ key: 'pgup/pgdn', label: 'page' },
 			{ key: 'ctrl+d/u', label: 'half' },
-		{ key: 'ctrl+e/y', label: 'line' },
+			{ key: 'ctrl+e/y', label: 'line' },
 		]
 	}
 

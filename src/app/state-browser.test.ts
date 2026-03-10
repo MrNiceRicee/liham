@@ -50,18 +50,38 @@ describe('FilterUpdate action', () => {
 			mode: 'browser',
 			browser: { ...initialState('preview-only', 'browser').browser, cursorIndex: 3 },
 		})
-		const next = appReducer(s, { type: 'FilterUpdate', text: 'readme' })
+		const next = appReducer(s, { type: 'FilterUpdate', text: 'readme', cursor: 6 })
 		expect(next.browser.filter).toBe('readme')
+		expect(next.browser.inputCursor).toBe(6)
 		expect(next.browser.cursorIndex).toBe(0)
 	})
 
-	test('returns same reference when filter unchanged', () => {
+	test('returns same reference when filter and cursor unchanged', () => {
 		const s = stateWith({
 			mode: 'browser',
-			browser: { ...initialState('preview-only', 'browser').browser, filter: 'test' },
+			browser: {
+				...initialState('preview-only', 'browser').browser,
+				filter: 'test',
+				inputCursor: 4,
+			},
 		})
-		const next = appReducer(s, { type: 'FilterUpdate', text: 'test' })
+		const next = appReducer(s, { type: 'FilterUpdate', text: 'test', cursor: 4 })
 		expect(next).toBe(s)
+	})
+
+	test('cursor-only change does not reset cursorIndex', () => {
+		const s = stateWith({
+			mode: 'browser',
+			browser: {
+				...initialState('preview-only', 'browser').browser,
+				filter: 'test',
+				inputCursor: 4,
+				cursorIndex: 2,
+			},
+		})
+		const next = appReducer(s, { type: 'FilterUpdate', text: 'test', cursor: 2 })
+		expect(next.browser.inputCursor).toBe(2)
+		expect(next.browser.cursorIndex).toBe(2) // preserved — text didn't change
 	})
 })
 
@@ -295,7 +315,7 @@ describe('browser state machine traces', () => {
 		expect(s.browser.files.length).toBe(3)
 
 		// filter
-		s = appReducer(s, { type: 'FilterUpdate', text: 'guide' })
+		s = appReducer(s, { type: 'FilterUpdate', text: 'guide', cursor: 5 })
 		expect(s.browser.filter).toBe('guide')
 
 		// cursor down (1 match assumed)

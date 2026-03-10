@@ -79,9 +79,7 @@ export function renderBrowserPreview(
 			}
 		} catch (err) {
 			setContent(
-				<text fg={theme.fallback.textColor}>
-					cannot read file: {extractError(err, 'unknown')}
-				</text>,
+				<text fg={theme.fallback.textColor}>cannot read file: {extractError(err, 'unknown')}</text>,
 			)
 		}
 	})()

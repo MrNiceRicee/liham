@@ -129,9 +129,12 @@ function browserFilterKey(
 	state: AppState,
 	dispatch: React.Dispatch<AppAction>,
 ): boolean {
-	const result = handleTextInputKey(key, state.browser.filter)
-	if (result.consumed && result.newText !== state.browser.filter) {
-		dispatch({ type: 'FilterUpdate', text: result.newText })
+	const result = handleTextInputKey(key, state.browser.filter, state.browser.inputCursor)
+	if (
+		result.consumed &&
+		(result.newText !== state.browser.filter || result.cursor !== state.browser.inputCursor)
+	) {
+		dispatch({ type: 'FilterUpdate', text: result.newText, cursor: result.cursor })
 	}
 	return result.consumed
 }
@@ -161,7 +164,7 @@ export function browserKeyHandler(
 
 	switch (key.name) {
 		case 'escape':
-			if (state.browser.filter.length > 0) dispatch({ type: 'FilterUpdate', text: '' })
+			if (state.browser.filter.length > 0) dispatch({ type: 'FilterUpdate', text: '', cursor: 0 })
 			else renderer?.destroy()
 			return
 		case 'return':

@@ -4,7 +4,7 @@ import type { AppAction, AppState } from './state.ts'
 
 // discriminated union — input phase has no match tracking fields
 export type SearchState =
-	| { phase: 'input'; query: string }
+	| { phase: 'input'; query: string; cursor: number }
 	| { phase: 'active'; query: string; matchCount: number; currentMatch: number }
 
 export type SearchAction = Extract<
@@ -51,12 +51,16 @@ export function searchReducer(state: AppState, action: SearchAction): AppState {
 	switch (action.type) {
 		case 'SearchOpen':
 			if (state.mode === 'browser') return state
-			return { ...state, searchState: { phase: 'input', query: '' }, mediaFocusIndex: null }
+			return {
+				...state,
+				searchState: { phase: 'input', query: '', cursor: 0 },
+				mediaFocusIndex: null,
+			}
 
 		case 'SearchUpdate': {
 			if (state.searchState == null) return state
 			const query = action.query.slice(0, 200)
-			return { ...state, searchState: { phase: 'input', query } }
+			return { ...state, searchState: { phase: 'input', query, cursor: action.cursor } }
 		}
 
 		case 'SearchConfirm':

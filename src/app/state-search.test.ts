@@ -10,14 +10,14 @@ describe('search state machine', () => {
 	test('SearchOpen creates initial search state', () => {
 		const s = stateWith({})
 		const next = appReducer(s, { type: 'SearchOpen' })
-		expect(next.searchState).toEqual({ phase: 'input', query: '' })
+		expect(next.searchState).toEqual({ phase: 'input', query: '', cursor: 0 })
 	})
 
 	test('SearchOpen clears media focus', () => {
 		const s = stateWith({ mediaFocusIndex: 2 })
 		const next = appReducer(s, { type: 'SearchOpen' })
 		expect(next.mediaFocusIndex).toBeNull()
-		expect(next.searchState).toEqual({ phase: 'input', query: '' })
+		expect(next.searchState).toEqual({ phase: 'input', query: '', cursor: 0 })
 	})
 
 	test('SearchOpen no-op in browser mode', () => {
@@ -27,21 +27,21 @@ describe('search state machine', () => {
 	})
 
 	test('SearchUpdate updates query', () => {
-		const s = stateWith({ searchState: { phase: 'input', query: 'hel' } })
-		const next = appReducer(s, { type: 'SearchUpdate', query: 'hello' })
-		expect(next.searchState).toEqual({ phase: 'input', query: 'hello' })
+		const s = stateWith({ searchState: { phase: 'input', query: 'hel', cursor: 3 } })
+		const next = appReducer(s, { type: 'SearchUpdate', query: 'hello', cursor: 5 })
+		expect(next.searchState).toEqual({ phase: 'input', query: 'hello', cursor: 5 })
 	})
 
 	test('SearchUpdate truncates to 200 chars', () => {
-		const s = stateWith({ searchState: { phase: 'input', query: '' } })
-		const next = appReducer(s, { type: 'SearchUpdate', query: 'a'.repeat(250) })
+		const s = stateWith({ searchState: { phase: 'input', query: '', cursor: 0 } })
+		const next = appReducer(s, { type: 'SearchUpdate', query: 'a'.repeat(250), cursor: 250 })
 		if (next.searchState?.phase === 'input') {
 			expect(next.searchState.query.length).toBe(200)
 		}
 	})
 
 	test('SearchConfirm with matches transitions to active', () => {
-		const s = stateWith({ searchState: { phase: 'input', query: 'test' } })
+		const s = stateWith({ searchState: { phase: 'input', query: 'test', cursor: 4 } })
 		const next = appReducer(s, { type: 'SearchConfirm', matchCount: 5 })
 		expect(next.searchState).toEqual({
 			phase: 'active',
@@ -52,7 +52,7 @@ describe('search state machine', () => {
 	})
 
 	test('SearchConfirm with 0 matches stays in input phase', () => {
-		const s = stateWith({ searchState: { phase: 'input', query: 'nope' } })
+		const s = stateWith({ searchState: { phase: 'input', query: 'nope', cursor: 4 } })
 		const next = appReducer(s, { type: 'SearchConfirm', matchCount: 0 })
 		expect(next).toBe(s)
 	})
@@ -88,7 +88,7 @@ describe('search state machine', () => {
 	})
 
 	test('SearchClose clears searchState to null', () => {
-		const s = stateWith({ searchState: { phase: 'input', query: 'test' } })
+		const s = stateWith({ searchState: { phase: 'input', query: 'test', cursor: 4 } })
 		const next = appReducer(s, { type: 'SearchClose' })
 		expect(next.searchState).toBeNull()
 	})
@@ -113,7 +113,7 @@ describe('search state machine', () => {
 
 describe('search legend entries', () => {
 	test('search input phase shows input legend', () => {
-		const s = stateWith({ searchState: { phase: 'input', query: '' } })
+		const s = stateWith({ searchState: { phase: 'input', query: '', cursor: 0 } })
 		const entries = legendEntries(s)
 		expect(entries.some((e) => e.key === 'Esc' && e.label === 'cancel')).toBe(true)
 		expect(entries.some((e) => e.key === 'Enter' && e.label === 'confirm')).toBe(true)

@@ -5,14 +5,22 @@ import { extractError, safeKill, safeSendSignal } from './error.ts'
 describe('safeKill', () => {
 	test('calls kill with default SIGKILL', () => {
 		let called = ''
-		const proc = { kill: (s?: number | string) => { called = String(s) } }
+		const proc = {
+			kill: (s?: number | string) => {
+				called = String(s)
+			},
+		}
 		safeKill(proc)
 		expect(called).toBe('SIGKILL')
 	})
 
 	test('calls kill with custom signal', () => {
 		let called = ''
-		const proc = { kill: (s?: number | string) => { called = String(s) } }
+		const proc = {
+			kill: (s?: number | string) => {
+				called = String(s)
+			},
+		}
 		safeKill(proc, 'SIGTERM')
 		expect(called).toBe('SIGTERM')
 	})

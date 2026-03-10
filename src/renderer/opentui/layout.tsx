@@ -33,6 +33,7 @@ export function renderBrowserLayout(
 	const browserProps = {
 		matches,
 		filter: state.browser.filter,
+		inputCursor: state.browser.inputCursor,
 		cursorIndex: state.browser.cursorIndex,
 		totalFiles: state.browser.files.length,
 		scanStatus: state.browser.scanStatus,
