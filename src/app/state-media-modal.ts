@@ -31,9 +31,10 @@ function openMediaModal(state: AppState): AppState {
 	}
 }
 
-function seekMedia(state: AppState, delta: number, duration: number): AppState {
+function seekMedia(state: AppState, delta: number, duration: number, elapsed: number): AppState {
 	if (state.mediaModal.kind !== 'open') return state
-	const newOffset = Math.max(0, Math.min(state.mediaModal.seekOffset + delta, duration))
+	// compute from actual playback position, not state seekOffset
+	const newOffset = Math.max(0, Math.min(elapsed + delta, duration))
 	// seeking backward to/past start — replay from beginning even if seekOffset is already 0
 	if (newOffset === 0 && delta < 0) {
 		return {
@@ -90,7 +91,7 @@ export function mediaModalReducer(state: AppState, action: MediaModalAction): Ap
 				seekOffset: 0,
 			}))
 		case 'SeekMedia':
-			return seekMedia(state, action.delta, action.duration)
+			return seekMedia(state, action.delta, action.duration, action.elapsed)
 		case 'CloseMediaModal':
 			return closeMediaModal(state)
 	}

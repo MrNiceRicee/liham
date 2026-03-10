@@ -69,6 +69,7 @@ export function handleModalKey(
 	dispatch: React.Dispatch<AppAction>,
 	mediaCount: number,
 	videoDuration = 0,
+	videoElapsed = 0,
 ): AppAction | null {
 	switch (key.name) {
 		case 'escape':
@@ -93,10 +94,10 @@ export function handleModalKey(
 			return { type: 'TogglePlayPause' }
 		case 'left':
 			if (videoDuration <= 0) return null
-			return { type: 'SeekMedia', delta: key.shift ? -5 : -1, duration: videoDuration }
+			return { type: 'SeekMedia', delta: key.shift ? -5 : -1, duration: videoDuration, elapsed: videoElapsed }
 		case 'right':
 			if (videoDuration <= 0) return null
-			return { type: 'SeekMedia', delta: key.shift ? 5 : 1, duration: videoDuration }
+			return { type: 'SeekMedia', delta: key.shift ? 5 : 1, duration: videoDuration, elapsed: videoElapsed }
 		// volume: = or + (raw mode) or shift+= (kitty)
 		case '=':
 		case '+':

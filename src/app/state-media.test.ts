@@ -333,7 +333,7 @@ describe('SeekMedia action', () => {
 
 	test('SeekMedia advances seekOffset by delta', () => {
 		const s = openModal(10)
-		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60 })
+		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60, elapsed: 10 })
 		if (next.mediaModal.kind === 'open') {
 			expect(next.mediaModal.seekOffset).toBe(15)
 		}
@@ -341,7 +341,7 @@ describe('SeekMedia action', () => {
 
 	test('SeekMedia retreats seekOffset by negative delta', () => {
 		const s = openModal(10)
-		const next = appReducer(s, { type: 'SeekMedia', delta: -5, duration: 60 })
+		const next = appReducer(s, { type: 'SeekMedia', delta: -5, duration: 60, elapsed: 10 })
 		if (next.mediaModal.kind === 'open') {
 			expect(next.mediaModal.seekOffset).toBe(5)
 		}
@@ -349,7 +349,7 @@ describe('SeekMedia action', () => {
 
 	test('SeekMedia clamps to 0 at lower bound', () => {
 		const s = openModal(3)
-		const next = appReducer(s, { type: 'SeekMedia', delta: -10, duration: 60 })
+		const next = appReducer(s, { type: 'SeekMedia', delta: -10, duration: 60, elapsed: 3 })
 		if (next.mediaModal.kind === 'open') {
 			expect(next.mediaModal.seekOffset).toBe(0)
 		}
@@ -357,7 +357,7 @@ describe('SeekMedia action', () => {
 
 	test('SeekMedia clamps to duration at upper bound', () => {
 		const s = openModal(55)
-		const next = appReducer(s, { type: 'SeekMedia', delta: 10, duration: 60 })
+		const next = appReducer(s, { type: 'SeekMedia', delta: 10, duration: 60, elapsed: 55 })
 		if (next.mediaModal.kind === 'open') {
 			expect(next.mediaModal.seekOffset).toBe(60)
 		}
@@ -365,7 +365,7 @@ describe('SeekMedia action', () => {
 
 	test('SeekMedia backward at zero replays from beginning', () => {
 		const s = openModal(0)
-		const next = appReducer(s, { type: 'SeekMedia', delta: -5, duration: 60 })
+		const next = appReducer(s, { type: 'SeekMedia', delta: -5, duration: 60, elapsed: 0 })
 		expect(next).not.toBe(s)
 		if (next.mediaModal.kind === 'open') {
 			expect(next.mediaModal.seekOffset).toBe(0)
@@ -377,13 +377,13 @@ describe('SeekMedia action', () => {
 
 	test('SeekMedia at upper boundary is no-op', () => {
 		const s = openModal(60)
-		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60 })
+		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60, elapsed: 60 })
 		expect(next).toBe(s)
 	})
 
 	test('SeekMedia increments restartCount', () => {
 		const s = openModal(10)
-		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60 })
+		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60, elapsed: 10 })
 		if (next.mediaModal.kind === 'open') {
 			expect(next.mediaModal.restartCount).toBe(1)
 		}
@@ -401,7 +401,7 @@ describe('SeekMedia action', () => {
 				seekOffset: 10,
 			},
 		})
-		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60 })
+		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60, elapsed: 10 })
 		if (next.mediaModal.kind === 'open') {
 			expect(next.mediaModal.paused).toBe(true)
 		}
@@ -409,7 +409,7 @@ describe('SeekMedia action', () => {
 
 	test('SeekMedia no-op when modal closed', () => {
 		const s = stateWith({})
-		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60 })
+		const next = appReducer(s, { type: 'SeekMedia', delta: 5, duration: 60, elapsed: 10 })
 		expect(next).toBe(s)
 	})
 })

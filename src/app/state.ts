@@ -97,7 +97,7 @@ export type AppAction =
 	| { type: 'ToggleGallery' }
 	| { type: 'TogglePlayPause' }
 	| { type: 'ReplayMedia' }
-	| { type: 'SeekMedia'; delta: number; duration: number }
+	| { type: 'SeekMedia'; delta: number; duration: number; elapsed: number }
 	| { type: 'CopySelection' }
 	// search actions
 	| { type: 'SearchOpen' }

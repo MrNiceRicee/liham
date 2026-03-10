@@ -50,6 +50,7 @@ export function dispatchViewerKey(
 	onAudioPlay: (entry: MediaEntry) => void,
 	onAction: (action: AppAction) => void,
 	videoDuration: number,
+	videoElapsed: number,
 	searchMatchCount: number,
 	tocEntryCount: number,
 	renderer?: CliRenderer | null,
@@ -70,7 +71,7 @@ export function dispatchViewerKey(
 
 	const action =
 		state.mediaModal.kind !== 'closed'
-			? handleModalKey(key, state, dispatch, mediaCount, videoDuration)
+			? handleModalKey(key, state, dispatch, mediaCount, videoDuration, videoElapsed)
 			: handleViewerKey(key, state, dispatch, mediaCount, renderer)
 	if (action == null) return
 	if (action.type === 'ReturnToBrowser') clearImageCache()

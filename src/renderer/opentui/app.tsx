@@ -345,6 +345,7 @@ export function App(props: Readonly<AppProps>) {
 			handleAudioPlay,
 			handleAction,
 			videoInfo?.duration ?? 0,
+			videoInfo?.elapsed ?? 0,
 			searchMatches.length,
 			viewerState.tocEntries.length,
 			renderer,
