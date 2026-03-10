@@ -1,6 +1,7 @@
 import type { Root } from 'hast'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import type { Plugin } from 'unified'
@@ -17,6 +18,7 @@ const PIPELINE_TIMEOUT_MS = 5_000
 export function createProcessor(theme: ThemeTokens) {
 	return unified()
 		.use(remarkParse)
+		.use(remarkMath)
 		.use(remarkGfm)
 		.use(remarkRehype, { allowDangerousHtml: false })
 		.use(

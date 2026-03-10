@@ -78,4 +78,14 @@ export const lightTheme: ThemeTokens = {
 		highlightFg: '#343b59',
 		currentHighlightBg: '#965027',
 	},
+	math: {
+		textColor: '#343b59',
+	},
+	mermaid: {
+		arrowColor: '#34548a',
+		borderColor: '#34548a',
+		errorColor: '#8c8fa1',
+		lineColor: '#8c8fa1',
+		textColor: '#343b59',
+	},
 }

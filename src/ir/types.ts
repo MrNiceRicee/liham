@@ -182,12 +182,22 @@ export interface CheckboxNode {
 
 // -- custom extension --
 
-export interface CustomNode<T extends string = string> {
+// type-safe data map for custom nodes — eliminates unsafe casts
+export interface CustomNodeDataMap {
+	mathDisplay: { fg: string; latex: string; unicode: string }
+	mathInline: { fg: string; latex: string; unicode: string }
+	mermaid: { error: string | null; rendered: string | null; source: string }
+}
+
+// data is required for mapped types (mathInline, mathDisplay, mermaid),
+// optional for generic CustomNode<string> to stay compatible with IRNode union
+export type CustomNode<T extends string = string> = {
 	type: T
 	children?: IRNode[]
-	data?: Record<string, unknown>
 	style?: Record<string, unknown>
-}
+} & (T extends keyof CustomNodeDataMap
+	? { data: CustomNodeDataMap[T] }
+	: { data?: Record<string, unknown> })
 
 // -- union + helpers --
 
@@ -241,8 +251,18 @@ const BLOCK_TYPES = new Set([
 	'tableCell',
 	'thematicBreak',
 	'unknown',
+	'mathDisplay',
+	'mermaid',
 ])
 
 export function isBlockNode(node: IRNode): boolean {
 	return BLOCK_TYPES.has(node.type)
+}
+
+// type guard for custom nodes — narrows CustomNode<string> to CustomNode<T>
+export function isCustomNode<T extends keyof CustomNodeDataMap>(
+	node: IRNode,
+	type: T,
+): node is CustomNode<T> {
+	return node.type === type
 }

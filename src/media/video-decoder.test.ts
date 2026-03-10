@@ -5,7 +5,7 @@ import { computeVideoDimensions, probeVideo, readFrames } from './video-decoder.
 // -- probeVideo --
 
 describe('probeVideo', () => {
-	const base = `${import.meta.dir}/../../test/assets`
+	const base = `${import.meta.dir}/../../sandbox/assets`
 
 	test('rejects empty path', async () => {
 		const result = await probeVideo('', base)

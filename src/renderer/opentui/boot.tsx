@@ -62,7 +62,7 @@ export async function boot(ctx: BootContext): Promise<void> {
 				mediaNodes,
 				tocEntries,
 				estimatedTotalHeight,
-			} = renderToOpenTUIWithMedia(ctx.ir, previewWidth)
+			} = renderToOpenTUIWithMedia(ctx.ir, ctx.theme, previewWidth)
 
 			createRoot(renderer).render(
 				<App

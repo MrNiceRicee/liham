@@ -402,6 +402,55 @@ deploy "$@"
 	)
 	s.push('')
 
+	// math
+	s.push('## Math\n')
+	s.push('### Inline Math\n')
+	s.push(
+		'The Pythagorean theorem states $x^2 + y^2 = z^2$ for right triangles. Greek letters: $\\alpha + \\beta = \\gamma$ and $\\theta \\in [0, 2\\pi]$.\n',
+	)
+	s.push(
+		'Adjacent math: $a$ and $b$ are variables. Math inside bold: **the formula $E = mc^2$ is famous**.\n',
+	)
+
+	s.push('### Display Math\n')
+	s.push('$$\\sum_{i=0}^n x_i^2$$\n')
+	s.push('$$\\int_0^\\infty e^{-x} dx = 1$$\n')
+	s.push('$$\\frac{d}{dx} e^x = e^x$$\n')
+
+	s.push('### Unsupported LaTeX\n')
+	s.push('$$\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$$\n')
+
+	s.push('### Non-Math Dollar Signs\n')
+	s.push('The price is $5 and the cost is $10. These should not be parsed as math.\n')
+
+	// mermaid
+	s.push('## Mermaid Diagrams\n')
+	s.push('### Flowchart\n')
+	s.push('```mermaid')
+	s.push('graph TD')
+	s.push('  A[Start] --> B{Decision}')
+	s.push('  B -->|Yes| C[Action]')
+	s.push('  B -->|No| D[End]')
+	s.push('```\n')
+
+	s.push('### Sequence Diagram\n')
+	s.push('```mermaid')
+	s.push('sequenceDiagram')
+	s.push('  Alice ->> Bob: Hello')
+	s.push('  Bob -->> Alice: Hi back')
+	s.push('  Alice ->> Charlie: Forward')
+	s.push('```\n')
+
+	s.push('### State Diagram\n')
+	s.push('```mermaid')
+	s.push('stateDiagram-v2')
+	s.push('  [*] --> Idle')
+	s.push('  Idle --> Loading : fetch')
+	s.push('  Loading --> Success : ok')
+	s.push('  Loading --> Error : fail')
+	s.push('  Error --> Idle : retry')
+	s.push('```\n')
+
 	// thematic breaks
 	s.push('## Thematic Breaks\n')
 	s.push(paragraph(1) + '\n')
@@ -431,6 +480,8 @@ deploy "$@"
 	s.push('#### Heading 4\n')
 	s.push('##### Heading 5\n')
 	s.push('###### Heading 6\n')
+	s.push('## The $\\alpha$ Algorithm\n')
+	s.push('This heading contains inline math for TOC testing.\n')
 
 	// dense paragraphs
 	s.push('## Dense Paragraphs for Scroll Testing\n')

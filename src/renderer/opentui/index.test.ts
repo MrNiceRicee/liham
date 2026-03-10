@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 
 import type { AudioNode, ImageNode, IRNode, VideoNode } from '../../ir/types.ts'
+import { darkTheme } from '../../theme/dark.ts'
 
 import { renderToOpenTUIWithMedia } from './index.tsx'
+
+const theme = darkTheme
 
 function makeImage(alt: string, url?: string): ImageNode {
 	const node: ImageNode = { type: 'image', alt, style: { fg: '#888888' } }
@@ -41,7 +44,7 @@ function makeRoot(...children: IRNode[]): IRNode {
 describe('renderToOpenTUIWithMedia — media collection', () => {
 	it('collects image nodes', () => {
 		const ir = makeRoot(makeImage('photo', 'img.png'))
-		const { mediaNodes } = renderToOpenTUIWithMedia(ir)
+		const { mediaNodes } = renderToOpenTUIWithMedia(ir, theme)
 		expect(mediaNodes.length).toBe(1)
 		expect(mediaNodes[0]!.node.type).toBe('image')
 		expect(mediaNodes[0]!.index).toBe(0)
@@ -49,14 +52,14 @@ describe('renderToOpenTUIWithMedia — media collection', () => {
 
 	it('collects video nodes', () => {
 		const ir = makeRoot(makeVideo('clip', 'video.mp4'))
-		const { mediaNodes } = renderToOpenTUIWithMedia(ir)
+		const { mediaNodes } = renderToOpenTUIWithMedia(ir, theme)
 		expect(mediaNodes.length).toBe(1)
 		expect(mediaNodes[0]!.node.type).toBe('video')
 	})
 
 	it('collects audio nodes', () => {
 		const ir = makeRoot(makeAudio('song', 'track.mp3'))
-		const { mediaNodes } = renderToOpenTUIWithMedia(ir)
+		const { mediaNodes } = renderToOpenTUIWithMedia(ir, theme)
 		expect(mediaNodes.length).toBe(1)
 		expect(mediaNodes[0]!.node.type).toBe('audio')
 	})
@@ -68,7 +71,7 @@ describe('renderToOpenTUIWithMedia — media collection', () => {
 			makeImage('photo2', 'c.png'),
 			makeAudio('song', 'd.mp3'),
 		)
-		const { mediaNodes } = renderToOpenTUIWithMedia(ir)
+		const { mediaNodes } = renderToOpenTUIWithMedia(ir, theme)
 		expect(mediaNodes.length).toBe(4)
 		expect(mediaNodes[0]!.node.type).toBe('image')
 		expect(mediaNodes[0]!.index).toBe(0)
@@ -82,19 +85,19 @@ describe('renderToOpenTUIWithMedia — media collection', () => {
 
 	it('returns empty media list for text-only document', () => {
 		const ir = makeRoot({ type: 'text', value: 'hello world' })
-		const { mediaNodes } = renderToOpenTUIWithMedia(ir)
+		const { mediaNodes } = renderToOpenTUIWithMedia(ir, theme)
 		expect(mediaNodes.length).toBe(0)
 	})
 
 	it('returns empty media list for empty document', () => {
 		const ir = makeRoot()
-		const { mediaNodes } = renderToOpenTUIWithMedia(ir)
+		const { mediaNodes } = renderToOpenTUIWithMedia(ir, theme)
 		expect(mediaNodes.length).toBe(0)
 	})
 
 	it('returns jsx alongside media nodes', () => {
 		const ir = makeRoot(makeImage('photo', 'img.png'))
-		const { jsx, mediaNodes } = renderToOpenTUIWithMedia(ir)
+		const { jsx, mediaNodes } = renderToOpenTUIWithMedia(ir, theme)
 		expect(jsx).not.toBeNull()
 		expect(mediaNodes.length).toBe(1)
 	})
