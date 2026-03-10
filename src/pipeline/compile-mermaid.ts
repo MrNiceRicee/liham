@@ -6,20 +6,28 @@ import { renderMermaidASCII } from 'beautiful-mermaid'
 import type { Element } from 'hast'
 
 import type { CustomNode } from '../ir/types.ts'
-import { extractText } from './hast-utils.ts'
+import type { ThemeTokens } from '../theme/types.ts'
+import { extractCodeOrText } from './hast-utils.ts'
+import { sanitizeForTerminal } from './sanitize.ts'
 
-export function compileMermaidBlock(node: Element): CustomNode<'mermaid'> {
-	const codeEl = node.children.find(
-		(c): c is Element => c.type === 'element' && c.tagName === 'code',
-	)
-	const source = codeEl != null ? extractText(codeEl) : extractText(node)
+export function compileMermaidBlock(node: Element, theme: ThemeTokens): CustomNode<'mermaid'> {
+	const source = sanitizeForTerminal(extractCodeOrText(node))
 
 	let rendered: string | null = null
 	let error: string | null = null
 	try {
+		const { mermaid } = theme
 		const options: AsciiRenderOptions = {
-			colorMode: 'none',
+			colorMode: 'truecolor',
+			theme: {
+				fg: mermaid.textColor,
+				border: mermaid.borderColor,
+				line: mermaid.lineColor,
+				arrow: mermaid.arrowColor,
+			},
 		}
+		// rendered output contains ANSI escapes from truecolor mode —
+		// safe because source was already sanitized and ANSI is library-generated
 		rendered = renderMermaidASCII(source, options)
 	} catch (e) {
 		error = e instanceof Error ? e.message : 'unsupported diagram type'

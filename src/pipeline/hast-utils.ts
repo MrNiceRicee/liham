@@ -103,6 +103,14 @@ export function extractCode(node: Element): string {
 	return extractText(codeEl)
 }
 
+// like extractCode but falls back to extractText(node) instead of ''
+export function extractCodeOrText(node: Element): string {
+	const codeEl = node.children.find(
+		(child): child is Element => child.type === 'element' && child.tagName === 'code',
+	)
+	return extractText(codeEl ?? node)
+}
+
 export function extractLanguage(node: Element): string | undefined {
 	const codeEl = node.children.find(
 		(child): child is Element => child.type === 'element' && child.tagName === 'code',

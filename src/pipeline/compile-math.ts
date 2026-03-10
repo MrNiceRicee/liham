@@ -6,7 +6,8 @@ import { replace } from 'unicodeit'
 
 import type { CustomNode } from '../ir/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
-import { extractText } from './hast-utils.ts'
+import { extractCodeOrText, extractText } from './hast-utils.ts'
+import { sanitizeForTerminal } from './sanitize.ts'
 
 function safeReplace(latex: string): string {
 	try {
@@ -17,20 +18,17 @@ function safeReplace(latex: string): string {
 }
 
 export function compileMathInline(node: Element, theme: ThemeTokens): CustomNode<'mathInline'> {
-	const latex = extractText(node)
+	const latex = sanitizeForTerminal(extractText(node))
 	return {
 		type: 'mathInline',
-		data: { latex, unicode: safeReplace(latex), fg: theme.math.textColor },
+		data: { latex, unicode: sanitizeForTerminal(safeReplace(latex)), fg: theme.math.textColor },
 	}
 }
 
 export function compileMathDisplay(node: Element, theme: ThemeTokens): CustomNode<'mathDisplay'> {
-	const codeEl = node.children.find(
-		(c): c is Element => c.type === 'element' && c.tagName === 'code',
-	)
-	const latex = codeEl != null ? extractText(codeEl) : extractText(node)
+	const latex = sanitizeForTerminal(extractCodeOrText(node))
 	return {
 		type: 'mathDisplay',
-		data: { latex, unicode: safeReplace(latex), fg: theme.math.textColor },
+		data: { latex, unicode: sanitizeForTerminal(safeReplace(latex)), fg: theme.math.textColor },
 	}
 }
