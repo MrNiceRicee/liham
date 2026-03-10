@@ -2,6 +2,7 @@
 
 import type { CliRenderer, KeyEvent } from '@opentui/core'
 
+import { activeLayer } from '../../app/active-layer.ts'
 import type { AppAction, AppState } from '../../app/state.ts'
 import { handleFloatingPanelKey } from './floating-panel.tsx'
 import { clearImageCache } from './image.tsx'
@@ -55,22 +56,24 @@ export function dispatchViewerKey(
 	tocEntryCount: number,
 	renderer?: CliRenderer | null,
 ): void {
+	const layer = activeLayer(state)
+
 	// search — input swallows all, active passes through scroll keys
-	if (state.searchState != null) {
-		if (handleSearchKey(key, state.searchState, dispatch, searchMatchCount)) return
+	if (layer === 'searchInput' || layer === 'searchActive') {
+		if (handleSearchKey(key, state.searchState!, dispatch, searchMatchCount)) return
 	}
 
 	// toc — owns j/k/Enter/Esc/g/G, passes / through to activate search
-	if (dispatchTocKey(key, state, dispatch, tocEntryCount)) return
+	if (layer === 'toc' && dispatchTocKey(key, state, dispatch, tocEntryCount)) return
 
 	// guard: ToggleToc no-op when no headings or modal open
-	if (key.name === 't' && state.mediaModal.kind === 'closed' && tocEntryCount === 0) return
+	if (key.name === 't' && layer === 'viewer' && tocEntryCount === 0) return
 
 	// audio intercept — play directly instead of opening modal
 	if (tryAudioIntercept(key, state, mediaNodes, onAudioPlay)) return
 
 	const action =
-		state.mediaModal.kind !== 'closed'
+		layer === 'modal'
 			? handleModalKey(key, state, dispatch, mediaCount, videoDuration, videoElapsed)
 			: handleViewerKey(key, state, dispatch, mediaCount, renderer)
 	if (action == null) return

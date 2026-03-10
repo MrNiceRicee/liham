@@ -1,6 +1,7 @@
 // legend entries — key hint labels for status bar.
 
 import { detectAudioBackend } from '../media/audio-backend.ts'
+import { activeLayer } from './active-layer.ts'
 import type { AppState, FocusTarget, LegendPage, MediaModalState } from './state.ts'
 import { isSplitLayout } from './state.ts'
 
@@ -121,13 +122,21 @@ function searchActiveLegend(legendPage: LegendPage): LegendEntry[] {
 	]
 }
 
-// key priority: search-input > search-active > toc > modal > media-focus > normal
 export function legendEntries(state: AppState): LegendEntry[] {
-	if (state.mode === 'browser') return browserLegend(state.legendPage)
-	if (state.searchState?.phase === 'input') return searchInputLegend()
-	if (state.searchState?.phase === 'active') return searchActiveLegend(state.legendPage)
-	if (state.tocState != null) return tocLegend(state.legendPage)
-	if (state.mediaModal.kind !== 'closed') return modalLegend(state.mediaModal, state.legendPage)
-	if (state.mediaFocusIndex != null) return mediaFocusLegend(state.legendPage)
-	return viewerLegend(state)
+	switch (activeLayer(state)) {
+		case 'browser':
+			return browserLegend(state.legendPage)
+		case 'searchInput':
+			return searchInputLegend()
+		case 'searchActive':
+			return searchActiveLegend(state.legendPage)
+		case 'toc':
+			return tocLegend(state.legendPage)
+		case 'modal':
+			return modalLegend(state.mediaModal, state.legendPage)
+		case 'mediaFocus':
+			return mediaFocusLegend(state.legendPage)
+		case 'viewer':
+			return viewerLegend(state)
+	}
 }
