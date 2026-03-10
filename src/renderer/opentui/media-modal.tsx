@@ -244,9 +244,9 @@ function ModalVideoContent({
 		setPlaybackState('playing')
 		audioCtxRef.current = { absPath, basePath, fps: meta.fps, hasAudio: meta.hasAudio, seekOffset }
 
-		// tell mpv to seek (instant IPC ~1ms) — only if backend exists
+		// tell mpv to seek (instant IPC ~1ms) — includes seek-to-0 for replay
 		const backend = backendRef.current
-		if (backend?.kind === 'mpv' && seekOffset > 0) {
+		if (backend?.kind === 'mpv') {
 			backend.seek(seekOffset)
 		}
 
@@ -271,10 +271,11 @@ function ModalVideoContent({
 					const timePos = currentBackend.getTimePos()
 					if (timePos == null) return // no clock yet, hold
 
-					const result = syncFrameToClockPos(
-						timePos,
+					// offset timePos relative to ring buffer start — buffer always starts at frame 0
+				const result = syncFrameToClockPos(
+						timePos - seekOffset,
 						meta.fps,
-						meta.duration,
+						meta.duration > 0 ? meta.duration - seekOffset : 0,
 						consumedFrameIndexRef.current,
 						buffer,
 					)

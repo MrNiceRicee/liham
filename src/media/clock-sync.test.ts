@@ -6,11 +6,11 @@ import { syncFrameToClockPos } from './clock-sync.ts'
 import { createRingBuffer } from './ring-buffer.ts'
 
 // helper: fill buffer with numbered frames
-function fillBuffer(buffer: ReturnType<typeof createRingBuffer>, count: number, frameSize: number) {
+async function fillBuffer(buffer: ReturnType<typeof createRingBuffer>, count: number, frameSize: number) {
 	for (let i = 0; i < count; i++) {
 		const frame = new Uint8Array(frameSize)
 		frame[0] = i // tag frame with index for identification
-		buffer.write(frame)
+		await buffer.write(frame)
 	}
 }
 
@@ -19,9 +19,9 @@ describe('syncFrameToClockPos', () => {
 	const duration = 10 // 10 seconds = 100 frames
 	const frameSize = 4
 
-	test('renders frame at target when buffer has it', () => {
+	test('renders frame at target when buffer has it', async () => {
 		const buffer = createRingBuffer(10, frameSize)
-		fillBuffer(buffer, 5, frameSize)
+		await fillBuffer(buffer, 5, frameSize)
 
 		// time-pos=0.0 → targetFrame=0, currentIndex=0 → read frame 0
 		const result = syncFrameToClockPos(0.0, fps, duration, 0, buffer)
@@ -30,9 +30,9 @@ describe('syncFrameToClockPos', () => {
 		expect(result.frameToRender![0]).toBe(0)
 	})
 
-	test('skips frames when behind target', () => {
+	test('skips frames when behind target', async () => {
 		const buffer = createRingBuffer(10, frameSize)
-		fillBuffer(buffer, 5, frameSize)
+		await fillBuffer(buffer, 5, frameSize)
 
 		// time-pos=0.3 → targetFrame=3, currentIndex=0 → skip 0,1,2, render 3
 		const result = syncFrameToClockPos(0.3, fps, duration, 0, buffer)
@@ -50,9 +50,9 @@ describe('syncFrameToClockPos', () => {
 		expect(result.frameToRender).toBeNull() // hold
 	})
 
-	test('caps skip count at maxSkipsPerTick', () => {
+	test('caps skip count at maxSkipsPerTick', async () => {
 		const buffer = createRingBuffer(20, frameSize)
-		fillBuffer(buffer, 15, frameSize)
+		await fillBuffer(buffer, 15, frameSize)
 
 		// time-pos=1.0 → targetFrame=10, currentIndex=0, maxSkips=3
 		const result = syncFrameToClockPos(1.0, fps, duration, 0, buffer, 3)
@@ -61,9 +61,9 @@ describe('syncFrameToClockPos', () => {
 		expect(result.frameToRender).toBeNull() // still catching up
 	})
 
-	test('detects backward clock jump and resets index', () => {
+	test('detects backward clock jump and resets index', async () => {
 		const buffer = createRingBuffer(10, frameSize)
-		fillBuffer(buffer, 5, frameSize)
+		await fillBuffer(buffer, 5, frameSize)
 
 		// currentIndex=50 but time-pos=0.1 → targetFrame=1 < 50 → backward jump
 		const result = syncFrameToClockPos(0.1, fps, duration, 50, buffer)
@@ -71,9 +71,9 @@ describe('syncFrameToClockPos', () => {
 		expect(result.frameToRender).toBeNull() // hold during reset
 	})
 
-	test('clamps target to last valid frame', () => {
+	test('clamps target to last valid frame', async () => {
 		const buffer = createRingBuffer(10, frameSize)
-		fillBuffer(buffer, 5, frameSize)
+		await fillBuffer(buffer, 5, frameSize)
 
 		// time-pos far past duration → clamp to last frame
 		const result = syncFrameToClockPos(999, fps, duration, 95, buffer)
@@ -83,10 +83,10 @@ describe('syncFrameToClockPos', () => {
 		expect(result.newIndex).toBeGreaterThanOrEqual(95)
 	})
 
-	test('holds when at target but buffer empty', () => {
+	test('holds when at target but buffer empty', async () => {
 		const buffer = createRingBuffer(10, frameSize)
 		// put exactly 2 frames
-		fillBuffer(buffer, 2, frameSize)
+		await fillBuffer(buffer, 2, frameSize)
 
 		// time-pos=0.2 → targetFrame=2, currentIndex=0
 		// skip frame 0, skip frame 1, try to read frame 2 → null
@@ -95,9 +95,9 @@ describe('syncFrameToClockPos', () => {
 		expect(result.frameToRender).toBeNull() // hold
 	})
 
-	test('handles zero duration gracefully', () => {
+	test('handles zero duration gracefully', async () => {
 		const buffer = createRingBuffer(10, frameSize)
-		fillBuffer(buffer, 5, frameSize)
+		await fillBuffer(buffer, 5, frameSize)
 
 		// duration=0 → totalFrames=MAX_SAFE_INTEGER, no clamping
 		const result = syncFrameToClockPos(0.1, fps, 0, 0, buffer)
@@ -105,9 +105,9 @@ describe('syncFrameToClockPos', () => {
 		expect(result.frameToRender).not.toBeNull()
 	})
 
-	test('already at target, renders next frame', () => {
+	test('already at target, renders next frame', async () => {
 		const buffer = createRingBuffer(10, frameSize)
-		fillBuffer(buffer, 5, frameSize)
+		await fillBuffer(buffer, 5, frameSize)
 
 		// time-pos=0.3 → targetFrame=3, currentIndex=3 → no skip, just read
 		const result = syncFrameToClockPos(0.3, fps, duration, 3, buffer)
