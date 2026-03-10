@@ -4,6 +4,7 @@
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, resolve } from 'node:path'
 
+import { extractError } from '../utils/error.ts'
 import type { ImageResult, LocalFile } from './types.ts'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -42,8 +43,8 @@ export async function resolveImagePath(
 		// realpath canonicalizes symlinks — prevents following malicious symlinks
 		const realResolved = await realpath(resolved)
 		return { ok: true, value: realResolved }
-	} catch {
-		return { ok: false, error: 'file not found' }
+	} catch (err) {
+		return { ok: false, error: 'file not found: ' + extractError(err, 'unknown') }
 	}
 }
 
@@ -69,7 +70,7 @@ export async function loadImageFile(
 		}
 
 		return { ok: true, value: { kind: 'local', bytes, absolutePath, mtime: s.mtimeMs } }
-	} catch {
-		return { ok: false, error: 'cannot read file' }
+	} catch (err) {
+		return { ok: false, error: 'cannot read file: ' + extractError(err, 'unknown') }
 	}
 }

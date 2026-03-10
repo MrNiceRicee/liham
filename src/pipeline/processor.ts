@@ -10,6 +10,7 @@ import { unified } from 'unified'
 import type { IRNode } from '../ir/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 import type { PipelineResult } from '../types/pipeline.ts'
+import { extractError } from '../utils/error.ts'
 
 import rehypeIR from './rehype-ir.ts'
 
@@ -47,10 +48,9 @@ export async function processMarkdown(
 			value: result.result as IRNode,
 		}
 	} catch (err: unknown) {
-		const message = err instanceof Error ? err.message : 'unknown pipeline error'
 		return {
 			ok: false,
-			error: message,
+			error: extractError(err, 'unknown pipeline error'),
 			cause: err,
 		}
 	}

@@ -132,7 +132,7 @@ describe('fetchRemoteImage', () => {
 		globalThis.fetch = (() => Promise.reject(new Error('network error'))) as unknown as typeof fetch
 		const result = await fetchRemoteImage('https://example.com/img.png')
 		expect(result.ok).toBe(false)
-		if (!result.ok) expect(result.error).toBe('remote image failed')
+		if (!result.ok) expect(result.error).toStartWith('remote image failed')
 	})
 
 	test('handles HTTP error status', async () => {
@@ -147,7 +147,7 @@ describe('fetchRemoteImage', () => {
 		controller.abort()
 		const result = await fetchRemoteImage('https://example.com/img.png', controller.signal)
 		expect(result.ok).toBe(false)
-		if (!result.ok) expect(result.error).toBe('remote image failed')
+		if (!result.ok) expect(result.error).toStartWith('remote image failed')
 	})
 
 	test('blocks 10.x.x.x (RFC 1918)', async () => {

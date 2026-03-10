@@ -1,6 +1,7 @@
 // fill ring buffer — producer that reads ffmpeg stdout frames into a ring buffer.
 // relies on ring buffer backpressure + OS pipe backpressure for flow control.
 
+import { extractError } from '../utils/error.ts'
 import type { RingBuffer } from './ring-buffer.ts'
 import { readFrames } from './video-decoder.ts'
 
@@ -53,7 +54,7 @@ export async function fillRingBuffer({
 		}
 	} catch (err) {
 		if (!isStale()) {
-			const reason = err instanceof Error ? err.message : 'pipe error'
+			const reason = extractError(err, 'pipe error')
 			buffer.markError(reason)
 			onEvent({ type: 'error', reason })
 			debug(`error: ${reason}`)

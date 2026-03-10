@@ -1,6 +1,7 @@
 // mpv audio backend — wraps MpvIpc with time-pos caching/interpolation,
 // volume clamping, and sanitizeMediaPath integration.
 
+import { extractError } from '../utils/error.ts'
 import { sanitizeMediaPath } from './ffplay.ts'
 import type { AudioBackend, PlayResult } from './audio-backend.ts'
 import { cleanupStaleSockets, createMpvIpc, type MpvIpc } from './mpv-ipc.ts'
@@ -93,7 +94,7 @@ export function createMpvBackend(): AudioBackend {
 				debug(`playing: ${sanitized.path!} at offset ${String(seekOffset)}`)
 				return { ok: true }
 			} catch (err) {
-				const message = err instanceof Error ? err.message : 'mpv play failed'
+				const message = extractError(err, 'mpv play failed')
 				debug(`play error: ${message}`)
 				return { ok: false, error: message }
 			}

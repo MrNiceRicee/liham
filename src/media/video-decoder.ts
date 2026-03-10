@@ -1,5 +1,6 @@
 // video decoder — ffprobe metadata, ffmpeg frame streaming, dimension calculation.
 
+import { extractError, safeKill, safeSendSignal } from '../utils/error.ts'
 import { sanitizeMediaPath } from './ffplay.ts'
 import type { ImageResult } from './types.ts'
 
@@ -86,17 +87,7 @@ async function probeAudioStream(absPath: string, signal?: AbortSignal): Promise<
 		)
 
 		if (signal != null) {
-			signal.addEventListener(
-				'abort',
-				() => {
-					try {
-						audioProc.kill('SIGKILL')
-					} catch {
-						/* already dead */
-					}
-				},
-				{ once: true },
-			)
+			signal.addEventListener('abort', () => safeKill(audioProc), { once: true })
 		}
 
 		const audioExited = audioProc.exited
@@ -106,11 +97,7 @@ async function probeAudioStream(absPath: string, signal?: AbortSignal): Promise<
 		const audioRace = await Promise.race([audioExited, audioTimeout])
 
 		if (audioRace === 'timeout') {
-			try {
-				audioProc.kill('SIGKILL')
-			} catch {
-				/* already dead */
-			}
+			safeKill(audioProc)
 			return false
 		}
 
@@ -161,17 +148,7 @@ export async function probeVideo(
 		)
 
 		if (signal != null) {
-			signal.addEventListener(
-				'abort',
-				() => {
-					try {
-						proc.kill('SIGKILL')
-					} catch {
-						/* already dead */
-					}
-				},
-				{ once: true },
-			)
+			signal.addEventListener('abort', () => safeKill(proc), { once: true })
 		}
 
 		const exited = proc.exited
@@ -179,11 +156,7 @@ export async function probeVideo(
 		const race = await Promise.race([exited, timeout])
 
 		if (race === 'timeout') {
-			try {
-				proc.kill('SIGKILL')
-			} catch {
-				/* already dead */
-			}
+			safeKill(proc)
 			return { ok: false, error: 'ffprobe timed out' }
 		}
 
@@ -198,8 +171,7 @@ export async function probeVideo(
 
 		videoJson = JSON.parse(stdout) as Record<string, unknown>
 	} catch (err) {
-		const message = err instanceof Error ? err.message : 'ffprobe failed'
-		return { ok: false, error: message }
+		return { ok: false, error: extractError(err, 'ffprobe failed') }
 	}
 
 	// extract video stream info
@@ -286,12 +258,8 @@ export function pauseActiveVideo(): void {
 		`pauseActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}`,
 	)
 	if (activeVideoProc != null && !videoStopped) {
-		try {
-			process.kill(activeVideoProc.pid, 'SIGSTOP')
-			videoStopped = true
-		} catch {
-			/* already dead */
-		}
+		safeSendSignal(activeVideoProc.pid, 'SIGSTOP')
+		videoStopped = true
 	}
 }
 
@@ -300,12 +268,8 @@ export function resumeActiveVideo(): void {
 		`resumeActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}`,
 	)
 	if (activeVideoProc != null && videoStopped) {
-		try {
-			process.kill(activeVideoProc.pid, 'SIGCONT')
-			videoStopped = false
-		} catch {
-			/* already dead */
-		}
+		safeSendSignal(activeVideoProc.pid, 'SIGCONT')
+		videoStopped = false
 	}
 }
 
@@ -320,11 +284,7 @@ export async function killActiveVideo(): Promise<void> {
 	}
 	proc.kill('SIGTERM')
 	await Promise.race([proc.exited, new Promise((r) => setTimeout(r, 500))])
-	try {
-		proc.kill('SIGKILL')
-	} catch {
-		// already exited
-	}
+	safeKill(proc)
 }
 
 export function createVideoStream(options: VideoStreamOptions): ReturnType<typeof Bun.spawn> {
@@ -351,12 +311,8 @@ export function createVideoStream(options: VideoStreamOptions): ReturnType<typeo
 
 	// kill any existing video process before starting new
 	if (activeVideoProc != null) {
-		try {
-			if (videoStopped) activeVideoProc.kill('SIGCONT')
-			activeVideoProc.kill('SIGKILL')
-		} catch {
-			/* already dead */
-		}
+		if (videoStopped) safeKill(activeVideoProc, 'SIGCONT')
+		safeKill(activeVideoProc)
 		activeVideoProc = null
 		videoStopped = false
 	}
@@ -421,11 +377,5 @@ export async function* readFrames(
 
 // kill video on process exit — prevents orphaned ffmpeg
 process.on('exit', () => {
-	if (activeVideoProc != null) {
-		try {
-			activeVideoProc.kill('SIGKILL')
-		} catch {
-			// ignore
-		}
-	}
+	if (activeVideoProc != null) safeKill(activeVideoProc)
 })

@@ -4,6 +4,7 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 import type { ReactNode, RefObject } from 'react'
 
 import type { AppAction, AppState } from '../../app/state.ts'
+import { extractError } from '../../utils/error.ts'
 import { paneDimensions } from '../../app/state.ts'
 import type { FuzzyMatch } from '../../browser/fuzzy.ts'
 import { scanDirectory } from '../../browser/scanner.ts'
@@ -28,8 +29,7 @@ export function scanDirectoryEffect(dir: string, dispatch: React.Dispatch<AppAct
 		},
 		(err: unknown) => {
 			if (cancelled) return
-			const message = err instanceof Error ? err.message : 'scan failed'
-			dispatch({ type: 'ScanError', error: message })
+			dispatch({ type: 'ScanError', error: extractError(err, 'scan failed') })
 		},
 	)
 
@@ -77,8 +77,12 @@ export function renderBrowserPreview(
 				setContent(rendered)
 				setRenderTime(elapsed)
 			}
-		} catch {
-			setContent(<text fg={theme.fallback.textColor}>cannot read file</text>)
+		} catch (err) {
+			setContent(
+				<text fg={theme.fallback.textColor}>
+					cannot read file: {extractError(err, 'unknown')}
+				</text>,
+			)
 		}
 	})()
 }

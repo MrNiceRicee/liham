@@ -1,5 +1,6 @@
 // remote image fetcher — HTTP fetch with timeout, size limit, SSRF basics.
 
+import { extractError } from '../utils/error.ts'
 import { isValidMagicBytes } from './loader.ts'
 import type { ImageResult, RemoteFile } from './types.ts'
 
@@ -125,7 +126,7 @@ export async function fetchRemoteImage(
 		if (!isValidMagicBytes(bodyResult.value)) return { ok: false, error: 'remote image failed' }
 
 		return { ok: true, value: { kind: 'remote', bytes: bodyResult.value, url } }
-	} catch {
-		return { ok: false, error: 'remote image failed' }
+	} catch (err) {
+		return { ok: false, error: 'remote image failed: ' + extractError(err, 'unknown') }
 	}
 }

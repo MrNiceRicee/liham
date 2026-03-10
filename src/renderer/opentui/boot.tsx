@@ -2,6 +2,7 @@
 // creates the CLI renderer, mounts the React tree, handles cleanup.
 
 import { createCliRenderer } from '@opentui/core'
+import { extractError } from '../../utils/error.ts'
 import { createRoot } from '@opentui/react'
 import { type LayoutMode, paneDimensions } from '../../app/state.ts'
 import type { IRNode } from '../../ir/types.ts'
@@ -83,7 +84,6 @@ export async function boot(ctx: BootContext): Promise<void> {
 		}
 	} catch (err: unknown) {
 		renderer.destroy()
-		const message = err instanceof Error ? err.message : 'unknown render error'
-		console.error(`render error: ${message}`)
+		console.error(`render error: ${extractError(err, 'unknown render error')}`)
 	}
 }

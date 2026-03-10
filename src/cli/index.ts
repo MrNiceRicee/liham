@@ -11,6 +11,7 @@ import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
 import type { LayoutMode } from '../app/state.ts'
+import { extractError } from '../utils/error.ts'
 import { isSharpAvailable } from '../media/decoder.ts'
 import { detectCapabilities } from '../media/detect.ts'
 import { isFfmpegAvailable, isFfplayAvailable } from '../media/ffplay.ts'
@@ -141,8 +142,7 @@ function parseCliArgs(): CliMode {
 		values = parsed.values
 		positionals = parsed.positionals
 	} catch (err: unknown) {
-		const message = err instanceof Error ? err.message : 'invalid arguments'
-		console.error(`error: ${message}`)
+		console.error(`error: ${extractError(err, 'invalid arguments')}`)
 		console.error(`\nrun 'liham --help' for usage`)
 		process.exit(1)
 	}

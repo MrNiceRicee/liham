@@ -3,6 +3,7 @@
 // via request_id, dispatches events, and provides synchronous cleanup.
 
 import { mkdtempSync, readdirSync, rmSync, unlinkSync } from 'node:fs'
+import { safeKill } from '../utils/error.ts'
 import { createConnection, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -61,13 +62,7 @@ let activeSocketDir: string | null = null
 let socketCounter = 0
 
 process.on('exit', () => {
-	if (activeMpvProc != null) {
-		try {
-			activeMpvProc.kill('SIGKILL')
-		} catch {
-			// already dead
-		}
-	}
+	if (activeMpvProc != null) safeKill(activeMpvProc)
 	if (activeSocketDir != null) {
 		try {
 			rmSync(activeSocketDir, { recursive: true })
@@ -206,11 +201,7 @@ export async function createMpvIpc(options: MpvIpcOptions = {}): Promise<MpvIpc>
 		socket = await waitForSocket(socketPath, timeoutMs)
 	} catch (err) {
 		// cleanup on connection failure
-		try {
-			proc.kill('SIGKILL')
-		} catch {
-			// already dead
-		}
+		safeKill(proc)
 		try {
 			rmSync(sockDir, { recursive: true })
 		} catch {
@@ -359,11 +350,7 @@ export async function createMpvIpc(options: MpvIpcOptions = {}): Promise<MpvIpc>
 			socket.destroy()
 
 			// SIGKILL mpv — synchronous, no async quit command
-			try {
-				proc.kill('SIGKILL')
-			} catch {
-				// already dead
-			}
+			safeKill(proc)
 
 			// unlink socket + remove dir
 			try {

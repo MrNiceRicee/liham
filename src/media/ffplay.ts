@@ -3,6 +3,8 @@
 import { realpathSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+import { extractError, safeKill } from '../utils/error.ts'
+
 const debug =
 	process.env['LIHAM_DEBUG'] === '1'
 		? (msg: string) => process.stderr.write(`[ffplay] ${msg}\n`)
@@ -75,11 +77,7 @@ export async function killActiveAudio(): Promise<void> {
 	const proc = activeAudioProc
 	activeAudioProc = null
 	debug(`killActiveAudio: SIGKILL pid=${String(proc.pid)}`)
-	try {
-		proc.kill('SIGKILL')
-	} catch {
-		// already dead
-	}
+	safeKill(proc)
 	pendingKill = proc.exited.then(() => {
 		pendingKill = null
 	})
@@ -140,18 +138,11 @@ export async function playAudio(
 		return { ok: true }
 	} catch (err) {
 		activeAudioProc = null
-		const message = err instanceof Error ? err.message : 'ffplay spawn failed'
-		return { ok: false, error: message }
+		return { ok: false, error: extractError(err, 'ffplay spawn failed') }
 	}
 }
 
 // kill audio on process exit — prevents orphaned ffplay
 process.on('exit', () => {
-	if (activeAudioProc != null) {
-		try {
-			activeAudioProc.kill('SIGKILL')
-		} catch {
-			// ignore
-		}
-	}
+	if (activeAudioProc != null) safeKill(activeAudioProc)
 })

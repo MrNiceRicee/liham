@@ -59,7 +59,7 @@ describe('resolveImagePath', () => {
 	test('rejects nonexistent deep traversal', async () => {
 		const result = await resolveImagePath('../../../etc/nonexistent-file', imagesDir)
 		expect(result.ok).toBe(false)
-		if (!result.ok) expect(result.error).toBe('file not found')
+		if (!result.ok) expect(result.error).toStartWith('file not found')
 	})
 
 	test('resolves valid symlink inside base dir', async () => {
@@ -70,7 +70,7 @@ describe('resolveImagePath', () => {
 	test('returns error for missing file', async () => {
 		const result = await resolveImagePath('nonexistent.png', imagesDir)
 		expect(result.ok).toBe(false)
-		if (!result.ok) expect(result.error).toBe('file not found')
+		if (!result.ok) expect(result.error).toStartWith('file not found')
 	})
 })
 
