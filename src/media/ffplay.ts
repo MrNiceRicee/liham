@@ -22,11 +22,7 @@ export function isFfmpegAvailable(): boolean {
 
 // -- path sanitization --
 
-export interface SanitizeResult {
-	ok: boolean
-	path?: string
-	error?: string
-}
+export type SanitizeResult = { ok: true; value: string } | { ok: false; error: string }
 
 export function sanitizeMediaPath(rawPath: string, basePath: string): SanitizeResult {
 	// reject empty
@@ -57,7 +53,7 @@ export function sanitizeMediaPath(rawPath: string, basePath: string): SanitizeRe
 		return { ok: false, error: 'cannot resolve path' }
 	}
 
-	return { ok: true, path: real }
+	return { ok: true, value: real }
 }
 
 // -- types --
@@ -100,13 +96,13 @@ export async function playAudio(
 
 	const sanitized = sanitizeMediaPath(mediaPath, basePath)
 	if (!sanitized.ok) {
-		return { ok: false, error: sanitized.error ?? 'invalid path' }
+		return { ok: false, error: sanitized.error }
 	}
 
 	// kill any existing audio before starting new
 	await killActiveAudio()
 
-	const filePath = sanitized.path!
+	const filePath = sanitized.value
 
 	try {
 		const args = [

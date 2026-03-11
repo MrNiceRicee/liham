@@ -23,8 +23,12 @@ describe('sanitizeForTerminal', () => {
 		expect(sanitizeForTerminal('a\x7fb')).toBe('ab')
 	})
 
-	it('preserves carriage return', () => {
-		expect(sanitizeForTerminal('a\rb')).toBe('a\rb')
+	it('strips carriage return (prevents visual overwrite)', () => {
+		expect(sanitizeForTerminal('a\rb')).toBe('ab')
+	})
+
+	it('strips \\r from CRLF line endings', () => {
+		expect(sanitizeForTerminal('line1\r\nline2')).toBe('line1\nline2')
 	})
 
 	it('returns empty string for empty input', () => {

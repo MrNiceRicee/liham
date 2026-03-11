@@ -17,6 +17,7 @@ export interface VideoMetadata {
 	fps: number
 	duration: number // seconds, 0 if unknown
 	hasAudio: boolean
+	absPath: string // sanitized absolute path from sanitizeMediaPath
 }
 
 export interface VideoStreamOptions {
@@ -121,10 +122,10 @@ export async function probeVideo(
 ): Promise<ImageResult<VideoMetadata>> {
 	const sanitized = sanitizeMediaPath(filePath, basePath)
 	if (!sanitized.ok) {
-		return { ok: false, error: sanitized.error ?? 'invalid path' }
+		return { ok: false, error: sanitized.error }
 	}
 
-	const absPath = sanitized.path!
+	const absPath = sanitized.value
 
 	// probe video stream metadata
 	let videoJson: Record<string, unknown>
@@ -208,7 +209,7 @@ export async function probeVideo(
 
 	return {
 		ok: true,
-		value: { width, height, fps, duration, hasAudio },
+		value: { width, height, fps, duration, hasAudio, absPath },
 	}
 }
 
@@ -289,6 +290,11 @@ export async function killActiveVideo(): Promise<void> {
 
 export function createVideoStream(options: VideoStreamOptions): ReturnType<typeof Bun.spawn> {
 	const { filePath, width, height, fps, seekOffset } = options
+
+	// defense-in-depth: reject unsanitized paths
+	if (filePath.length === 0 || filePath.startsWith('-')) {
+		throw new Error('invalid path')
+	}
 
 	// validate seekOffset
 	if (seekOffset != null && (!Number.isFinite(seekOffset) || seekOffset < 0)) {
@@ -387,10 +393,10 @@ export async function extractVideoThumbnail(
 ): Promise<ImageResult<Uint8Array>> {
 	const sanitized = sanitizeMediaPath(filePath, basePath)
 	if (!sanitized.ok) {
-		return { ok: false, error: sanitized.error ?? 'invalid path' }
+		return { ok: false, error: sanitized.error }
 	}
 
-	const absPath = sanitized.path!
+	const absPath = sanitized.value
 
 	try {
 		const proc = Bun.spawn(

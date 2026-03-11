@@ -36,7 +36,7 @@ export async function printMarkdown(args: PrintMode): Promise<void> {
 		process.exit(1)
 	}
 
-	const ir = result.value as RootNode
+	const ir = result.value
 	const width = process.stdout.columns ?? 80
 	const basePath = args.source === 'file' ? resolve(args.filePath, '..') : process.cwd()
 
@@ -180,7 +180,7 @@ function chunkIRChildren(children: IRNode[], paneWidth: number): Chunk[] {
 
 function estimateNodeHeight(node: IRNode, paneWidth: number): number {
 	if ('type' in node && typeof node.type === 'string') {
-		return estimateHeight(node as Parameters<typeof estimateHeight>[0], paneWidth)
+		return estimateHeight(node, paneWidth)
 	}
 	return 1
 }

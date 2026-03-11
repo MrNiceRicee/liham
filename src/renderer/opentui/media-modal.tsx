@@ -178,9 +178,7 @@ function ModalVideoContent({
 	const [playbackState, setPlaybackState] = useState<PlaybackState>('loading')
 
 	// cached probe result — survives across seek/resize, only re-probed on src change
-	const [probeCache, setProbeCache] = useState<{ meta: VideoMetadata; absPath: string } | null>(
-		null,
-	)
+	const [probeCache, setProbeCache] = useState<VideoMetadata | null>(null)
 
 	// detected backend kind — cached once per component mount
 	const [detectedBackendKind] = useState<'mpv' | 'ffplay'>(() => detectAudioBackend())
@@ -210,16 +208,15 @@ function ModalVideoContent({
 		setProbeCache(null)
 		setPlaybackState('loading')
 		const controller = new AbortController()
-		const absPath = resolve(basePath, src)
 
 		void (async () => {
-			const result = await probeVideo(absPath, basePath, controller.signal)
+			const result = await probeVideo(src, basePath, controller.signal)
 			if (controller.signal.aborted) return
 			if (!result.ok) {
 				setPlaybackState('error')
 				return
 			}
-			setProbeCache({ meta: result.value, absPath })
+			setProbeCache(result.value)
 		})()
 
 		return () => {
@@ -231,7 +228,7 @@ function ModalVideoContent({
 	// DECOUPLED from stream effect: mpv stays alive across seeks.
 	// only re-fires when the video file changes.
 	useEffect(() => {
-		if (!probeCache?.meta.hasAudio) return
+		if (!probeCache?.hasAudio) return
 
 		const { absPath } = probeCache
 		let backend: AudioBackend | null = null
@@ -276,8 +273,8 @@ function ModalVideoContent({
 	useEffect(() => {
 		if (probeCache == null) return
 
-		const { meta, absPath } = probeCache
-		const dims = computeVideoDimensions(meta.width, meta.height, maxCols, maxRows)
+		const { absPath } = probeCache
+		const dims = computeVideoDimensions(probeCache.width, probeCache.height, maxCols, maxRows)
 		if (dims == null) return
 
 		const thisLoadId = ++loadIdRef.current
@@ -291,7 +288,8 @@ function ModalVideoContent({
 
 		setGridWidth(dims.termCols)
 		setPlaybackState('playing')
-		audioCtxRef.current = { absPath, basePath, fps: meta.fps, hasAudio: meta.hasAudio, seekOffset }
+		const { fps, hasAudio, duration } = probeCache
+		audioCtxRef.current = { absPath, basePath, fps, hasAudio, seekOffset }
 
 		// tell mpv to seek (instant IPC ~1ms) — includes seek-to-0 for replay
 		const backend = backendRef.current
@@ -303,13 +301,13 @@ function ModalVideoContent({
 			filePath: absPath,
 			width: dims.pixelWidth,
 			height: dims.pixelHeight,
-			fps: meta.fps,
+			fps,
 			seekOffset,
 		})
 
 		// consumer: timer-driven rendering from ring buffer
 		const timer = createFrameTimer({
-			delays: [1000 / meta.fps],
+			delays: [1000 / fps],
 			onFrame: () => {
 				if (renderPendingRef.current) return // backpressure: skip if React hasn't committed
 
@@ -321,8 +319,8 @@ function ModalVideoContent({
 						currentBackend,
 						buffer,
 						seekOffset,
-						meta.fps,
-						meta.duration,
+						fps,
+						duration,
 						consumedFrameIndexRef,
 						dims,
 						src,
@@ -350,8 +348,8 @@ function ModalVideoContent({
 				renderPendingRef.current = true
 				setCurrentGrid(grid)
 
-				const elapsed = seekOffset + timer.tickCount / meta.fps
-				onVideoInfo({ elapsed, duration: meta.duration, paused: false })
+				const elapsed = seekOffset + timer.tickCount / fps
+				onVideoInfo({ elapsed, duration, paused: false })
 			},
 			loop: true,
 		})
@@ -362,7 +360,7 @@ function ModalVideoContent({
 			stdout: proc.stdout as ReadableStream<Uint8Array>,
 			buffer,
 			frameSize,
-			fps: meta.fps,
+			fps,
 			isStale,
 			onEvent: (event) => {
 				if (isStale()) return
@@ -389,7 +387,7 @@ function ModalVideoContent({
 			}
 
 			// ffplay fallback: start audio here (mpv audio managed by audio effect)
-			if (meta.hasAudio && detectedBackendKind === 'ffplay') {
+			if (hasAudio && detectedBackendKind === 'ffplay') {
 				await playAudio(absPath, basePath, seekOffset)
 				if (isStale()) return
 			}

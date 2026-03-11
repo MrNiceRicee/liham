@@ -32,19 +32,19 @@ describe('sanitizeMediaPath', () => {
 	test('resolves valid local file', () => {
 		const result = sanitizeMediaPath('fixture.txt', base)
 		expect(result.ok).toBe(true)
-		expect(result.path).toContain('fixture.txt')
+		if (result.ok) expect(result.value).toContain('fixture.txt')
 	})
 
 	test('rejects empty path', () => {
 		const result = sanitizeMediaPath('', base)
 		expect(result.ok).toBe(false)
-		expect(result.error).toBe('empty path')
+		if (!result.ok) expect(result.error).toBe('empty path')
 	})
 
 	test('rejects path starting with dash (flag injection)', () => {
 		const result = sanitizeMediaPath('-autoexit', base)
 		expect(result.ok).toBe(false)
-		expect(result.error).toBe('path starts with dash')
+		if (!result.ok) expect(result.error).toBe('path starts with dash')
 	})
 
 	test('rejects remote URLs', () => {
@@ -58,25 +58,25 @@ describe('sanitizeMediaPath', () => {
 	test('rejects nonexistent file', () => {
 		const result = sanitizeMediaPath('nonexistent.mp4', base)
 		expect(result.ok).toBe(false)
-		expect(result.error).toBe('file not found')
+		if (!result.ok) expect(result.error).toBe('file not found')
 	})
 
 	test('rejects directory', () => {
 		const result = sanitizeMediaPath('.', base)
 		expect(result.ok).toBe(false)
-		expect(result.error).toBe('not a file')
+		if (!result.ok) expect(result.error).toBe('not a file')
 	})
 
 	test('resolves relative path from basePath', () => {
 		const result = sanitizeMediaPath('../assets/fixture.txt', `${base}/../fixtures`)
 		expect(result.ok).toBe(true)
-		expect(result.path).toContain('fixture.txt')
+		if (result.ok) expect(result.value).toContain('fixture.txt')
 	})
 
 	test('path with shell metacharacters is treated as literal filename', () => {
 		// this file doesn't exist, but the point is it doesn't execute
 		const result = sanitizeMediaPath('$(whoami).mp4', base)
 		expect(result.ok).toBe(false)
-		expect(result.error).toBe('file not found')
+		if (!result.ok) expect(result.error).toBe('file not found')
 	})
 })

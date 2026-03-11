@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
-import type { CoreIRNode, IRNode, TableCellNode, TableNode, TableRowNode } from '../../ir/types.ts'
+import type { IRNode, TableCellNode, TableNode, TableRowNode } from '../../ir/types.ts'
+import { isCoreNode } from '../../ir/types.ts'
 
 import { renderInlineChildren } from './inline.tsx'
 import { sourceLineId } from './source-line-id.ts'
@@ -11,23 +12,23 @@ import { sourceLineId } from './source-line-id.ts'
 function extractPlainText(nodes: IRNode[]): string {
 	let text = ''
 	for (const node of nodes) {
-		const core = node as CoreIRNode
-		switch (core.type) {
+		if (!isCoreNode(node)) continue
+		switch (node.type) {
 			case 'text':
 			case 'inlineCode':
-				text += core.value
+				text += node.value
 				break
 			case 'strong':
 			case 'emphasis':
 			case 'link':
 			case 'strikethrough':
-				text += extractPlainText(core.children)
+				text += extractPlainText(node.children)
 				break
 			case 'image':
-				text += `[image: ${core.alt}]`
+				text += `[image: ${node.alt}]`
 				break
 			case 'checkbox':
-				text += core.checked ? '[x] ' : '[ ] '
+				text += node.checked ? '[x] ' : '[ ] '
 				break
 			case 'break':
 				text += ' '

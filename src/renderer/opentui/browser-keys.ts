@@ -9,35 +9,10 @@ import {
 	type AppState,
 	type CursorDirection,
 	isSplitLayout,
+	moveCursor,
 } from '../../app/state.ts'
 import type { FuzzyMatch } from '../../browser/fuzzy.ts'
 import { handleTextInputKey } from './text-input-keys.ts'
-
-const PAGE_SIZE = 10
-
-// predict new cursor position (mirrors reducer's moveCursor logic)
-function predictCursor(current: number, direction: CursorDirection, length: number): number {
-	if (length === 0) return 0
-	const max = length - 1
-	switch (direction) {
-		case 'up':
-			return Math.max(0, current - 1)
-		case 'down':
-			return Math.min(max, current + 1)
-		case 'top':
-			return 0
-		case 'bottom':
-			return max
-		case 'pageUp':
-			return Math.max(0, current - PAGE_SIZE)
-		case 'pageDown':
-			return Math.min(max, current + PAGE_SIZE)
-		case 'halfUp':
-			return Math.max(0, current - Math.floor(PAGE_SIZE / 2))
-		case 'halfDown':
-			return Math.min(max, current + Math.floor(PAGE_SIZE / 2))
-	}
-}
 
 // content row for cursor position, accounting for directory group headers
 function cursorItemRow(matches: FuzzyMatch[], cursorIndex: number): number {
@@ -188,7 +163,7 @@ export function browserKeyHandler(
 
 	const cursorDir = browserCursorKey(key, dispatch, matches.length)
 	if (cursorDir != null) {
-		const newIndex = predictCursor(state.browser.cursorIndex, cursorDir, matches.length)
+		const newIndex = moveCursor(state.browser.cursorIndex, cursorDir, matches.length)
 		scrollToCursor(scrollRef, matches, newIndex)
 		return
 	}

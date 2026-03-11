@@ -6,9 +6,9 @@ import type { ReactNode } from 'react'
 import { TextAttributes } from '@opentui/core'
 import { extractText } from '../../ir/text-utils.ts'
 import {
-	type CoreIRNode,
 	type IRNode,
 	isBlockNode,
+	isCoreNode,
 	isCustomNode,
 	type MediaIRNode,
 } from '../../ir/types.ts'
@@ -50,10 +50,6 @@ interface RenderContext {
 	toc: TocEntry[]
 	blockIndex: number
 	irNodes: IRNode[] // top-level nodes for estimateHeadingOffset
-}
-
-function isCoreNode(node: IRNode): node is CoreIRNode {
-	return 'type' in node && typeof node.type === 'string'
 }
 
 // renders a single IR node to OpenTUI JSX

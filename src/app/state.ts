@@ -157,7 +157,7 @@ function nextLegendPage(current: LegendPage): LegendPage {
 
 // -- reducer --
 
-const PAGE_SIZE = 10
+export const PAGE_SIZE = 10
 
 export function moveCursor(
 	current: number,
