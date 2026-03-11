@@ -249,102 +249,122 @@ export function computeVideoDimensions(
 	return { pixelWidth, pixelHeight, termCols, termRows }
 }
 
-// -- frame streaming --
+// -- video manager factory --
 
-let activeVideoProc: ReturnType<typeof Bun.spawn> | null = null
-let videoStopped = false
-
-export function pauseActiveVideo(): void {
-	debug(
-		`pauseActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}`,
-	)
-	if (activeVideoProc != null && !videoStopped) {
-		safeSendSignal(activeVideoProc.pid, 'SIGSTOP')
-		videoStopped = true
-	}
+export interface VideoManager {
+	createStream(options: VideoStreamOptions): ReturnType<typeof Bun.spawn>
+	pause(): void
+	resume(): void
+	kill(): void
+	dispose(): void
 }
 
-export function resumeActiveVideo(): void {
-	debug(
-		`resumeActiveVideo: proc=${String(activeVideoProc != null)}, stopped=${String(videoStopped)}, pid=${String(activeVideoProc?.pid)}`,
-	)
-	if (activeVideoProc != null && videoStopped) {
-		safeSendSignal(activeVideoProc.pid, 'SIGCONT')
-		videoStopped = false
+export function createVideoManager(): VideoManager {
+	let activeProc: ReturnType<typeof Bun.spawn> | null = null
+	let stopped = false
+
+	const exitHandler = () => {
+		if (activeProc != null) safeKill(activeProc)
 	}
-}
+	process.on('exit', exitHandler)
 
-export async function killActiveVideo(): Promise<void> {
-	if (activeVideoProc == null) return
-	const proc = activeVideoProc
-	activeVideoProc = null
-	// must resume stopped process before SIGTERM (stopped processes can't handle signals)
-	if (videoStopped) {
-		proc.kill('SIGCONT')
-		videoStopped = false
+	return {
+		createStream(options: VideoStreamOptions): ReturnType<typeof Bun.spawn> {
+			const { filePath, width, height, fps, seekOffset } = options
+
+			// defense-in-depth: reject unsanitized paths
+			if (filePath.length === 0 || filePath.startsWith('-')) {
+				throw new Error('invalid path')
+			}
+
+			// validate seekOffset
+			if (seekOffset != null && (!Number.isFinite(seekOffset) || seekOffset < 0)) {
+				throw new Error('invalid seek offset')
+			}
+
+			// validate dimensions
+			if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+				throw new Error('invalid video stream dimensions')
+			}
+			if (width > MAX_FFMPEG_DIMENSION || height > MAX_FFMPEG_DIMENSION) {
+				throw new Error('video stream dimensions exceed limit')
+			}
+			if (height % 2 !== 0) {
+				throw new Error('video stream height must be even')
+			}
+
+			const clampedFps = Math.min(Math.max(1, fps), MAX_FPS)
+			const vf = `scale=${Math.round(width)}:${Math.round(height)},fps=${clampedFps}`
+
+			// kill any existing video process before starting new
+			if (activeProc != null) {
+				if (stopped) safeKill(activeProc, 'SIGCONT')
+				safeKill(activeProc)
+				activeProc = null
+				stopped = false
+			}
+
+			// build args — prepend -ss before -i for input-level seek (fast keyframe seeking)
+			// no -re: pacing is application-controlled via frame-interval sleep in runFrameLoop.
+			// -re uses wall clock, which breaks SIGSTOP pause (ffmpeg catches up on resume).
+			const args = ['ffmpeg', '-v', 'quiet']
+			if (seekOffset != null && seekOffset > 0) {
+				args.push('-ss', String(seekOffset))
+			}
+			args.push('-i', filePath, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-vf', vf, 'pipe:1')
+
+			const proc = Bun.spawn(args, { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' })
+
+			activeProc = proc
+
+			// clean up reference when process exits + reset stopped flag
+			void proc.exited.then(() => {
+				if (activeProc === proc) {
+					activeProc = null
+					stopped = false
+				}
+			})
+
+			return proc
+		},
+
+		pause(): void {
+			debug(
+				`pause: proc=${String(activeProc != null)}, stopped=${String(stopped)}, pid=${String(activeProc?.pid)}`,
+			)
+			if (activeProc != null && !stopped) {
+				safeSendSignal(activeProc.pid, 'SIGSTOP')
+				stopped = true
+			}
+		},
+
+		resume(): void {
+			debug(
+				`resume: proc=${String(activeProc != null)}, stopped=${String(stopped)}, pid=${String(activeProc?.pid)}`,
+			)
+			if (activeProc != null && stopped) {
+				safeSendSignal(activeProc.pid, 'SIGCONT')
+				stopped = false
+			}
+		},
+
+		kill(): void {
+			if (activeProc == null) return
+			const proc = activeProc
+			activeProc = null
+			// must resume stopped process before SIGTERM (stopped processes can't handle signals)
+			if (stopped) {
+				proc.kill('SIGCONT')
+				stopped = false
+			}
+			safeKill(proc)
+		},
+
+		dispose(): void {
+			this.kill()
+			process.removeListener('exit', exitHandler)
+		},
 	}
-	proc.kill('SIGTERM')
-	await Promise.race([proc.exited, new Promise((r) => setTimeout(r, 500))])
-	safeKill(proc)
-}
-
-export function createVideoStream(options: VideoStreamOptions): ReturnType<typeof Bun.spawn> {
-	const { filePath, width, height, fps, seekOffset } = options
-
-	// defense-in-depth: reject unsanitized paths
-	if (filePath.length === 0 || filePath.startsWith('-')) {
-		throw new Error('invalid path')
-	}
-
-	// validate seekOffset
-	if (seekOffset != null && (!Number.isFinite(seekOffset) || seekOffset < 0)) {
-		throw new Error('invalid seek offset')
-	}
-
-	// validate dimensions
-	if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-		throw new Error('invalid video stream dimensions')
-	}
-	if (width > MAX_FFMPEG_DIMENSION || height > MAX_FFMPEG_DIMENSION) {
-		throw new Error('video stream dimensions exceed limit')
-	}
-	if (height % 2 !== 0) {
-		throw new Error('video stream height must be even')
-	}
-
-	const clampedFps = Math.min(Math.max(1, fps), MAX_FPS)
-	const vf = `scale=${Math.round(width)}:${Math.round(height)},fps=${clampedFps}`
-
-	// kill any existing video process before starting new
-	if (activeVideoProc != null) {
-		if (videoStopped) safeKill(activeVideoProc, 'SIGCONT')
-		safeKill(activeVideoProc)
-		activeVideoProc = null
-		videoStopped = false
-	}
-
-	// build args — prepend -ss before -i for input-level seek (fast keyframe seeking)
-	// no -re: pacing is application-controlled via frame-interval sleep in runFrameLoop.
-	// -re uses wall clock, which breaks SIGSTOP pause (ffmpeg catches up on resume).
-	const args = ['ffmpeg', '-v', 'quiet']
-	if (seekOffset != null && seekOffset > 0) {
-		args.push('-ss', String(seekOffset))
-	}
-	args.push('-i', filePath, '-f', 'rawvideo', '-pix_fmt', 'rgba', '-vf', vf, 'pipe:1')
-
-	const proc = Bun.spawn(args, { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' })
-
-	activeVideoProc = proc
-
-	// clean up reference when process exits + reset stopped flag
-	void proc.exited.then(() => {
-		if (activeVideoProc === proc) {
-			activeVideoProc = null
-			videoStopped = false
-		}
-	})
-
-	return proc
 }
 
 // async generator for frame accumulation — pre-allocated buffer, no array concat
@@ -470,8 +490,3 @@ export async function extractVideoThumbnail(
 		return { ok: false, error: extractError(err, 'thumbnail extraction failed') }
 	}
 }
-
-// kill video on process exit — prevents orphaned ffmpeg
-process.on('exit', () => {
-	if (activeVideoProc != null) safeKill(activeVideoProc)
-})

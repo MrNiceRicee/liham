@@ -24,6 +24,12 @@ export function isFfmpegAvailable(): boolean {
 
 export type SanitizeResult = { ok: true; value: string } | { ok: false; error: string }
 
+// validates and resolves a media file path for local-only access.
+// rejects URLs (SSRF/DNS rebinding prevention), flag injection (dash prefix),
+// and nonexistent files. returns the resolved real path via realpath.
+// if remote resources are ever added, this function must be revisited
+// with an allowlist or proxy — ffmpeg supports dozens of custom protocols
+// that the URL regex alone cannot fully cover, so the stat check is essential.
 export function sanitizeMediaPath(rawPath: string, basePath: string): SanitizeResult {
 	// reject empty
 	if (rawPath.length === 0) return { ok: false, error: 'empty path' }

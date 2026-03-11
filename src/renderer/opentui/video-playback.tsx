@@ -15,11 +15,10 @@ import { createRingBuffer, type RingBuffer } from '../../media/ring-buffer.ts'
 import type { LoadedImage } from '../../media/types.ts'
 import {
 	type VideoMetadata,
+	type VideoManager,
 	computeVideoDimensions,
-	createVideoStream,
-	pauseActiveVideo,
+	createVideoManager,
 	probeVideo,
-	resumeActiveVideo,
 } from '../../media/video-decoder.ts'
 import { sanitizeForTerminal } from '../../pipeline/sanitize.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
@@ -169,11 +168,12 @@ export function ModalVideoContent({
 	// detected backend kind — cached once per component mount
 	const [detectedBackendKind] = useState<'mpv' | 'ffplay'>(() => detectAudioBackend())
 
-	// refs for timer, buffer, and audio backend
+	// refs for timer, buffer, audio backend, and video manager
 	const timerRef = useRef<FrameTimerHandle | null>(null)
 	const bufferRef = useRef<RingBuffer | null>(null)
 	const backendRef = useRef<AudioBackend | null>(null)
 	const consumedFrameIndexRef = useRef(0)
+	const [videoManager] = useState<VideoManager>(() => createVideoManager())
 
 	// audio resync context — ref avoids adding deps to pause effect (ffplay fallback only)
 	const audioCtxRef = useRef<{
@@ -183,6 +183,9 @@ export function ModalVideoContent({
 		hasAudio: boolean
 		seekOffset: number
 	} | null>(null)
+
+	// dispose video manager on unmount — unregisters exit handler
+	useEffect(() => () => videoManager.dispose(), [videoManager])
 
 	// clear renderPending after React commits (NOT queueMicrotask)
 	useEffect(() => {
@@ -283,7 +286,7 @@ export function ModalVideoContent({
 			backend.seek(seekOffset)
 		}
 
-		const proc = createVideoStream({
+		const proc = videoManager.createStream({
 			filePath: absPath,
 			width: dims.pixelWidth,
 			height: dims.pixelHeight,
@@ -414,11 +417,11 @@ export function ModalVideoContent({
 		const backend = backendRef.current
 		if (paused) {
 			backend?.pause()
-			pauseActiveVideo()
+			videoManager.pause()
 			if (detectedBackendKind === 'ffplay') void killActiveAudio()
 		} else {
 			if (backend != null) void backend.resume()
-			resumeActiveVideo()
+			videoManager.resume()
 			resyncFfplayAudio(detectedBackendKind, audioCtxRef.current, timer)
 		}
 	}, [paused])
