@@ -47,7 +47,6 @@ test/assets/*.mkv
 test/assets/*.webm
 test/assets
 
-# docs — local development artifacts, keep learnings/solutions for knowledge sharing
-docs/
+# docs — local development artifacts, keep learnings for institutional knowledge
+docs/*
 !docs/learnings/
-!docs/solutions/
