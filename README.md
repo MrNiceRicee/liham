@@ -1,4 +1,12 @@
-# liham
+```text
+  _ _ _
+ | (_) |__   __ _ _ __ ___
+ | | | '_ \ / _` | '_ ` _ \
+ | | | | | | (_| | | | | | |
+ |_|_|_| |_|\__,_|_| |_| |_|
+```
+
+*tagalog for letter, addressed to you, the reader.*
 
 Terminal markdown previewer with split-pane view, search, TOC, math, mermaid, and media support.
 
@@ -30,6 +38,8 @@ bun add -g @mrnicericee/liham
 liham              # browse .md files in current directory
 liham README.md    # preview a file
 liham docs/        # browse a directory
+liham README.md | less   # print mode (auto-detected)
+cat README.md | liham    # read from stdin
 ```
 
 Press `?` for keybindings. Enable [shell completions](#shell-completions) for tab autocompletion.
@@ -107,6 +117,8 @@ liham [file|directory] [options]
 Options:
   -t, --theme <name>     Color theme: auto, dark, light (default: auto)
   -l, --layout <mode>    Layout: side, top, preview-only, source-only
+  -p, --print            Render to stdout (auto-detected when piped)
+  --plain                Strip ANSI colors from print output
   -i, --info             Show terminal capabilities
   --no-images            Disable image rendering
   --no-watch             Disable file watching
@@ -121,6 +133,7 @@ Options:
 | `LIHAM_THEME` | Override theme when `--theme auto` (`dark` or `light`) |
 | `LIHAM_IMAGE_PROTOCOL` | Override image protocol detection |
 | `LIHAM_DEBUG` | Set to `1` for verbose media debug logging |
+| `NO_COLOR` | Disable ANSI colors in print mode ([no-color.org](https://no-color.org)) |
 
 ## Optional Dependencies
 

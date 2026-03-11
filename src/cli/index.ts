@@ -11,7 +11,6 @@ import { resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 
 import type { LayoutMode } from '../app/state.ts'
-import { extractError } from '../utils/error.ts'
 import { isSharpAvailable } from '../media/decoder.ts'
 import { detectCapabilities } from '../media/detect.ts'
 import { isFfmpegAvailable, isFfplayAvailable } from '../media/ffplay.ts'
@@ -21,7 +20,9 @@ import { boot } from '../renderer/opentui/boot.tsx'
 import { darkTheme } from '../theme/dark.ts'
 import { lightTheme } from '../theme/light.ts'
 import type { ThemeTokens } from '../theme/types.ts'
+import { extractError } from '../utils/error.ts'
 import { generateBashCompletion, generateZshCompletion } from './completions.ts'
+import { printMarkdown } from './print.tsx'
 
 // -- renderer name union — add entries as renderers are implemented --
 
@@ -34,7 +35,7 @@ function isRendererName(value: string): value is RendererName {
 
 // -- theme name union --
 
-type ThemeName = 'auto' | 'dark' | 'light'
+export type ThemeName = 'auto' | 'dark' | 'light'
 const VALID_THEMES: readonly ThemeName[] = ['auto', 'dark', 'light'] as const
 
 function isThemeName(value: string): value is ThemeName {
@@ -74,6 +75,10 @@ options:
 
   -i, --info               Show detected theme and terminal info, then exit
 
+  -p, --print              Render to stdout (auto-detected when piped)
+
+  --plain                  Strip ANSI colors from print output
+
   --no-images              Disable image rendering (text fallback only)
 
   --no-watch               Disable file watching (no live reload)
@@ -86,7 +91,10 @@ examples:
   liham                    browse cwd for markdown files
   liham ./docs             browse docs/ for markdown files
   liham README.md          preview README.md
-  liham -t dark README.md`
+  liham -t dark README.md
+  liham README.md | less   print mode (auto-detected)
+  liham -p README.md       print to stdout on a TTY
+  liham --plain README.md  plain text, no colors`
 
 // -- arg parsing --
 
@@ -97,11 +105,13 @@ const options = {
 	layout: { type: 'string' as const, short: 'l', default: 'side' },
 	'no-images': { type: 'boolean' as const, default: false },
 	'no-watch': { type: 'boolean' as const, default: false },
+	plain: { type: 'boolean' as const, default: false },
+	print: { type: 'boolean' as const, short: 'p', default: false },
 	renderer: { type: 'string' as const, short: 'r', default: 'opentui' },
 	theme: { type: 'string' as const, short: 't', default: 'auto' },
 } as const
 
-type CliMode =
+export type CliMode =
 	| {
 			mode: 'info'
 			layout: LayoutMode
@@ -127,6 +137,8 @@ type CliMode =
 			noWatch: boolean
 			noImages: boolean
 	  }
+	| { mode: 'print'; source: 'file'; filePath: string; theme: ThemeName; plain: boolean }
+	| { mode: 'print'; source: 'stdin'; theme: ThemeName; plain: boolean }
 
 function parseCliArgs(): CliMode {
 	let values: ReturnType<typeof parseArgs<{ options: typeof options }>>['values']
@@ -196,6 +208,8 @@ function parseCliArgs(): CliMode {
 	}
 
 	const positional = positionals[0]
+	const printResult = resolvePrintMode(values, positional, theme)
+	if (printResult != null) return printResult
 
 	const noWatch = values['no-watch'] ?? false
 
@@ -206,6 +220,28 @@ function parseCliArgs(): CliMode {
 
 	// positional present — will be resolved to file or directory in main()
 	return { mode: 'viewer', filePath: positional, layout, renderer, theme, noWatch, noImages }
+}
+
+type ParsedValues = ReturnType<typeof parseArgs<{ options: typeof options }>>['values']
+
+function resolvePrintMode(
+	values: ParsedValues,
+	positional: string | undefined,
+	theme: ThemeName,
+): CliMode | null {
+	const plain = (values.plain ?? false) || process.env['NO_COLOR'] != null
+	const stdinPiped = !process.stdin.isTTY && positional == null
+	const isPrint = (values.print ?? false) || plain || !process.stdout.isTTY || stdinPiped
+	if (!isPrint) return null
+
+	if (positional != null) {
+		return { mode: 'print', source: 'file', filePath: positional, theme, plain }
+	}
+	if (!process.stdin.isTTY) {
+		return { mode: 'print', source: 'stdin', theme, plain }
+	}
+	console.error('no input: provide a file or pipe markdown to stdin')
+	process.exit(1)
 }
 
 // resolve positional arg: file → viewer, directory → browser, missing → error
@@ -308,6 +344,12 @@ async function resolveDetection(themeName: ThemeName): Promise<ResolvedDetection
 async function main() {
 	let args = parseCliArgs()
 
+	// print mode — skip capability detection entirely
+	if (args.mode === 'print') {
+		await printMarkdown(args)
+		return
+	}
+
 	// resolve positional: detect file vs directory
 	if (args.mode === 'viewer') {
 		args = await resolvePositional(
@@ -351,6 +393,8 @@ async function main() {
 		console.log(`tty: ${String(process.stdout.isTTY ?? false)}`)
 		process.exit(0)
 	}
+
+	if (args.mode === 'print') return // unreachable — handled above, satisfies narrowing
 
 	const detection = await resolveDetection(args.theme)
 	if (args.noImages) {
