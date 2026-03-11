@@ -13,7 +13,7 @@ import {
 	type MediaIRNode,
 } from '../../ir/types.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
-import { estimateHeadingOffset, estimateTotalHeight } from './scroll-utils.ts'
+import { buildHeadingOffsets } from './scroll-utils.ts'
 import type { TocEntry } from './toc.ts'
 import { renderBlockquote } from './blockquote.tsx'
 import { renderCodeBlock } from './code-block.tsx'
@@ -39,6 +39,7 @@ export interface RenderResult {
 	jsx: ReactNode
 	mediaNodes: MediaEntry[]
 	tocEntries: TocEntry[]
+	headingOffsets: number[]
 	estimatedTotalHeight: number
 }
 
@@ -76,7 +77,7 @@ function renderNode(node: IRNode, key: string, ctx: RenderContext): ReactNode {
 				level: node.level,
 				text: extractText(node.children),
 				blockIndex: ctx.blockIndex,
-				estimatedOffset: estimateHeadingOffset(ctx.irNodes, ctx.toc.length, ctx.maxWidth),
+				estimatedOffset: 0, // patched after render by buildHeadingOffsets
 			}
 			if (node.sourceLine != null) tocEntry.sourceLine = node.sourceLine
 			ctx.toc.push(tocEntry)
@@ -267,6 +268,16 @@ export function renderToOpenTUIWithMedia(
 	currentTheme = theme
 	const ctx: RenderContext = { maxWidth, media: [], theme, toc: [], blockIndex: 0, irNodes: [] }
 	const jsx = renderNode(ir, 'root', ctx)
-	const totalHeight = estimateTotalHeight(ctx.irNodes, maxWidth)
-	return { jsx, mediaNodes: ctx.media, tocEntries: ctx.toc, estimatedTotalHeight: totalHeight }
+	const { offsets, totalHeight } = buildHeadingOffsets(ctx.irNodes, maxWidth)
+	// patch pre-computed offsets into TOC entries
+	for (let i = 0; i < ctx.toc.length; i++) {
+		ctx.toc[i]!.estimatedOffset = offsets[i] ?? 0
+	}
+	return {
+		jsx,
+		mediaNodes: ctx.media,
+		tocEntries: ctx.toc,
+		headingOffsets: offsets,
+		estimatedTotalHeight: totalHeight,
+	}
 }

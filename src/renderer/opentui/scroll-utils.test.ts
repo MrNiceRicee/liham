@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import type { CoreIRNode, IRNode } from '../../ir/types.ts'
-import { estimateHeadingOffset, estimateHeight, scrollToLine } from './scroll-utils.ts'
+import { buildHeadingOffsets, estimateHeight, scrollToLine } from './scroll-utils.ts'
 
 describe('scrollToLine', () => {
 	test('centers line in viewport with +1 padding offset', () => {
@@ -114,13 +114,14 @@ describe('estimateHeight', () => {
 	})
 })
 
-describe('estimateHeadingOffset', () => {
+describe('buildHeadingOffsets', () => {
 	test('first heading has offset 0', () => {
 		const nodes: IRNode[] = [
 			{ type: 'heading', level: 1, style: {}, children: [{ type: 'text', value: 'Title' }] },
 			{ type: 'paragraph', style: {}, children: [{ type: 'text', value: 'text' }] },
 		]
-		expect(estimateHeadingOffset(nodes, 0)).toBe(0)
+		const { offsets } = buildHeadingOffsets(nodes)
+		expect(offsets[0]).toBe(0)
 	})
 
 	test('second heading offset accounts for content between', () => {
@@ -130,14 +131,25 @@ describe('estimateHeadingOffset', () => {
 			{ type: 'heading', level: 2, style: {}, children: [{ type: 'text', value: 'Section' }] },
 		]
 		// heading1=2, paragraph=2 (ceil(4/78)+1=2) → offset for heading2 = 4
-		expect(estimateHeadingOffset(nodes, 1, 80)).toBe(4)
+		const { offsets } = buildHeadingOffsets(nodes, 80)
+		expect(offsets[1]).toBe(4)
 	})
 
-	test('returns total offset if heading index past end', () => {
+	test('totalHeight equals sum of all node heights', () => {
 		const nodes: IRNode[] = [
 			{ type: 'heading', level: 1, style: {}, children: [{ type: 'text', value: 'Title' }] },
+			{ type: 'paragraph', style: {}, children: [{ type: 'text', value: 'text' }] },
+			{ type: 'heading', level: 2, style: {}, children: [{ type: 'text', value: 'Section' }] },
 		]
-		// heading=2, looking for index 5 → returns total = 2
-		expect(estimateHeadingOffset(nodes, 5, 80)).toBe(2)
+		const { offsets, totalHeight } = buildHeadingOffsets(nodes, 80)
+		// heading1=2 + paragraph=2 + heading2=2 = 6
+		expect(totalHeight).toBe(6)
+		expect(offsets).toEqual([0, 4])
+	})
+
+	test('empty nodes returns empty offsets and zero height', () => {
+		const { offsets, totalHeight } = buildHeadingOffsets([])
+		expect(offsets).toEqual([])
+		expect(totalHeight).toBe(0)
 	})
 })

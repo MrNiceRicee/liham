@@ -109,35 +109,32 @@ function estimateCustomHeight(node: IRNode): number | null {
 	return null
 }
 
-// compute estimated total height of all top-level IR nodes
-export function estimateTotalHeight(nodes: IRNode[], paneWidth = 80): number {
+// single O(n) pass: computes heading offsets and total height together
+export function buildHeadingOffsets(
+	nodes: IRNode[],
+	paneWidth = 80,
+): { offsets: number[]; totalHeight: number } {
+	const offsets: number[] = []
 	let total = 0
 	for (const node of nodes) {
 		if (!('type' in node)) continue
-		const custom = estimateCustomHeight(node)
-		total += custom ?? estimateHeight(node, paneWidth)
+		if (node.type === 'heading') offsets.push(total)
+		total += estimateHeight(node, paneWidth)
 	}
-	return total
+	return { offsets, totalHeight: total }
 }
 
-// compute estimated row offset of the Nth heading in a list of top-level IR nodes
+// compute estimated total height of all top-level IR nodes
+export function estimateTotalHeight(nodes: IRNode[], paneWidth = 80): number {
+	return buildHeadingOffsets(nodes, paneWidth).totalHeight
+}
+
+/** @deprecated use buildHeadingOffsets for O(n) total instead of O(n) per call */
 export function estimateHeadingOffset(
 	nodes: IRNode[],
 	headingIndex: number,
 	paneWidth = 80,
 ): number {
-	let offset = 0
-	let headingCount = 0
-
-	for (const node of nodes) {
-		if (!('type' in node)) continue
-		if (node.type === 'heading') {
-			if (headingCount === headingIndex) return offset
-			headingCount++
-		}
-		const custom = estimateCustomHeight(node)
-		offset += custom ?? estimateHeight(node, paneWidth)
-	}
-
-	return offset
+	const { offsets } = buildHeadingOffsets(nodes, paneWidth)
+	return offsets[headingIndex] ?? 0
 }

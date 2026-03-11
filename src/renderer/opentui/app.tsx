@@ -133,6 +133,18 @@ function useClearOnMediaChange(
 	}
 }
 
+function useDebouncedValue(value: string, delayMs: number): string {
+	const [debounced, setDebounced] = useState(value)
+	useEffect(() => {
+		if (value === debounced) return
+		const timer = setTimeout(() => setDebounced(value), delayMs)
+		return () => clearTimeout(timer)
+	}, [value])
+	// when value is cleared, update immediately (no lag when closing search)
+	if (value.length === 0 && debounced.length > 0) setDebounced(value)
+	return debounced
+}
+
 function useClearSearchOnClose(searchQuery: string) {
 	const prevRef = useRef(searchQuery)
 	if (searchQuery.length === 0 && prevRef.current.length > 0) {
@@ -337,23 +349,26 @@ export function App(props: Readonly<AppProps>) {
 	)
 	useTocJump(state, viewerState.tocEntries, previewRef, sourceRef, dispatch)
 
+	// debounce the search query for expensive preview rebuild (150ms).
+	// the search bar reflects typed characters immediately — only the preview is debounced.
+	const debouncedSearchQuery = useDebouncedValue(searchQuery, 150)
+
 	// compute preview content with search highlights baked in.
-	// runs synchronously during render — the IR-to-JSX step is fast (~10-50ms).
 	// when no search is active, uses the cached viewerState.content directly.
 	const searchPreviewWidth =
 		paneDimensions(state.layout, state.dimensions.width, state.dimensions.height, state.mode)
 			.preview?.width ?? state.dimensions.width
 
 	const highlightedPreview = useMemo(() => {
-		if (viewerState.ir == null || searchQuery.length === 0) return null
+		if (viewerState.ir == null || debouncedSearchQuery.length === 0) return null
 		setSearchState(
-			searchQuery,
+			debouncedSearchQuery,
 			props.theme.search.currentHighlightBg,
 			props.theme.codeBlock.backgroundColor,
 		)
 		const width = Math.max(1, searchPreviewWidth - 4)
 		return renderToOpenTUIWithMedia(viewerState.ir, props.theme, width)
-	}, [searchQuery, viewerState.ir, searchPreviewWidth, props.theme])
+	}, [debouncedSearchQuery, viewerState.ir, searchPreviewWidth, props.theme])
 
 	// clear search state when search closes so future non-search renders are clean
 	useClearSearchOnClose(searchQuery)
