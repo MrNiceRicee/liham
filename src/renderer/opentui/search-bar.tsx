@@ -1,5 +1,5 @@
 // search bar — bottom bar replacing status bar during search.
-// shows query text with cursor in input phase, match count in both phases.
+// shows query text with cursor in input kind, match count in both kinds.
 
 import type { SearchState } from '../../app/state-search.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
@@ -18,7 +18,7 @@ export function SearchBar({ searchState, matchCount, theme }: Readonly<SearchBar
 	const countColor = theme.pane.focusedBorderColor
 	const noMatchColor = theme.search.noMatchColor
 
-	const isInput = searchState.phase === 'input'
+	const isInput = searchState.kind === 'input'
 	const query = searchState.query
 	const inputCursor = isInput ? searchState.cursor : 0
 	const before = isInput ? graphemeSlice(query, 0, inputCursor) : query
@@ -34,7 +34,7 @@ export function SearchBar({ searchState, matchCount, theme }: Readonly<SearchBar
 		countLabel = query.length > 0 ? `${String(matchCount)} matches` : ''
 		hintLabel = 'Enter: search · Esc: cancel'
 	} else {
-		const current = searchState.phase === 'active' ? searchState.currentMatch + 1 : 0
+		const current = searchState.kind === 'active' ? searchState.currentMatch + 1 : 0
 		countLabel = `${String(current)}/${String(matchCount)}`
 		hintLabel = 'n/N: next/prev · Esc: close'
 	}

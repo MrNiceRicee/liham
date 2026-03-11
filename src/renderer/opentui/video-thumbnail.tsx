@@ -1,14 +1,13 @@
 // video thumbnail — extracts first frame via ffmpeg, renders through image decode pipeline.
 // reuses ImageContext, decode, and halfblock/kitty rendering from image.tsx.
 
-import { writeSync } from 'node:fs'
 import { type BoxRenderable, resolveRenderLib } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
-import { memo, type ReactNode, useContext, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useContext, useEffect, useRef, useState } from 'react'
 
 import type { VideoNode } from '../../ir/types.ts'
 import { type DecodeOptions, decodeImage } from '../../media/decoder.ts'
-import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
+import { renderHalfBlockMerged } from '../../media/halfblock.ts'
 import {
 	buildCleanupCommand,
 	buildTransmitChunks,
@@ -17,23 +16,16 @@ import {
 } from '../../media/kitty.ts'
 import type { LoadedImage } from '../../media/types.ts'
 import { extractVideoThumbnail } from '../../media/video-decoder.ts'
+import {
+	HalfBlockRows,
+	activeImageIds,
+	mediaBasename,
+	registerKittyExitHandler,
+	useScrollIntoView,
+} from './halfblock-rendering.tsx'
 import { ImageContext, type ImageContextValue } from './image-context.tsx'
 import { MediaFocusContext, type MediaFocusContextValue } from './media-focus-context.tsx'
 import { useViewportVisibility } from './use-image-loader.ts'
-
-// track active kitty IDs for cleanup
-const activeImageIds = new Set<number>()
-let exitHandlerRegistered = false
-
-function registerExitHandler(): void {
-	if (exitHandlerRegistered) return
-	exitHandlerRegistered = true
-	process.on('exit', () => {
-		for (const id of activeImageIds) {
-			writeSync(1, buildCleanupCommand(id))
-		}
-	})
-}
 
 // thumbnail cache — keyed by video path + target cols
 const thumbnailCache = new Map<string, LoadedImage>()
@@ -118,40 +110,6 @@ function useThumbnailLoader(
 	return { state, image }
 }
 
-// -- halfblock rows (reuses pattern from image.tsx) --
-
-function renderSpans(spans: MergedSpan[], rowIdx: number): ReactNode[] {
-	return spans.map((s, sIdx) => {
-		const props: Record<string, unknown> = {}
-		if (s.bg.length > 0) props['bg'] = s.bg
-		if (s.fg.length > 0) props['fg'] = s.fg
-		return (
-			<span key={`vs-${String(rowIdx)}-${String(sIdx)}`} {...props}>
-				{s.text}
-			</span>
-		)
-	})
-}
-
-const HalfBlockRows = memo(
-	function HalfBlockRows({
-		rows,
-		width,
-	}: {
-		readonly rows: MergedSpan[][]
-		readonly width: number
-	}) {
-		return (
-			<box style={{ height: rows.length, width }}>
-				{rows.map((spans, rowIdx) => (
-					<text key={`vhb-${String(rowIdx)}`}>{renderSpans(spans, rowIdx)}</text>
-				))}
-			</box>
-		)
-	},
-	(prev, next) => prev.rows === next.rows,
-)
-
 // -- main component --
 
 function VideoThumbnailInner({
@@ -171,20 +129,7 @@ function VideoThumbnailInner({
 	const { state, image } = useThumbnailLoader(node.src, ctx ?? null, isVisible)
 	const kittyIdRef = useRef<number | null>(null)
 	const isFocused = focusCtx?.focusedMediaIndex === mediaIndex
-
-	// scroll into view when focused
-	useEffect(() => {
-		if (!isFocused || boxRef.current == null || ctx?.scrollRef.current == null) return
-		const scrollbox = ctx.scrollRef.current
-		const box = boxRef.current
-		const boxTop = box.y - scrollbox.viewport.y + scrollbox.scrollTop
-		const boxBottom = boxTop + box.height
-		const scrollTop = scrollbox.scrollTop
-		const viewHeight = scrollbox.height
-		if (boxTop < scrollTop || boxBottom > scrollTop + viewHeight) {
-			scrollbox.scrollTo(Math.max(0, boxTop - 2))
-		}
-	}, [isFocused])
+	useScrollIntoView(boxRef, ctx?.scrollRef, isFocused)
 
 	const handleMouseDown = () => {
 		if (focusCtx != null) focusCtx.onMediaClick(mediaIndex)
@@ -199,7 +144,7 @@ function VideoThumbnailInner({
 		const id = generateImageId()
 		kittyIdRef.current = id
 		activeImageIds.add(id)
-		registerExitHandler()
+		registerKittyExitHandler()
 
 		void (async () => {
 			try {
@@ -291,7 +236,7 @@ function renderThumbnail(image: LoadedImage, ctx: ImageContextValue): ReactNode 
 	const protocol = ctx.capabilities.protocol
 	if (protocol === 'halfblock') {
 		const rows = renderHalfBlockMerged(image, ctx.bgColor)
-		return <HalfBlockRows rows={rows} width={image.terminalCols} />
+		return <HalfBlockRows rows={rows} width={image.terminalCols} keyPrefix="vhb" spanPrefix="vs" />
 	}
 	if (protocol === 'kitty-virtual') {
 		return <box style={{ height: image.terminalRows, width: image.terminalCols }} />
@@ -300,7 +245,7 @@ function renderThumbnail(image: LoadedImage, ctx: ImageContextValue): ReactNode 
 }
 
 function buildFocusLabel(node: VideoNode, index: number, ctx: MediaFocusContextValue): ReactNode {
-	const name = node.src != null ? basename(node.src) : node.alt
+	const name = node.src != null ? mediaBasename(node.src) : node.alt
 	return (
 		<text>
 			<span
@@ -308,11 +253,6 @@ function buildFocusLabel(node: VideoNode, index: number, ctx: MediaFocusContextV
 			>{`▸ ${name} [${String(index + 1)}/${String(ctx.mediaCount)}]`}</span>
 		</text>
 	)
-}
-
-function basename(urlOrPath: string): string {
-	const parts = urlOrPath.split('/')
-	return parts[parts.length - 1] ?? urlOrPath
 }
 
 function renderTextFallback(

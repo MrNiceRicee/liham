@@ -1,13 +1,12 @@
 // image renderer component — Kitty virtual placements, half-block fallback, text fallback.
 // thin rendering shell — loading logic lives in use-image-loader.ts.
 
-import { writeSync } from 'node:fs'
 import { type BoxRenderable, resolveRenderLib } from '@opentui/core'
 import { useRenderer } from '@opentui/react'
-import { memo, type ReactNode, useContext, useEffect, useRef } from 'react'
+import { type ReactNode, useContext, useEffect, useRef } from 'react'
 
 import type { ImageNode } from '../../ir/types.ts'
-import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts'
+import { renderHalfBlockMerged } from '../../media/halfblock.ts'
 import {
 	buildCleanupCommand,
 	buildTransmitChunks,
@@ -15,67 +14,19 @@ import {
 	generateImageId,
 } from '../../media/kitty.ts'
 import type { LoadedImage } from '../../media/types.ts'
+import {
+	HalfBlockRows,
+	activeImageIds,
+	mediaBasename,
+	registerKittyExitHandler,
+	useScrollIntoView,
+} from './halfblock-rendering.tsx'
 import { ImageContext, type ImageContextValue } from './image-context.tsx'
 import { MediaFocusContext } from './media-focus-context.tsx'
 import { useImageLoader, useViewportVisibility } from './use-image-loader.ts'
 
 // re-export for consumers that import from here
 export { clearImageCache } from './use-image-loader.ts'
-
-// track active image IDs for process exit cleanup
-const activeImageIds = new Set<number>()
-let exitHandlerRegistered = false
-
-function registerExitHandler(): void {
-	if (exitHandlerRegistered) return
-	exitHandlerRegistered = true
-	process.on('exit', () => {
-		if (activeImageIds.size === 0) return
-		for (const id of activeImageIds) {
-			writeSync(1, buildCleanupCommand(id))
-		}
-	})
-}
-
-// -- half-block memoized output --
-
-interface HalfBlockRowsProps {
-	readonly rows: MergedSpan[][]
-	readonly width: number
-	readonly href?: string | undefined
-}
-
-function renderSpans(spans: MergedSpan[], rowIdx: number): ReactNode[] {
-	return spans.map((s, sIdx) => {
-		const props: Record<string, unknown> = {}
-		if (s.bg.length > 0) props['bg'] = s.bg
-		if (s.fg.length > 0) props['fg'] = s.fg
-		return (
-			<span key={`s-${String(rowIdx)}-${String(sIdx)}`} {...props}>
-				{s.text}
-			</span>
-		)
-	})
-}
-
-const HalfBlockRows = memo(
-	function HalfBlockRows({ rows, width, href }: HalfBlockRowsProps) {
-		return (
-			<box style={{ height: rows.length, width }}>
-				{rows.map((spans, rowIdx) => (
-					<text key={`hb-${String(rowIdx)}`}>
-						{href != null ? (
-							<a href={href}>{renderSpans(spans, rowIdx)}</a>
-						) : (
-							renderSpans(spans, rowIdx)
-						)}
-					</text>
-				))}
-			</box>
-		)
-	},
-	(prev, next) => prev.rows === next.rows && prev.href === next.href,
-)
 
 // -- kitty text fallback for placeholder rendering --
 
@@ -109,22 +60,7 @@ function ImageBlock({
 	const kittyIdRef = useRef<number | null>(null)
 
 	const isFocused = mediaIndex != null && focusCtx?.focusedMediaIndex === mediaIndex
-
-	// scroll into view when focused
-	useEffect(() => {
-		if (!isFocused || boxRef.current == null || ctx?.scrollRef.current == null) return
-		const scrollbox = ctx.scrollRef.current
-		const box = boxRef.current
-		// box.y is absolute screen position — convert to content-relative
-		const boxTop = box.y - scrollbox.viewport.y + scrollbox.scrollTop
-		const boxBottom = boxTop + box.height
-		const scrollTop = scrollbox.scrollTop
-		const viewHeight = scrollbox.height
-		// scroll only if image is not fully visible
-		if (boxTop < scrollTop || boxBottom > scrollTop + viewHeight) {
-			scrollbox.scrollTo(Math.max(0, boxTop - 2))
-		}
-	}, [isFocused])
+	useScrollIntoView(boxRef, ctx?.scrollRef, isFocused)
 
 	// click handler for opening modal
 	const handleMouseDown = () => {
@@ -205,7 +141,7 @@ function ImageBlock({
 		const id = generateImageId()
 		kittyIdRef.current = id
 		activeImageIds.add(id)
-		registerExitHandler()
+		registerKittyExitHandler()
 
 		void (async () => {
 			try {
@@ -267,11 +203,6 @@ function renderLoadedImage(
 	}
 
 	return renderTextFallback(node, key)
-}
-
-function mediaBasename(urlOrPath: string): string {
-	const parts = urlOrPath.split('/')
-	return parts[parts.length - 1] ?? urlOrPath
 }
 
 function buildFocusLabel(node: ImageNode, index: number, total: number, color: string): ReactNode {

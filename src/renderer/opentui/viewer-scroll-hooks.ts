@@ -52,7 +52,7 @@ export function useSearchHighlight(
 	const searchMatches = useMemo(() => findMatches(raw, searchQuery), [raw, searchQuery])
 
 	const safeSearchIndex = useMemo(() => {
-		if (state.searchState?.phase !== 'active') return 0
+		if (state.searchState?.kind !== 'active') return 0
 		if (searchMatches.length === 0) return 0
 		return Math.min(state.searchState.currentMatch, searchMatches.length - 1)
 	}, [state.searchState, searchMatches.length])
@@ -66,7 +66,7 @@ export function useSearchHighlight(
 		scrollToLine(sourceRef.current, match.line)
 		// preview: find nearest block element by walking src-line-* ids backward
 		scrollToNearestBlock(previewRef.current, match.line)
-	}, [safeSearchIndex, searchMatches, state.searchState?.phase])
+	}, [safeSearchIndex, searchMatches, state.searchState?.kind])
 
 	return { searchQuery, searchMatches, safeSearchIndex }
 }

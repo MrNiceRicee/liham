@@ -26,7 +26,7 @@ describe('activeLayer', () => {
 		expect(
 			activeLayer({
 				...base(),
-				searchState: { phase: 'input', query: '', cursor: 0 },
+				searchState: { kind: 'input', query: '', cursor: 0 },
 				tocState: { kind: 'open', cursorIndex: 0 },
 				media: { ...OPEN_MODAL },
 			}),
@@ -37,7 +37,7 @@ describe('activeLayer', () => {
 		expect(
 			activeLayer({
 				...base(),
-				searchState: { phase: 'active', query: 'x', matchCount: 1, currentMatch: 0 },
+				searchState: { kind: 'active', query: 'x', matchCount: 1, currentMatch: 0 },
 				tocState: { kind: 'open', cursorIndex: 0 },
 			}),
 		).toBe('searchActive')
