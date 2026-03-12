@@ -1,3 +1,8 @@
+// theme tokens use interfaces (not Map) by design: all keys are statically known,
+// interfaces provide compile-time exhaustiveness checking, and with
+// noUncheckedIndexedAccess, Record<string, T> already requires T | undefined.
+// Map is for truly dynamic key sets — theme tokens are fixed at compile time.
+
 export interface HeadingLevelTokens {
 	color: string
 	bold: boolean

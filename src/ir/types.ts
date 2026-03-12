@@ -274,3 +274,35 @@ export function isCustomNode<T extends keyof CustomNodeDataMap>(
 ): node is CustomNode<T> {
 	return node.type === type
 }
+
+// type guard for core nodes — uses concrete type set for sound narrowing.
+// mirrors BLOCK_TYPES pattern above. compile error if CoreIRNode gains a new member.
+const CORE_TYPES = new Set<CoreIRNode['type']>([
+	'audio',
+	'blockquote',
+	'break',
+	'checkbox',
+	'codeBlock',
+	'emphasis',
+	'heading',
+	'image',
+	'inlineCode',
+	'link',
+	'list',
+	'listItem',
+	'paragraph',
+	'root',
+	'strikethrough',
+	'strong',
+	'table',
+	'tableCell',
+	'tableRow',
+	'text',
+	'thematicBreak',
+	'unknown',
+	'video',
+])
+
+export function isCoreNode(node: IRNode): node is CoreIRNode {
+	return CORE_TYPES.has(node.type as CoreIRNode['type'])
+}

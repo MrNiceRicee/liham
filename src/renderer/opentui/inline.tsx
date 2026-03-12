@@ -4,8 +4,8 @@
 import { TextAttributes } from '@opentui/core'
 import { Fragment, type ReactNode } from 'react'
 
-import type { CoreIRNode, ImageNode, InlineStyle, IRNode, LinkNode } from '../../ir/types.ts'
-import { isCustomNode } from '../../ir/types.ts'
+import type { ImageNode, InlineStyle, IRNode, LinkNode } from '../../ir/types.ts'
+import { isCoreNode, isCustomNode } from '../../ir/types.ts'
 import { renderMathInline } from './math.tsx'
 import { renderSearchText } from './search-highlight-context.tsx'
 
@@ -54,47 +54,46 @@ function renderInlineCode(style: InlineStyle, value: string, key: string): React
 
 // renders a single inline IR node to OpenTUI JSX
 export function renderInlineNode(node: IRNode, key: string): ReactNode {
-	const core = node as CoreIRNode
+	// custom nodes first — mathInline is the only inline custom node
+	if (isCustomNode(node, 'mathInline')) return renderMathInline(node, key)
+	if (!isCoreNode(node)) return null
 
-	switch (core.type) {
+	switch (node.type) {
 		case 'text':
-			return renderSearchText(core.value, core.style?.fg, key)
+			return renderSearchText(node.value, node.style?.fg, key)
 
 		case 'strong':
-			return <strong key={key}>{renderInlineChildren(core.children, key)}</strong>
+			return <strong key={key}>{renderInlineChildren(node.children, key)}</strong>
 
 		case 'emphasis':
-			return <em key={key}>{renderInlineChildren(core.children, key)}</em>
+			return <em key={key}>{renderInlineChildren(node.children, key)}</em>
 
 		case 'strikethrough':
 			return (
 				<span key={key} attributes={TextAttributes.STRIKETHROUGH}>
-					{renderInlineChildren(core.children, key)}
+					{renderInlineChildren(node.children, key)}
 				</span>
 			)
 
 		case 'inlineCode':
-			return renderInlineCode(core.style, core.value, key)
+			return renderInlineCode(node.style, node.value, key)
 
 		case 'link':
-			return renderLink(core, key)
+			return renderLink(node, key)
 
 		case 'image':
-			return renderImage(core, key)
+			return renderImage(node, key)
 
 		case 'break':
 			return '\n'
 
 		case 'checkbox':
-			return <span key={key}>{core.checked ? '[x] ' : '[ ] '}</span>
+			return <span key={key}>{node.checked ? '[x] ' : '[ ] '}</span>
 
 		case 'root':
-			return <Fragment key={key}>{renderInlineChildren(core.children, key)}</Fragment>
+			return <Fragment key={key}>{renderInlineChildren(node.children, key)}</Fragment>
 
 		default:
-			if (isCustomNode(node, 'mathInline')) {
-				return renderMathInline(node, key)
-			}
 			return null
 	}
 }

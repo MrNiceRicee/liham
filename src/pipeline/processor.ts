@@ -7,7 +7,7 @@ import remarkRehype from 'remark-rehype'
 import type { Plugin } from 'unified'
 import { unified } from 'unified'
 
-import type { IRNode } from '../ir/types.ts'
+import type { IRNode, RootNode } from '../ir/types.ts'
 import type { ThemeTokens } from '../theme/types.ts'
 import type { PipelineResult } from '../types/pipeline.ts'
 import { extractError } from '../utils/error.ts'
@@ -43,10 +43,11 @@ export async function processMarkdown(
 			}),
 		])
 
-		return {
-			ok: true,
-			value: result.result as IRNode,
+		const ir = result.result as IRNode
+		if (ir.type !== 'root') {
+			return { ok: false, error: 'pipeline produced non-root node' }
 		}
+		return { ok: true, value: ir as RootNode }
 	} catch (err: unknown) {
 		return {
 			ok: false,

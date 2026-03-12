@@ -33,7 +33,7 @@ export function createMpvBackend(): AudioBackend {
 		async play(filePath: string, basePath: string, seekOffset = 0): Promise<PlayResult> {
 			const sanitized = sanitizeMediaPath(filePath, basePath)
 			if (!sanitized.ok) {
-				return { ok: false, error: sanitized.error ?? 'invalid path' }
+				return { ok: false, error: sanitized.error }
 			}
 
 			try {
@@ -80,9 +80,9 @@ export function createMpvBackend(): AudioBackend {
 				await ipc.observeProperty(EOF_OBSERVE_ID, 'eof-reached')
 
 				// load file
-				const loadArgs: [string, ...unknown[]] = ['loadfile', sanitized.path!]
+				const loadArgs: [string, ...unknown[]] = ['loadfile', sanitized.value]
 				await ipc.command(loadArgs)
-				loadedFilePath = sanitized.path!
+				loadedFilePath = sanitized.value
 				fileEnded = false
 
 				// seek if needed
@@ -91,7 +91,7 @@ export function createMpvBackend(): AudioBackend {
 				}
 
 				isPaused = false
-				debug(`playing: ${sanitized.path!} at offset ${String(seekOffset)}`)
+				debug(`playing: ${sanitized.value} at offset ${String(seekOffset)}`)
 				return { ok: true }
 			} catch (err) {
 				const message = extractError(err, 'mpv play failed')

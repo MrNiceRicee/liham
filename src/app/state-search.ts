@@ -2,10 +2,10 @@
 
 import type { AppAction, AppState } from './state.ts'
 
-// discriminated union — input phase has no match tracking fields
+// discriminated union — input kind has no match tracking fields
 export type SearchState =
-	| { phase: 'input'; query: string; cursor: number }
-	| { phase: 'active'; query: string; matchCount: number; currentMatch: number }
+	| { kind: 'input'; query: string; cursor: number }
+	| { kind: 'active'; query: string; matchCount: number; currentMatch: number }
 
 export type SearchAction = Extract<
 	AppAction,
@@ -21,12 +21,12 @@ export type SearchAction = Extract<
 >
 
 function searchConfirm(state: AppState, matchCount: number): AppState {
-	if (state.searchState?.phase !== 'input') return state
+	if (state.searchState?.kind !== 'input') return state
 	if (matchCount === 0) return state
 	return {
 		...state,
 		searchState: {
-			phase: 'active',
+			kind: 'active',
 			query: state.searchState.query,
 			matchCount,
 			currentMatch: 0,
@@ -35,7 +35,7 @@ function searchConfirm(state: AppState, matchCount: number): AppState {
 }
 
 function navigateMatch(state: AppState, delta: number): AppState {
-	if (state.searchState?.phase !== 'active') return state
+	if (state.searchState?.kind !== 'active') return state
 	const { matchCount, currentMatch } = state.searchState
 	if (matchCount === 0) return state
 	return {
@@ -55,7 +55,7 @@ export function searchReducer(state: AppState, action: SearchAction): AppState {
 			const needsLayoutSwitch = state.layout === 'preview-only' || state.layout === 'source-only'
 			return {
 				...state,
-				searchState: { phase: 'input', query: '', cursor: 0 },
+				searchState: { kind: 'input', query: '', cursor: 0 },
 				media: { kind: 'none' },
 				...(needsLayoutSwitch
 					? { preSearchLayout: state.layout, layout: 'side', focus: 'source' as const }
@@ -66,7 +66,7 @@ export function searchReducer(state: AppState, action: SearchAction): AppState {
 		case 'SearchUpdate': {
 			if (state.searchState == null) return state
 			const query = action.query.slice(0, 200)
-			return { ...state, searchState: { phase: 'input', query, cursor: action.cursor } }
+			return { ...state, searchState: { kind: 'input', query, cursor: action.cursor } }
 		}
 
 		case 'SearchConfirm':

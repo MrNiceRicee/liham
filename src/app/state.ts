@@ -157,7 +157,7 @@ function nextLegendPage(current: LegendPage): LegendPage {
 
 // -- reducer --
 
-const PAGE_SIZE = 10
+export const PAGE_SIZE = 10
 
 export function moveCursor(
 	current: number,
@@ -299,43 +299,33 @@ function focusIndex(media: MediaOverlay): number | null {
 	return media.kind === 'none' ? null : media.index
 }
 
+function navigateMedia(state: AppState, newIndex: number): AppState {
+	if (state.media.kind === 'modal')
+		return {
+			...state,
+			media: {
+				...state.media,
+				index: newIndex,
+				mediaIndex: newIndex,
+				paused: false,
+				seekOffset: 0,
+				restartCount: state.media.restartCount + 1,
+			},
+		}
+	return { ...state, media: { kind: 'focused', index: newIndex } }
+}
+
 function mediaFocusReducer(state: AppState, action: MediaFocusAction): AppState {
 	switch (action.type) {
 		case 'FocusNextMedia': {
 			if (action.mediaCount === 0) return state
 			const cur = focusIndex(state.media) ?? -1
-			const next = (cur + 1) % action.mediaCount
-			if (state.media.kind === 'modal')
-				return {
-					...state,
-					media: {
-						...state.media,
-						index: next,
-						mediaIndex: next,
-						paused: false,
-						seekOffset: 0,
-						restartCount: state.media.restartCount + 1,
-					},
-				}
-			return { ...state, media: { kind: 'focused', index: next } }
+			return navigateMedia(state, (cur + 1) % action.mediaCount)
 		}
 		case 'FocusPrevMedia': {
 			if (action.mediaCount === 0) return state
 			const cur = focusIndex(state.media) ?? 0
-			const prev = (cur - 1 + action.mediaCount) % action.mediaCount
-			if (state.media.kind === 'modal')
-				return {
-					...state,
-					media: {
-						...state.media,
-						index: prev,
-						mediaIndex: prev,
-						paused: false,
-						seekOffset: 0,
-						restartCount: state.media.restartCount + 1,
-					},
-				}
-			return { ...state, media: { kind: 'focused', index: prev } }
+			return navigateMedia(state, (cur - 1 + action.mediaCount) % action.mediaCount)
 		}
 		case 'FocusMedia':
 			if (state.media.kind === 'modal')

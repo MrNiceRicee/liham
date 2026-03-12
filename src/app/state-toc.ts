@@ -34,8 +34,6 @@ export function tocReducer(state: AppState, action: TocAction): AppState {
 			}
 
 		case 'TocJumpComplete':
-			return { ...state, tocState: null }
-
 		case 'CloseToc':
 			return { ...state, tocState: null }
 	}

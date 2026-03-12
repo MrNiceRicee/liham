@@ -3,6 +3,14 @@
 // rather than React context, because the preview JSX tree is cached as a static
 // ReactNode and context changes don't propagate to cached subtrees.
 //
+// why module-level state instead of React context:
+//   the preview pane caches its JSX tree as a static ReactNode (useMemo in app.tsx).
+//   React context changes only re-render components that read the context, but cached
+//   JSX subtrees are plain ReactNode values — they skip reconciliation entirely.
+//   module-level variables are read during IR-to-JSX construction, so highlights
+//   are baked into the tree before caching. if the caching strategy changes to use
+//   React elements with proper context consumers, this module could be converted.
+//
 // renderSearchText is a plain function (NOT a React component) — it is called
 // during IR-to-JSX tree construction so highlights are baked into the static tree.
 

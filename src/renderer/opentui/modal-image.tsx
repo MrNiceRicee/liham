@@ -16,6 +16,7 @@ import { type MergedSpan, renderHalfBlockMerged } from '../../media/halfblock.ts
 import type { LoadedImage } from '../../media/types.ts'
 import { sanitizeForTerminal } from '../../pipeline/sanitize.ts'
 import type { ThemeTokens } from '../../theme/types.ts'
+import { HalfBlockRows } from './halfblock-rendering.tsx'
 import { ImageContext } from './image-context.tsx'
 import { useImageLoader } from './use-image-loader.ts'
 
@@ -25,7 +26,7 @@ const MODAL_ANIMATION_LIMITS: AnimationLimits = {
 	maxDecodedBytes: 30 * 1024 * 1024,
 }
 
-// -- half-block rows for modal (reused from image.tsx pattern) --
+// -- half-block rows for modal --
 
 export function ModalHalfBlockRows({
 	rows,
@@ -34,24 +35,7 @@ export function ModalHalfBlockRows({
 	readonly rows: MergedSpan[][]
 	readonly width: number
 }): ReactNode {
-	return (
-		<box style={{ height: rows.length, width, justifyContent: 'center' }}>
-			{rows.map((spans, rowIdx) => (
-				<text key={`mhb-${String(rowIdx)}`}>
-					{spans.map((s, sIdx) => {
-						const props: Record<string, unknown> = {}
-						if (s.bg.length > 0) props['bg'] = s.bg
-						if (s.fg.length > 0) props['fg'] = s.fg
-						return (
-							<span key={`ms-${String(rowIdx)}-${String(sIdx)}`} {...props}>
-								{s.text}
-							</span>
-						)
-					})}
-				</text>
-			))}
-		</box>
-	)
+	return <HalfBlockRows rows={rows} width={width} keyPrefix="mhb" spanPrefix="ms" centered />
 }
 
 // -- lazy pre-computed halfblock grids for animation --

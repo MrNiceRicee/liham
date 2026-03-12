@@ -36,7 +36,7 @@ export async function printMarkdown(args: PrintMode): Promise<void> {
 		process.exit(1)
 	}
 
-	const ir = result.value as RootNode
+	const ir = result.value
 	const width = process.stdout.columns ?? 80
 	const basePath = args.source === 'file' ? resolve(args.filePath, '..') : process.cwd()
 
@@ -71,8 +71,15 @@ async function readFileSource(filePath: string): Promise<string> {
 	return Bun.file(resolved).text()
 }
 
+const STDIN_TIMEOUT_MS = 30_000
+
 async function readStdinSource(): Promise<string> {
+	const timeoutId = setTimeout(() => {
+		console.error('stdin read timed out (30s) — pipe input or use a file')
+		process.exit(1)
+	}, STDIN_TIMEOUT_MS)
 	const markdown = await Bun.stdin.text()
+	clearTimeout(timeoutId)
 	if (markdown.length > MAX_STDIN_BYTES) {
 		console.error(
 			`stdin too large (${String(Math.round(markdown.length / 1024 / 1024))}MB, max 50MB)`,
@@ -180,7 +187,7 @@ function chunkIRChildren(children: IRNode[], paneWidth: number): Chunk[] {
 
 function estimateNodeHeight(node: IRNode, paneWidth: number): number {
 	if ('type' in node && typeof node.type === 'string') {
-		return estimateHeight(node as Parameters<typeof estimateHeight>[0], paneWidth)
+		return estimateHeight(node, paneWidth)
 	}
 	return 1
 }
@@ -193,7 +200,9 @@ const ATTR_ITALIC = 4
 const ATTR_UNDERLINE = 8
 const ATTR_STRIKETHROUGH = 128
 
-function spansToAnsi(frame: CapturedFrame): string {
+// converts a CapturedFrame (OpenTUI test renderer output) to ANSI-escaped text.
+// maps fg/bg colors to 24-bit SGR sequences and text attributes to ANSI codes.
+export function spansToAnsi(frame: CapturedFrame): string {
 	// find last non-empty row
 	let lastRow = frame.lines.length - 1
 	while (lastRow >= 0) {
@@ -223,7 +232,7 @@ function spansToAnsi(frame: CapturedFrame): string {
 	return parts.join('')
 }
 
-function spanToAnsi(span: CapturedSpan): string {
+export function spanToAnsi(span: CapturedSpan): string {
 	const codes: string[] = ['\x1b[0m']
 
 	const [fr, fg, fb] = span.fg.toInts()
@@ -255,11 +264,14 @@ function trimTrailing(text: string): string {
 	return lines.join('\n')
 }
 
+// suppress key prop + act() warnings from non-interactive test renderer usage.
+// review on React version upgrades — these warning strings may change.
+const SUPPRESSED_WARNINGS = /unique "key" prop|not wrapped in act/
+
 function suppressReactWarnings(): void {
 	const originalError = console.error
 	console.error = (...args: unknown[]) => {
-		const msg = String(args[0])
-		if (msg.includes('unique "key" prop') || msg.includes('not wrapped in act')) return
+		if (SUPPRESSED_WARNINGS.test(String(args[0]))) return
 		originalError(...args)
 	}
 }

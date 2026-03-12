@@ -2,8 +2,8 @@
 
 import type { ScrollBoxRenderable } from '@opentui/core'
 
-import type { CoreIRNode, IRNode } from '../../ir/types.ts'
-import { isCustomNode } from '../../ir/types.ts'
+import type { IRNode } from '../../ir/types.ts'
+import { isCoreNode, isCustomNode } from '../../ir/types.ts'
 import { extractText } from '../../ir/text-utils.ts'
 
 // source pane: centered line-based scroll
@@ -18,8 +18,9 @@ export function scrollToLine(ref: ScrollBoxRenderable | null, line: number): voi
 
 const MAX_DEPTH = 100
 
-function estimateHeightInternal(node: CoreIRNode, paneWidth: number, depth: number): number {
+function estimateHeightInternal(node: IRNode, paneWidth: number, depth: number): number {
 	if (depth >= MAX_DEPTH) return 1
+	if (!isCoreNode(node)) return estimateCustomHeight(node) ?? 1
 
 	switch (node.type) {
 		case 'heading':
@@ -39,7 +40,7 @@ function estimateHeightInternal(node: CoreIRNode, paneWidth: number, depth: numb
 		case 'blockquote': {
 			let inner = 0
 			for (const child of node.children) {
-				inner += estimateHeightInternal(child as CoreIRNode, paneWidth - 4, depth + 1)
+				inner += estimateHeightInternal(child, paneWidth - 4, depth + 1)
 			}
 			return inner + 2 // border
 		}
@@ -47,7 +48,7 @@ function estimateHeightInternal(node: CoreIRNode, paneWidth: number, depth: numb
 		case 'list': {
 			let total = 0
 			for (const child of node.children) {
-				total += estimateHeightInternal(child as CoreIRNode, paneWidth, depth + 1)
+				total += estimateHeightInternal(child, paneWidth, depth + 1)
 			}
 			return total + 1 // margin
 		}
@@ -55,7 +56,7 @@ function estimateHeightInternal(node: CoreIRNode, paneWidth: number, depth: numb
 		case 'listItem': {
 			let total = 0
 			for (const child of node.children) {
-				total += estimateHeightInternal(child as CoreIRNode, paneWidth - 2, depth + 1)
+				total += estimateHeightInternal(child, paneWidth - 2, depth + 1)
 			}
 			return Math.max(1, total)
 		}
@@ -78,7 +79,7 @@ function estimateHeightInternal(node: CoreIRNode, paneWidth: number, depth: numb
 		case 'root': {
 			let total = 0
 			for (const child of node.children) {
-				total += estimateHeightInternal(child as CoreIRNode, paneWidth, depth + 1)
+				total += estimateHeightInternal(child, paneWidth, depth + 1)
 			}
 			return total
 		}
@@ -91,7 +92,7 @@ function estimateHeightInternal(node: CoreIRNode, paneWidth: number, depth: numb
 	}
 }
 
-export function estimateHeight(node: CoreIRNode, paneWidth = 80): number {
+export function estimateHeight(node: IRNode, paneWidth = 80): number {
 	return estimateHeightInternal(node, paneWidth, 0)
 }
 
@@ -108,35 +109,32 @@ function estimateCustomHeight(node: IRNode): number | null {
 	return null
 }
 
-// compute estimated total height of all top-level IR nodes
-export function estimateTotalHeight(nodes: IRNode[], paneWidth = 80): number {
+// single O(n) pass: computes heading offsets and total height together
+export function buildHeadingOffsets(
+	nodes: IRNode[],
+	paneWidth = 80,
+): { offsets: number[]; totalHeight: number } {
+	const offsets: number[] = []
 	let total = 0
 	for (const node of nodes) {
 		if (!('type' in node)) continue
-		const custom = estimateCustomHeight(node)
-		total += custom ?? estimateHeight(node as CoreIRNode, paneWidth)
+		if (node.type === 'heading') offsets.push(total)
+		total += estimateHeight(node, paneWidth)
 	}
-	return total
+	return { offsets, totalHeight: total }
 }
 
-// compute estimated row offset of the Nth heading in a list of top-level IR nodes
+// compute estimated total height of all top-level IR nodes
+export function estimateTotalHeight(nodes: IRNode[], paneWidth = 80): number {
+	return buildHeadingOffsets(nodes, paneWidth).totalHeight
+}
+
+/** @deprecated use buildHeadingOffsets for O(n) total instead of O(n) per call */
 export function estimateHeadingOffset(
 	nodes: IRNode[],
 	headingIndex: number,
 	paneWidth = 80,
 ): number {
-	let offset = 0
-	let headingCount = 0
-
-	for (const node of nodes) {
-		if (!('type' in node)) continue
-		if (node.type === 'heading') {
-			if (headingCount === headingIndex) return offset
-			headingCount++
-		}
-		const custom = estimateCustomHeight(node)
-		offset += custom ?? estimateHeight(node as CoreIRNode, paneWidth)
-	}
-
-	return offset
+	const { offsets } = buildHeadingOffsets(nodes, paneWidth)
+	return offsets[headingIndex] ?? 0
 }

@@ -1,5 +1,5 @@
-// search key handler — routes keys based on search phase.
-// input phase: text editing + confirm/cancel. active phase: n/N navigation.
+// search key handler — routes keys based on search kind.
+// input kind: text editing + confirm/cancel. active kind: n/N navigation.
 
 import type { KeyEvent } from '@opentui/core'
 
@@ -14,9 +14,9 @@ export function handleSearchKey(
 	dispatch: (action: AppAction) => void,
 	matchCount: number,
 ): boolean {
-	if (searchState.phase === 'input') {
+	if (searchState.kind === 'input') {
 		handleSearchInputKey(key, searchState, dispatch, matchCount)
-		// input phase swallows all keys — never pass through
+		// input kind swallows all keys — never pass through
 		return true
 	}
 	return handleSearchActiveKey(key, dispatch)
@@ -24,7 +24,7 @@ export function handleSearchKey(
 
 function handleSearchInputKey(
 	key: KeyEvent,
-	searchState: SearchState & { phase: 'input' },
+	searchState: SearchState & { kind: 'input' },
 	dispatch: (action: AppAction) => void,
 	matchCount: number,
 ): void {
@@ -60,7 +60,7 @@ function handleSearchActiveKey(key: KeyEvent, dispatch: (action: AppAction) => v
 			dispatch({ type: 'SearchClose' })
 			return true
 		default:
-			// active phase: pass through for scroll keys, q, etc.
+			// active kind: pass through for scroll keys, q, etc.
 			return false
 	}
 }

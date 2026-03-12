@@ -14,8 +14,8 @@ export type ActiveLayer =
 // key priority: browser > search-input > search-active > toc > modal > media-focus > viewer
 export function activeLayer(state: AppState): ActiveLayer {
 	if (state.mode === 'browser') return 'browser'
-	if (state.searchState?.phase === 'input') return 'searchInput'
-	if (state.searchState?.phase === 'active') return 'searchActive'
+	if (state.searchState?.kind === 'input') return 'searchInput'
+	if (state.searchState?.kind === 'active') return 'searchActive'
 	if (state.tocState != null) return 'toc'
 	if (state.media.kind === 'modal') return 'modal'
 	if (state.media.kind === 'focused') return 'mediaFocus'
