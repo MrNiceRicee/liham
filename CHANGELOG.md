@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.3] - 2026-03-11
+
+### Added
+- `--version`/`-v` flag to show current version
+- `liham upgrade` subcommand to self-update via bun or npm
+- Shell completion support for upgrade subcommand and version flag
+
+### Removed
+- TODO.md (use GitHub issues instead)
+
 ## [1.1.2] - 2026-03-11
 
 ### Fixed

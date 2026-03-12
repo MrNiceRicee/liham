@@ -52,6 +52,54 @@ function isLayoutName(value: string): value is LayoutMode {
 
 // -- help text --
 
+// -- version --
+
+import pkg from '../../package.json'
+
+function getVersion(): string {
+	return pkg.version
+}
+
+// -- upgrade --
+
+async function runUpgrade(): Promise<void> {
+	const current = getVersion()
+	console.log(`current: v${current}`)
+	console.log('checking for updates...')
+
+	// fetch latest version from npm registry
+	const response = await fetch('https://registry.npmjs.org/@mrnicericee/liham/latest')
+	if (!response.ok) {
+		console.error('failed to check for updates')
+		process.exit(1)
+	}
+	const data = (await response.json()) as { version: string }
+	const latest = data.version
+
+	if (current === latest) {
+		console.log(`already up to date (v${current})`)
+		process.exit(0)
+	}
+
+	console.log(`latest:  v${latest}`)
+
+	// detect package manager from install path
+	const which = Bun.which('liham')
+	const pm = which?.includes('.bun/') ? 'bun' : which?.includes('pnpm') ? 'pnpm' : 'npm'
+	const cmd = {
+		bun: ['bun', 'install', '-g', '@mrnicericee/liham@latest'],
+		pnpm: ['pnpm', 'add', '-g', '@mrnicericee/liham@latest'],
+		npm: ['npm', 'install', '-g', '@mrnicericee/liham@latest'],
+	}[pm]
+
+	console.log(`upgrading via ${pm}...`)
+	const proc = Bun.spawn(cmd, { stdin: 'inherit', stdout: 'inherit', stderr: 'inherit' })
+	const exitCode = await proc.exited
+	process.exit(exitCode)
+}
+
+// -- help text --
+
 const USAGE = `liham — terminal markdown previewer
 
 usage:
@@ -59,6 +107,9 @@ usage:
   liham <directory>        browse directory for .md files
   liham <file.md>          preview a markdown file
   liham [options] [path]
+
+commands:
+  liham upgrade            upgrade to the latest version
 
 options:
   -r, --renderer <name>   TUI renderer to use (default: opentui)
@@ -85,6 +136,8 @@ options:
 
   --completions <shell>    Output shell completion script (zsh, bash)
 
+  -v, --version            Show version number
+
   -h, --help               Show this help message
 
 examples:
@@ -94,7 +147,8 @@ examples:
   liham -t dark README.md
   liham README.md | less   print mode (auto-detected)
   liham -p README.md       print to stdout on a TTY
-  liham --plain README.md  plain text, no colors`
+  liham --plain README.md  plain text, no colors
+  liham upgrade            upgrade to latest version`
 
 // -- arg parsing --
 
@@ -109,6 +163,7 @@ const options = {
 	print: { type: 'boolean' as const, short: 'p', default: false },
 	renderer: { type: 'string' as const, short: 'r', default: 'opentui' },
 	theme: { type: 'string' as const, short: 't', default: 'auto' },
+	version: { type: 'boolean' as const, short: 'v' },
 } as const
 
 export type CliMode =
@@ -157,6 +212,11 @@ function parseCliArgs(): CliMode {
 		console.error(`error: ${extractError(err, 'invalid arguments')}`)
 		console.error(`\nrun 'liham --help' for usage`)
 		process.exit(1)
+	}
+
+	if (values.version) {
+		console.log(getVersion())
+		process.exit(0)
 	}
 
 	if (values.help) {
@@ -342,6 +402,12 @@ async function resolveDetection(themeName: ThemeName): Promise<ResolvedDetection
 // -- main --
 
 async function main() {
+	// subcommand: upgrade
+	if (process.argv[2] === 'upgrade') {
+		await runUpgrade()
+		return
+	}
+
 	let args = parseCliArgs()
 
 	// print mode — skip capability detection entirely

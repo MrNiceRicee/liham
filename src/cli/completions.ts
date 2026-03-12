@@ -24,9 +24,18 @@ _liham() {
     '--no-images[disable image rendering]::'
     '--no-watch[disable file watching]::'
     '--completions[output shell completion script]:shell:(zsh bash)'
+    '-v[show version]::'
+    '--version[show version]::'
   )
 
-  _arguments -s $options '*:file:_files -g "*.md(N) *(N-/)"'
+  local -a subcommands
+  subcommands=('upgrade:upgrade to the latest version')
+
+  _arguments -s $options '1:command:->cmd' '*:file:_files -g "*.md(N) *(N-/)"'
+
+  case "$state" in
+    cmd) _describe 'subcommand' subcommands ;;
+  esac
 }
 
 compdef _liham liham`
@@ -58,7 +67,13 @@ export function generateBashCompletion(): string {
   esac
 
   if [[ "$cur" == -* ]]; then
-    COMPREPLY=($(compgen -W "-h --help -i --info -t --theme -l --layout -r --renderer -p --print --plain --no-images --no-watch --completions" -- "$cur"))
+    COMPREPLY=($(compgen -W "-h --help -i --info -t --theme -l --layout -r --renderer -p --print --plain --no-images --no-watch --completions -v --version" -- "$cur"))
+    return
+  fi
+
+  # subcommands and file completion
+  if [[ "$COMP_CWORD" == 1 ]]; then
+    COMPREPLY=($(compgen -W "upgrade" -- "$cur") $(compgen -f -X '!*.md' -- "$cur") $(compgen -d -- "$cur"))
     return
   fi
 
