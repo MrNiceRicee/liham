@@ -4,10 +4,11 @@
 import type { ScrollBoxRenderable } from '@opentui/core'
 import { useEffect, useMemo } from 'react'
 
-import type { AppAction, AppState } from '../../app/state.ts'
+import { type AppAction, type AppState, isSplitLayout } from '../../app/state.ts'
 import { findMatches } from '../../search/find.ts'
 import { scrollToLine } from './scroll-utils.ts'
 import type { TocEntry } from './toc.ts'
+import { syncScroll } from './viewer-keys.ts'
 
 // scroll a scrollbox so that a descendant element with the given id is centered vertically.
 // uses the actual rendered position from OpenTUI's layout engine — no estimation.
@@ -93,6 +94,13 @@ export function useTocJump(
 		// source: scroll to the heading's source line
 		if (entry.sourceLine != null) {
 			scrollToLine(sourceRef.current, entry.sourceLine)
+		}
+		// sync the other pane proportionally when scroll sync is on
+		if (state.scrollSync && isSplitLayout(state.layout)) {
+			queueMicrotask(() => {
+				// use preview as authority (layout-based position is more precise)
+				syncScroll(previewRef.current, sourceRef.current)
+			})
 		}
 		dispatch({ type: 'TocJumpComplete' })
 	}, [state.tocState?.kind])
