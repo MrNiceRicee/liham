@@ -99,21 +99,6 @@ function browserCursorKey(
 	}
 }
 
-function browserFilterKey(
-	key: KeyEvent,
-	state: AppState,
-	dispatch: React.Dispatch<AppAction>,
-): boolean {
-	const result = handleTextInputKey(key, state.browser.filter, state.browser.inputCursor)
-	if (
-		result.consumed &&
-		(result.newText !== state.browser.filter || result.cursor !== state.browser.inputCursor)
-	) {
-		dispatch({ type: 'FilterUpdate', text: result.newText, cursor: result.cursor })
-	}
-	return result.consumed
-}
-
 function browserOpenSelected(
 	state: AppState,
 	matches: FuzzyMatch[],
@@ -155,9 +140,22 @@ export function browserKeyHandler(
 			return
 	}
 
-	// when filter has text, prioritize text editing for ctrl+u (clear) and ctrl+w (word delete)
-	if (state.browser.filter.length > 0 && key.ctrl && (key.name === 'u' || key.name === 'w')) {
-		browserFilterKey(key, state, dispatch)
+	const textResult = handleTextInputKey(key, state.browser.filter, state.browser.inputCursor)
+	const textChanged =
+		textResult.consumed &&
+		(textResult.newText !== state.browser.filter || textResult.cursor !== state.browser.inputCursor)
+	if (textChanged) {
+		dispatch({ type: 'FilterUpdate', text: textResult.newText, cursor: textResult.cursor })
+		return
+	}
+
+	// let browser navigation keep working for ctrl+u when the filter is empty
+	if (key.ctrl && key.name === 'u' && state.browser.filter.length === 0) {
+		const cursorDir = browserCursorKey(key, dispatch, matches.length)
+		if (cursorDir != null) {
+			const newIndex = moveCursor(state.browser.cursorIndex, cursorDir, matches.length)
+			scrollToCursor(scrollRef, matches, newIndex)
+		}
 		return
 	}
 
@@ -165,7 +163,5 @@ export function browserKeyHandler(
 	if (cursorDir != null) {
 		const newIndex = moveCursor(state.browser.cursorIndex, cursorDir, matches.length)
 		scrollToCursor(scrollRef, matches, newIndex)
-		return
 	}
-	browserFilterKey(key, state, dispatch)
 }
