@@ -155,17 +155,13 @@ export function browserKeyHandler(
 			return
 	}
 
-	// when filter has text, prioritize text editing for ctrl+u (clear) and ctrl+w (word delete)
-	if (state.browser.filter.length > 0 && key.ctrl && (key.name === 'u' || key.name === 'w')) {
-		browserFilterKey(key, state, dispatch)
-		return
-	}
+	// text editing wins over browser hotkeys so printable characters can be typed
+	// into the filter even when they overlap with navigation shortcuts like g/G.
+	if (browserFilterKey(key, state, dispatch)) return
 
 	const cursorDir = browserCursorKey(key, dispatch, matches.length)
 	if (cursorDir != null) {
 		const newIndex = moveCursor(state.browser.cursorIndex, cursorDir, matches.length)
 		scrollToCursor(scrollRef, matches, newIndex)
-		return
 	}
-	browserFilterKey(key, state, dispatch)
 }
