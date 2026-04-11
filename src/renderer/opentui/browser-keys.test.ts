@@ -42,5 +42,4 @@ describe('browserKeyHandler', () => {
 			expect(actions).toEqual([{ type: 'FilterUpdate', text: expected, cursor: 1 }])
 		})
 	}
-
 })

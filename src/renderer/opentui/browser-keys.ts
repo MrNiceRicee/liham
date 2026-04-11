@@ -109,6 +109,90 @@ function browserOpenSelected(
 	if (selected != null) openFile(selected.entry.absolutePath)
 }
 
+function handleBrowserSpecialKey(
+	key: KeyEvent,
+	state: AppState,
+	dispatch: React.Dispatch<AppAction>,
+	matches: FuzzyMatch[],
+	openFile: (path: string) => void,
+	renderer: ReturnType<typeof useRenderer>,
+): boolean {
+	if (key.name === 'escape') {
+		if (state.browser.filter.length > 0) dispatch({ type: 'FilterUpdate', text: '', cursor: 0 })
+		else renderer?.destroy()
+		return true
+	}
+
+	if (key.name === 'return') {
+		browserOpenSelected(state, matches, openFile)
+		return true
+	}
+
+	if (key.name === '?') {
+		dispatch({ type: 'CycleLegend' })
+		return true
+	}
+
+	if (key.name === 'tab') {
+		if (isSplitLayout(state.layout)) {
+			dispatch({ type: 'FocusPane', target: state.focus === 'preview' ? 'source' : 'preview' })
+		}
+		return true
+	}
+
+	return false
+}
+
+function applyBrowserCursorMove(
+	key: KeyEvent,
+	dispatch: React.Dispatch<AppAction>,
+	matches: FuzzyMatch[],
+	scrollRef: RefObject<ScrollBoxRenderable | null>,
+	cursorIndex: number,
+): boolean {
+	const cursorDir = browserCursorKey(key, dispatch, matches.length)
+	if (cursorDir == null) return false
+	const newIndex = moveCursor(cursorIndex, cursorDir, matches.length)
+	scrollToCursor(scrollRef, matches, newIndex)
+	return true
+}
+
+function handleBrowserTextInput(
+	key: KeyEvent,
+	state: AppState,
+	dispatch: React.Dispatch<AppAction>,
+): boolean {
+	const textResult = handleTextInputKey(key, state.browser.filter, state.browser.inputCursor)
+	if (
+		textResult.consumed &&
+		(textResult.newText !== state.browser.filter || textResult.cursor !== state.browser.inputCursor)
+	) {
+		dispatch({ type: 'FilterUpdate', text: textResult.newText, cursor: textResult.cursor })
+		return true
+	}
+	return textResult.consumed
+}
+
+function routeBrowserKey(
+	key: KeyEvent,
+	state: AppState,
+	dispatch: React.Dispatch<AppAction>,
+	matches: FuzzyMatch[],
+	openFile: (path: string) => void,
+	renderer: ReturnType<typeof useRenderer>,
+	scrollRef: RefObject<ScrollBoxRenderable | null>,
+): boolean {
+	if (handleBrowserSpecialKey(key, state, dispatch, matches, openFile, renderer)) return true
+	if (handleBrowserTextInput(key, state, dispatch)) return true
+
+	// let browser navigation keep working for ctrl+u when the filter is empty
+	if (key.ctrl && key.name === 'u' && state.browser.filter.length === 0) {
+		return applyBrowserCursorMove(key, dispatch, matches, scrollRef, state.browser.cursorIndex)
+	}
+
+	return applyBrowserCursorMove(key, dispatch, matches, scrollRef, state.browser.cursorIndex)
+}
+
 export function browserKeyHandler(
 	key: KeyEvent,
 	state: AppState,
@@ -122,46 +206,5 @@ export function browserKeyHandler(
 	// prevent focused scrollbox from also handling arrow/page keys
 	key.preventDefault()
 
-	switch (key.name) {
-		case 'escape':
-			if (state.browser.filter.length > 0) dispatch({ type: 'FilterUpdate', text: '', cursor: 0 })
-			else renderer?.destroy()
-			return
-		case 'return':
-			browserOpenSelected(state, matches, openFile)
-			return
-		case '?':
-			dispatch({ type: 'CycleLegend' })
-			return
-		case 'tab':
-			if (isSplitLayout(state.layout)) {
-				dispatch({ type: 'FocusPane', target: state.focus === 'preview' ? 'source' : 'preview' })
-			}
-			return
-	}
-
-	const textResult = handleTextInputKey(key, state.browser.filter, state.browser.inputCursor)
-	const textChanged =
-		textResult.consumed &&
-		(textResult.newText !== state.browser.filter || textResult.cursor !== state.browser.inputCursor)
-	if (textChanged) {
-		dispatch({ type: 'FilterUpdate', text: textResult.newText, cursor: textResult.cursor })
-		return
-	}
-
-	// let browser navigation keep working for ctrl+u when the filter is empty
-	if (key.ctrl && key.name === 'u' && state.browser.filter.length === 0) {
-		const cursorDir = browserCursorKey(key, dispatch, matches.length)
-		if (cursorDir != null) {
-			const newIndex = moveCursor(state.browser.cursorIndex, cursorDir, matches.length)
-			scrollToCursor(scrollRef, matches, newIndex)
-		}
-		return
-	}
-
-	const cursorDir = browserCursorKey(key, dispatch, matches.length)
-	if (cursorDir != null) {
-		const newIndex = moveCursor(state.browser.cursorIndex, cursorDir, matches.length)
-		scrollToCursor(scrollRef, matches, newIndex)
-	}
+	routeBrowserKey(key, state, dispatch, matches, openFile, renderer, scrollRef)
 }

@@ -85,7 +85,9 @@ async function runUpgrade(): Promise<void> {
 
 	// detect package manager from install path
 	const which = Bun.which('liham')
-	const pm = which?.includes('.bun/') ? 'bun' : which?.includes('pnpm') ? 'pnpm' : 'npm'
+	let pm: 'bun' | 'pnpm' | 'npm' = 'npm'
+	if (which?.includes('.bun/')) pm = 'bun'
+	else if (which?.includes('pnpm')) pm = 'pnpm'
 	const cmd = {
 		bun: ['bun', 'install', '-g', '@mrnicericee/liham@latest'],
 		pnpm: ['pnpm', 'add', '-g', '@mrnicericee/liham@latest'],
