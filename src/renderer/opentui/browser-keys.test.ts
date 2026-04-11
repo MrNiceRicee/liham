@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { CliRenderer, KeyEvent, ScrollBoxRenderable } from '@opentui/core'
+import type { KeyEvent } from '@opentui/core'
 
 import { type AppAction, initialState } from '../../app/state.ts'
 import { browserKeyHandler } from './browser-keys.ts'
@@ -18,28 +18,29 @@ function makeKey(name: string, overrides?: Partial<KeyEvent>): KeyEvent {
 }
 
 describe('browserKeyHandler', () => {
-	for (const [key, expected] of [
-		['g', 'g'],
-		['G', 'G'],
-		['j', 'j'],
-		['k', 'k'],
+	for (const { label, key, expected } of [
+		{ label: 'g', key: makeKey('g'), expected: 'g' },
+		{ label: 'G', key: makeKey('g', { shift: true, sequence: 'G' }), expected: 'g' },
+		{ label: 'j', key: makeKey('j'), expected: 'j' },
+		{ label: 'k', key: makeKey('k'), expected: 'k' },
 	] as const) {
-		test(`types ${key} into the filter instead of triggering navigation`, () => {
+		test(`types ${label} into the filter instead of triggering navigation`, () => {
 			const state = initialState('preview-only', 'browser')
 			const actions: AppAction[] = []
 			const dispatch = (action: AppAction) => actions.push(action)
 
 			browserKeyHandler(
-				makeKey(key, { shift: key === 'G' }),
+				key,
 				state,
 				dispatch,
 				[],
 				() => undefined,
-				undefined as unknown as CliRenderer,
-				{ current: null } as unknown as React.RefObject<ScrollBoxRenderable | null>,
+				{ destroy() {} } as never,
+				{ current: null } as never,
 			)
 
 			expect(actions).toEqual([{ type: 'FilterUpdate', text: expected, cursor: 1 }])
 		})
 	}
+
 })
