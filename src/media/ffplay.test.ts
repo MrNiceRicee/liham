@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { realpathSync } from 'node:fs'
 
 import { isFfmpegAvailable, isFfplayAvailable, sanitizeMediaPath } from './ffplay.ts'
 
@@ -68,9 +69,9 @@ describe('sanitizeMediaPath', () => {
 	})
 
 	test('resolves relative path from basePath', () => {
-		const result = sanitizeMediaPath('../fixtures/small.md', base)
+		const result = sanitizeMediaPath('../test/fixtures/small.md', `${base}/../../src`)
 		expect(result.ok).toBe(true)
-		if (result.ok) expect(result.value).toContain('small.md')
+		if (result.ok) expect(result.value).toBe(realpathSync(`${base}/small.md`))
 	})
 
 	test('path with shell metacharacters is treated as literal filename', () => {

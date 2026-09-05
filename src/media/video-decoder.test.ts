@@ -52,8 +52,8 @@ describe('probeVideo', () => {
 		const controller = new AbortController()
 		controller.abort()
 		const result = await probeVideo('small.md', base, controller.signal)
-		// should be aborted or error — either is fine
 		expect(result.ok).toBe(false)
+		if (!result.ok && Bun.which('ffprobe') != null) expect(result.error).toBe('aborted')
 	})
 })
 

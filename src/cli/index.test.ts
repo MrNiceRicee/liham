@@ -44,9 +44,11 @@ test('CLI prints markdown from a file and stdin', async () => {
 	const stdinResult = await runCli(['--plain'], '# Stdin heading')
 
 	expect(fileResult.stdout).toContain('Heading 1')
+	expect(fileResult.stdout).not.toContain('# Heading 1')
+	expect(fileResult.stdout).not.toContain('\u001b[')
 	expect(fileResult.stderr).toBe('')
 	expect(fileResult.exitCode).toBe(0)
-	expect(stdinResult.stdout).toContain('Stdin heading')
+	expect(stdinResult.stdout.trim()).toBe('Stdin heading')
 	expect(stdinResult.stderr).toBe('')
 	expect(stdinResult.exitCode).toBe(0)
 })
