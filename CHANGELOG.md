@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Changed
+- Remove the TypeScript peer dependency; Liham runs directly on Bun.
+- Support consumer projects using TypeScript 7 while retaining TypeScript 5.9.3 for development linting.
+
 ## [1.1.3] - 2026-03-11
 
 ### Added

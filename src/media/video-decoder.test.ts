@@ -5,7 +5,7 @@ import { computeVideoDimensions, probeVideo, readFrames } from './video-decoder.
 // -- probeVideo --
 
 describe('probeVideo', () => {
-	const base = `${import.meta.dir}/../../sandbox/assets`
+	const base = `${import.meta.dir}/../../test/fixtures`
 
 	test('rejects empty path', async () => {
 		const result = await probeVideo('', base)
@@ -43,14 +43,15 @@ describe('probeVideo', () => {
 	})
 
 	test('returns error for non-video file', async () => {
-		const result = await probeVideo('fixture.txt', base)
+		const result = await probeVideo('small.md', base)
 		expect(result.ok).toBe(false)
+		if (!result.ok) expect(result.error).not.toBe('file not found')
 	})
 
 	test('supports AbortSignal cancellation', async () => {
 		const controller = new AbortController()
 		controller.abort()
-		const result = await probeVideo('fixture.txt', base, controller.signal)
+		const result = await probeVideo('small.md', base, controller.signal)
 		// should be aborted or error — either is fine
 		expect(result.ok).toBe(false)
 	})

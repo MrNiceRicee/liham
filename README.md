@@ -16,6 +16,8 @@ Terminal markdown previewer with split-pane view, search, TOC, math, mermaid, an
 
 [Bun](https://bun.sh) v1.1 or later.
 
+Liham runs directly on Bun, so consumers do not need to install TypeScript.
+
 ```sh
 curl -fsSL https://bun.sh/install | bash
 ```
