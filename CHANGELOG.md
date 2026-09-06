@@ -2,11 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## [1.1.5] - Unreleased
 
 ### Changed
 - Remove the TypeScript peer dependency; Liham runs directly on Bun.
 - Support consumer projects using TypeScript 7 while retaining TypeScript 5.9.3 for development linting.
+
+### Fixed
+- Restore media-path test coverage using committed fixtures and verify CLI startup and markdown rendering with real subprocesses.
+
+### Known limitations
+- The upstream `bun-ffi-structs` dependency still declares a TypeScript 5 peer; Bun and pnpm may report a peer warning in TypeScript 7 projects.
 
 ## [1.1.3] - 2026-03-11
 
