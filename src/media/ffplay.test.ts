@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { realpathSync } from 'node:fs'
 
 import { isFfmpegAvailable, isFfplayAvailable, sanitizeMediaPath } from './ffplay.ts'
 
@@ -27,12 +28,12 @@ describe('isFfmpegAvailable', () => {
 })
 
 describe('sanitizeMediaPath', () => {
-	const base = `${import.meta.dir}/../../sandbox/assets`
+	const base = `${import.meta.dir}/../../test/fixtures`
 
 	test('resolves valid local file', () => {
-		const result = sanitizeMediaPath('fixture.txt', base)
+		const result = sanitizeMediaPath('small.md', base)
 		expect(result.ok).toBe(true)
-		if (result.ok) expect(result.value).toContain('fixture.txt')
+		if (result.ok) expect(result.value).toContain('small.md')
 	})
 
 	test('rejects empty path', () => {
@@ -68,9 +69,9 @@ describe('sanitizeMediaPath', () => {
 	})
 
 	test('resolves relative path from basePath', () => {
-		const result = sanitizeMediaPath('../assets/fixture.txt', `${base}/../fixtures`)
+		const result = sanitizeMediaPath('../test/fixtures/small.md', `${base}/../../src`)
 		expect(result.ok).toBe(true)
-		if (result.ok) expect(result.value).toContain('fixture.txt')
+		if (result.ok) expect(result.value).toBe(realpathSync(`${base}/small.md`))
 	})
 
 	test('path with shell metacharacters is treated as literal filename', () => {

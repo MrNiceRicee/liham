@@ -16,6 +16,11 @@ Terminal markdown previewer with split-pane view, search, TOC, math, mermaid, an
 
 [Bun](https://bun.sh) v1.1 or later.
 
+Liham runs directly on Bun, so consumers do not need to install TypeScript.
+The current OpenTUI dependency still has a transitive TypeScript 5 peer requirement:
+npm may install a separate compiler, while Bun and pnpm can warn in TypeScript 7
+projects. Liham's CLI has been smoke-tested in these configurations.
+
 ```sh
 curl -fsSL https://bun.sh/install | bash
 ```
